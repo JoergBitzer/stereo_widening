@@ -13,7 +13,6 @@ SettingsPanel::SettingsPanel(juce::AudioProcessorValueTreeState& apvts)
     setUpRow(m_integrationRow, apvts, g_paramIntegration.ID, g_paramIntegration.name, g_paramIntegration.unitName);
     setUpRow(m_peakHoldRow, apvts, g_paramPeakHold.ID, g_paramPeakHold.name, g_paramPeakHold.unitName);
     setUpRow(m_peakDecayRow, apvts, g_paramPeakDecay.ID, g_paramPeakDecay.name, g_paramPeakDecay.unitName);
-    setUpRow(m_afterglowRow, apvts, g_paramAfterglow.ID, g_paramAfterglow.name, g_paramAfterglow.unitName);
 
     setSize(width, height);
 }
@@ -38,7 +37,7 @@ void SettingsPanel::setUpRow(Row& row, juce::AudioProcessorValueTreeState& apvts
 void SettingsPanel::resized()
 {
     auto r = getLocalBounds().reduced(kPadding);
-    for (Row* row : { &m_integrationRow, &m_peakHoldRow, &m_peakDecayRow, &m_afterglowRow })
+    for (Row* row : { &m_integrationRow, &m_peakHoldRow, &m_peakDecayRow })
     {
         auto rowArea = r.removeFromTop(kRowHeight);
         row->label.setBounds(rowArea.removeFromTop(kLabelHeight));

@@ -11,10 +11,12 @@ A pass-through plugin (it never modifies the audio) with:
 - **Goniometer** (`GoniometerComponent`): Lissajous plot of S (horizontal) vs. M
   (vertical), same convention as `python/stereo_eval/report.py`'s goniometer plots, so a
   Python plot and the on-screen display can be compared directly. Points fade with age
-  ("phosphor" persistence) over a configurable **Afterglow** time (see Settings below);
-  since points arrive one per audio sample, `GoniometerComponent` converts that time to
-  a point count via `StereoMeterState::getSampleRate()`, so the visible persistence
-  duration is correct regardless of sample rate, unlike a fixed point count would be.
+  ("phosphor" persistence) over a fixed afterglow time
+  (`kGoniometerAfterglowSeconds` = 0.2 s -- tried as a user-adjustable Settings
+  parameter, see "Afterglow: tried, reverted" below for why it isn't one); since points
+  arrive one per audio sample, `GoniometerComponent` still converts that time to a point
+  count via `StereoMeterState::getSampleRate()`, so the persistence duration is correct
+  regardless of sample rate, unlike a fixed point count would be.
 - **Correlation meter** (`CorrelationMeterComponent`): −1 … +1 bar, three colour zones
   (green ≥ +0.3, amber −0.3…+0.3, red < −0.3 — a rule of thumb, not a formal standard)
   and endpoint labels ("OUT OF PHASE" / "WIDE" / "MONO").
@@ -25,18 +27,15 @@ A pass-through plugin (it never modifies the audio) with:
   width-estimate readout in dB (0 dB = M and S equal power, matches
   `stereo_eval.measures.levels()["S_minus_M_dB"]`).
 - **Settings popup** (`SettingsPanel`, opened from the main view's "Settings..." button
-  via a `juce::CallOutBox`): four continuous parameters — Integration time (the RMS and
-  correlation meters' shared time constant, 50 ms – 2 s), Peak Hold (0 – 5 s), Peak
-  Decay (3 – 60 dB/s once the hold expires), and Afterglow (the goniometer's point
-  persistence, 50 ms – 2 s). All four are ordinary `AudioParameterFloat`s (automatable,
-  saved with the plugin state), not just GUI-local settings — including Afterglow, even
-  though it never reaches `StereoAnalyzerAudio`/the audio thread at all (see "GUI-only
-  settings" below).
-
-![settings popup](img/settings_panel.png)
+  via a `juce::CallOutBox`): three continuous parameters — Integration time (the RMS and
+  correlation meters' shared time constant, 50 ms – 2 s), Peak Hold (0 – 5 s), and Peak
+  Decay (3 – 60 dB/s once the hold expires). All three are ordinary `AudioParameterFloat`s
+  (automatable, saved with the plugin state), not just GUI-local settings.
 - All three meter components share a panel chrome (border + title,
   `MeterLookAndFeel::drawPanel`) and a colour/size vocabulary (`MeterLookAndFeel.h`), so
   they read as one instrument panel rather than three independently-styled widgets.
+
+![settings popup](img/settings_panel.png)
 
 ![level meter colour zones](img/level_meter_zones.png)
 ![correlation meter colour zones](img/correlation_zones.png)
@@ -246,46 +245,57 @@ match what the offline-rendered verification predicted. Reaper's own track/maste
 (visible at the left edge of the full screenshot) confirm real audio was flowing, not
 just the plugin's internal state.
 
-## Goniometer afterglow (GUI-only settings)
+## Afterglow: tried as a Settings parameter, then reverted
 
 The goniometer's "phosphor" persistence used to be a fixed point count
 (`maxHistoryPoints = 6000`, "~130 ms at 48 kHz" per the old comment -- correct only at
-that one sample rate). Replaced with a fourth Settings parameter, **Afterglow**
-(`g_paramAfterglow`, 50 ms - 2 s, default 200 ms): `GoniometerComponent` converts it to a
-point count each `refresh()` tick via `StereoMeterState::getSampleRate()` (points arrive
-one per audio sample, so this conversion is exact, not an approximation), so the visible
-persistence duration is correct at any sample rate.
+that one sample rate). First tried as a fourth Settings parameter, **Afterglow**
+(`g_paramAfterglow`, 50 ms - 2 s): `GoniometerComponent` converted it to a point count
+each `refresh()` tick via `StereoMeterState::getSampleRate()` (points arrive one per
+audio sample, so this conversion is exact, not an approximation), so the visible
+persistence duration was correct at any sample rate.
 
-Afterglow is deliberately **not** read by `StereoAnalyzerAudio`/the audio thread at all
+Afterglow was deliberately **not** read by `StereoAnalyzerAudio`/the audio thread at all
 -- it only ever affects how many of `GoniometerComponent`'s already-received points are
-drawn, never `StereoMeterState`. It is still an ordinary `AudioParameterFloat` (declared
-in `addParameter()` alongside the other three, so it is saved/restored with the plugin
-state and automatable like them), but `StereoAnalyzerGUI` is the only thing that reads
-it: a 10 Hz `Timer` (slower than the meters' 30 Hz -- a settings change does not need to
-be picked up as fast) polls the parameter and calls `m_goniometer.setAfterglowTime()`
-only when the value actually changes, the same poll-and-apply-on-change pattern
-`StereoAnalyzerAudio::processSynchronBlock()` already used for the other three
-parameters, just on the GUI thread. This picks up a change from the Settings slider or
-from host automation the same way, without `SettingsPanel` (a separate popup, recreated
-fresh each time) needing any direct reference back to the goniometer.
+drawn, never `StereoMeterState`. It was still an ordinary `AudioParameterFloat`
+(automatable, saved with the plugin state like the other three), but `StereoAnalyzerGUI`
+was the only thing that read it: a 10 Hz `Timer` polled the parameter and called
+`m_goniometer.setAfterglowTime()` on change, the same poll-and-apply-on-change pattern
+`StereoAnalyzerAudio::processSynchronBlock()` uses for its own three parameters, just on
+the GUI thread, so a change from the Settings slider or from host automation was picked
+up either way.
+
+After trying it (following the performance fix below), it did not give the desired
+look, and the range's usefulness was already in question after that fix -- so the
+parameter, its Settings row, and the polling `Timer` were all removed again.
+`GoniometerComponent::setAfterglowTime()` and the sample-rate-correct conversion stay in
+`shared/metering/`, just called once with a fixed value
+(`kGoniometerAfterglowSeconds = 0.2 s`, chosen to match the old default) from
+`StereoAnalyzerGUI`'s constructor instead of from a parameter -- still an improvement
+over the old fixed-*point*-count approach, since the persistence duration this way stays
+correct regardless of sample rate, it just is not user-adjustable any more.
 
 ![goniometer afterglow, 0.05 s vs 0.30 s](img/goniometer_afterglow.png)
 
-Verified offline (`GoniometerComponent::paintEntireComponent()` to a PNG, no display
-needed, same technique as the colour-zone renders above): a 20 ms noise burst followed
-by 150 ms of silence, rendered with Afterglow set to 0.05 s (left) and 0.30 s (right).
-At 0.05 s the 150 ms of silence since the burst already exceeds the persistence window,
-so the burst has fully aged out -- an empty circle. At 0.30 s the full 170 ms of burst
-plus silence still fits inside the window, so the burst remains clearly visible.
-`pluginval --strictness-level 10` stays clean with the new parameter.
+(From when it was still a Settings parameter, kept as a record of what was tried:
+`GoniometerComponent::paintEntireComponent()` rendered to a PNG, no display needed, a
+20 ms noise burst followed by 150 ms of silence, at Afterglow 0.05 s (left) and 0.30 s
+(right). At 0.05 s the 150 ms of silence since the burst already exceeds the persistence
+window, so the burst has fully aged out; at 0.30 s the full 170 ms of burst plus silence
+still fits inside the window, so the burst remains visible. The point-count-vs-sample-
+rate math checked out; the parameter still did not look right once actually tried
+against real, continuous material, hence the reversal above.)
 
 ## Bug found and fixed: paint() cost grew unbounded with Afterglow
 
-User report after trying the feature: "increasing the afterglow time slows down the
-meter update," with a specific, well-targeted question -- CPU/Debug-build limitation, or
-a side effect of the afterglow change itself? The verification above only ever used
-short bursts (170 ms total), never exercised anywhere near the parameter's actual 2 s
-maximum under continuous audio, so this went uncaught at the time.
+While the parameter was still user-adjustable: "increasing the afterglow time slows down
+the meter update," with a specific, well-targeted question -- CPU/Debug-build
+limitation, or a side effect of the afterglow change itself? The verification above only
+ever used short bursts (170 ms total), never exercised anywhere near the parameter's
+then-2 s maximum under continuous audio, so this went uncaught at the time. The fix
+below is unaffected by the later removal of the parameter above -- it bounds `paint()`
+cost however many points `history` holds, and that can still reach several thousand at
+the fixed 0.2 s default under continuous audio, so it remains necessary.
 
 **Measured, not guessed:** a small throwaway tool (`GoniometerComponent::
 paintEntireComponent()` timed with `std::chrono`, no display needed -- history built up
