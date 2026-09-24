@@ -16,7 +16,9 @@ A pass-through plugin (it never modifies the audio) with:
   parameter, see "Afterglow: tried, reverted" below for why it isn't one); since points
   arrive one per audio sample, `GoniometerComponent` still converts that time to a point
   count via `StereoMeterState::getSampleRate()`, so the persistence duration is correct
-  regardless of sample rate, unlike a fixed point count would be.
+  regardless of sample rate, unlike a fixed point count would be. A point further than 1
+  from the centre (input above 0 dBFS) is clamped onto the circle and drawn red instead
+  of at its true, off-circle position -- see "goniometer overload clamping" below.
 - **Correlation meter** (`CorrelationMeterComponent`): −1 … +1 bar, three colour zones
   (green ≥ +0.3, amber −0.3…+0.3, red < −0.3 — a rule of thumb, not a formal standard)
   and endpoint labels ("OUT OF PHASE" / "WIDE" / "MONO").
@@ -344,6 +346,36 @@ render) traces towards "R". `pluginval --strictness-level 5` stays clean. The ex
 Standalone and Reaper screenshots earlier in this page were taken before this fix and
 still show the old (backwards) label placement; not worth re-capturing them just for a
 label position, but worth knowing if the two are compared side by side.
+
+## Goniometer overload clamping
+
+User observation: with the input level pushed above 0 dBFS, the goniometer drew points
+anywhere in the whole rectangular panel, not just inside the grid circle -- and the
+suggested fix, verbatim: cap the point to a radius of 1, but colour those points red.
+
+Cause: `toScreen(s, m)` maps normalised (-1..1) S/M coordinates straight to screen
+pixels with no bound on `s`/`m` -- correct as long as neither exceeds ±1, which stops
+being true once |L| or |R| exceeds 1.0 (0 dBFS). JUCE clips drawing to the component's
+own rectangle, but nothing previously clipped it to the *circle*, so an overloaded point
+could land anywhere in that rectangle, including corners well outside the grid.
+
+Fix: a point's distance from the centre is `sqrt(S^2 + M^2)`, which -- since `toScreen()`
+uses the same pixel-per-unit scale for both axes -- is exactly the grid circle's own
+radius of 1. `paint()` now checks that distance for every drawn point; above 1, it
+normalises S and M by that distance (placing the point exactly on the circle,
+in the same direction it was originally heading) and colours it with
+`MeterLookAndFeel::meterDanger` (the same red already used for the level and
+correlation meters' danger zones) instead of the usual green, at the same age-based
+alpha as any other point.
+
+![goniometer overload: clamped to the circle, coloured red](img/goniometer_overload.png)
+
+Verified offline (same technique as above): uniform noise in ±1.8 (well above 0 dBFS)
+produces a solid ring of red points exactly on the circle boundary, with green points
+from the in-range portion scattered normally inside it -- nothing escapes the circle. A
+second render with the same signal scaled down to ±0.6 (comfortably below 0 dBFS) showed
+plain green throughout, confirming the clamping only engages when it should.
+`pluginval --strictness-level 10` stays clean.
 
 ## Screenshot (Standalone, current layout)
 

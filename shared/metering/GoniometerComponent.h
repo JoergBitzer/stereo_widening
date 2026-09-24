@@ -8,6 +8,10 @@
  * circle. This matches the plotting convention in python/stereo_eval/report.py, so a
  * Python plot and this display can be compared directly.
  *
+ * A point's distance from the centre is sqrt(S^2 + M^2); above 0 dBFS input this can
+ * exceed 1 (the grid circle's own radius), so paint() clamps such points onto the
+ * circle and draws them in red instead of letting them land anywhere in the panel.
+ *
  * (c) J. Bitzer, Jade HS, MIT license
  */
 

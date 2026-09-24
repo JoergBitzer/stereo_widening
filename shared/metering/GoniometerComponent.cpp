@@ -1,5 +1,7 @@
 #include "GoniometerComponent.h"
 
+#include <cmath>
+
 namespace
 {
     // circle radius = this fraction of half the smaller bounds dimension, so the
@@ -118,9 +120,26 @@ void GoniometerComponent::paint(juce::Graphics& g)
         for (int i = 0; i < numPoints; i += stride)
         {
             const float age = (float) i / (float) numPoints; // 0 = oldest, 1 = newest
-            g.setColour(MeterLookAndFeel::meterGood.withAlpha(kOldestPointAlpha + (kNewestPointAlpha - kOldestPointAlpha) * age));
             const auto& p = history[(size_t) i]; // std::deque: O(1) random access
-            auto screenPoint = toScreen(p.x, p.y);
+
+            // sqrt(S^2 + M^2) is the point's distance from the centre in normalised
+            // (-1..1) coordinates, exactly matching the grid circle's radius of 1 (both
+            // axes use the same screen-pixel scale, see toScreen()). Above 0 dBFS input
+            // this can exceed 1: clamp the point onto the circle rather than letting it
+            // land anywhere in the component's rectangle, and colour it red -- a visible
+            // overload marker instead of a silently misleading position.
+            float s = p.x, m = p.y;
+            const float magnitude = std::sqrt(s * s + m * m);
+            const bool isOverload = magnitude > 1.0f;
+            if (isOverload)
+            {
+                s /= magnitude;
+                m /= magnitude;
+            }
+
+            const auto baseColour = isOverload ? MeterLookAndFeel::meterDanger : MeterLookAndFeel::meterGood;
+            g.setColour(baseColour.withAlpha(kOldestPointAlpha + (kNewestPointAlpha - kOldestPointAlpha) * age));
+            auto screenPoint = toScreen(s, m);
             g.fillEllipse(screenPoint.x - 0.5f * pointDiameter, screenPoint.y - 0.5f * pointDiameter, pointDiameter, pointDiameter);
         }
     }
