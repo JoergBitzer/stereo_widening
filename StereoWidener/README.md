@@ -6,7 +6,9 @@ components (`shared/metering/`) so both plugins show the same goniometer/level-m
 look and any fix helps both.
 
 See [../docs/algorithms/phase3_stereo_widener.md](../docs/algorithms/phase3_stereo_widener.md)
-for the architecture, the algorithm-switch crossfade, and the two algorithms.
+for the architecture, the algorithm-switch crossfade, and the two algorithms, and
+[../docs/algorithms/phase4_settings.md](../docs/algorithms/phase4_settings.md) for the
+global settings file.
 
 ## Build
 
@@ -43,5 +45,21 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     high-pass filtered first, so bass content is forced mono and only the highs get
     widened, then high-shelved to restore some "air". The left knob sets the **Bass
     Cutoff** (40-500 Hz, turn below 40 Hz for "Off" -- bypasses the high-pass entirely),
-    the right knob sets the **High Shelf** frequency (1000-16000 Hz, fixed +3 dB for
-    this first version; turn above 16 kHz for "Off" -- bypasses the shelf entirely).
+    the right knob sets the **High Shelf** frequency (1000-16000 Hz, turn above 16 kHz
+    for "Off" -- bypasses the shelf entirely). The shelf's gain (default 3 dB) is not a
+    parameter; it's read from the global settings file, see below.
+
+## Global settings file
+
+See [../docs/algorithms/phase4_settings.md](../docs/algorithms/phase4_settings.md).
+`~/.config/StereoWidener/settings.json` (created automatically on first run) stores
+user-wide defaults that aren't (yet) automatable parameters:
+
+```json
+{
+  "highShelfGainDb": 3.0
+}
+```
+
+Edit and save while the plugin/DAW is closed; it's read once when a plugin instance is
+created, not watched live.

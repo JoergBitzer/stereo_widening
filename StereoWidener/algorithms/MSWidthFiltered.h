@@ -14,11 +14,13 @@
  *     so collapsing them to the centre is usually inaudible as a width change but
  *     avoids phase-cancellation problems on mono sum.
  *  2. A high shelf at the High Shelf frequency (the right aux knob, params.auxRight),
- *     boosting the side signal above that frequency by a fixed kHighShelfGainDb. This
- *     restores some of the high-frequency "air"/openness that step 1 and the width
- *     control together tend to reduce perceptually. Only the frequency is exposed as a
- *     parameter for this first version (see docs/algorithms/phase3_stereo_widener.md);
- *     the gain is a fixed constant.
+ *     boosting the side signal above that frequency by highShelfGainDb (default 3 dB,
+ *     see setHighShelfGainDb()). This restores some of the high-frequency "air"/
+ *     openness that step 1 and the width control together tend to reduce perceptually.
+ *     Only the frequency is exposed as an automatable parameter for this first version
+ *     (see docs/algorithms/phase3_stereo_widener.md); the gain is a user-configurable
+ *     default from GlobalSettings (StereoWidener/GlobalSettings.h, Phase 4), set once
+ *     by StereoWidenerAudio's constructor -- not itself an automatable parameter.
  *
  * Both knobs have an "off" zone past their normal range, a common pattern for a cutoff
  * control: dragging Bass Cutoff below kBassCutoffOffThreshold (its range extends a bit
@@ -62,7 +64,15 @@ public:
     bool isMonoSafe() const noexcept override { return true; }
     int getLatencySamples() const noexcept override { return 0; }
 
-    static constexpr float kHighShelfGainDb = 3.0f; // fixed for this first version, see the file header
+    /** User-configurable default (GlobalSettings, Phase 4), not an automatable
+     *  parameter -- see the file header. Safe to call at any time, including after
+     *  processing has started; takes effect on the next process() call. */
+    void setHighShelfGainDb(float gainDb) noexcept
+    {
+        highShelfGainDb = gainDb;
+        lastHighShelfHz = -1.0f; // force updateFiltersIfNeeded() to recompute with the new gain
+    }
+
     static constexpr float kFilterQ = 0.70710678f;  // Butterworth (maximally flat)
 
     // "Off" zone thresholds, see the file header. The parameter ranges (StereoWidener.h)
@@ -75,6 +85,7 @@ private:
     void updateFiltersIfNeeded(float bassCutoffHz, float highShelfHz) noexcept;
 
     double sampleRate = 48000.0;
+    float highShelfGainDb = 3.0f; // compiled-in fallback; see setHighShelfGainDb() and GlobalSettings
     float lastBassCutoffHz = -1.0f;
     float lastHighShelfHz = -1.0f;
     bool bassCutoffBypassed = false;

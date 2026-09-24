@@ -8,6 +8,7 @@
 #include "tools/SynchronBlockProcessor.h"
 #include "PluginSettings.h"
 #include "AlgorithmHelpPanel.h"
+#include "GlobalSettings.h"
 #include "algorithms/StereoAlgorithm.h"
 #include "algorithms/MSWidthBroadband.h"
 #include "algorithms/MSWidthFiltered.h"
@@ -125,6 +126,10 @@ private:
 
     std::vector<std::unique_ptr<StereoAlgorithm>> m_algorithms;
     int m_activeIndex = 0;
+
+    // loaded once in the constructor (plan2.md Phase 4, "Global ini file"), not
+    // re-read afterwards -- see GlobalSettings.h
+    GlobalSettings m_globalSettings;
 
     // Equal-power crossfade between the outgoing and incoming algorithm on a switch
     // (plan2.md Phase 3: "Algorithm switching with an equal-power crossfade

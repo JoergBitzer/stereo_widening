@@ -186,20 +186,28 @@ Details, findings and verification: `docs/algorithms/phase3_stereo_widener.md`.
    correlation plot for `MSWidthFiltered` visibly shows the bass staying correlated
    below the Bass Cutoff and decorrelating above it, exactly as designed.
 
-### Phase 4 – Settings, utilities, latency
-1. **Global ini file** using `juce::PropertiesFile` (in the user's application-data
-   folder, e.g. `~/.config/StereoWidener/StereoWidener.settings` on Linux). It stores:
+### Phase 4 – Settings, utilities, latency — started
+Details and verification: `docs/algorithms/phase4_settings.md`.
+1. 🟡 **Global settings file** -- format changed from the original plan's
+   `juce::PropertiesFile` (XML/binary only) to **JSON** (user preference: "a simple
+   YAML or TOML format. JSON is also OK"; JUCE has no built-in YAML/TOML parser, and
+   `juce::JSON` needs no extra dependency). `StereoWidener/GlobalSettings.h`/`.cpp`
+   reads/creates `~/.config/StereoWidener/settings.json`. So far it stores only one
+   value, the side high-shelf's gain (`MSWidthFiltered`, previously a fixed 3 dB
+   constant, user request); still to do:
    - profile (Mastering / Creative)
    - last used state, used as the default for new instances
    - GUI size and meter options (integration time, goniometer persistence)
-   The state of each instance is still saved in the DAW project as usual. The ini file
-   only provides the defaults and user preferences.
+   The state of each instance is still saved in the DAW project as usual. The settings
+   file only provides the defaults and user preferences.
 2. Utilities (2.13 and 2.2): mono, L/R swap, polarity invert, rotation, balance, mono
-   check (listen to L+R), and solo side.
+   check (listen to L+R), and solo side. Not started.
 3. Latency: each mode reports its latency with `setLatencySamples()` when it is
    selected, and the GUI shows the current latency in ms. If a mode switch during
    playback turns out to be a problem in hosts, add an option "constant latency"
-   (all modes padded to the maximum).
+   (all modes padded to the maximum). Not started (`StereoAlgorithm::getLatencySamples()`
+   exists but isn't wired to `setLatencySamples()` yet -- not needed while every
+   algorithm reports 0).
 
 ### Phase 5 – Algorithms 2–5 (v1)
 Order: **2.4 comb → 2.7 multiband → 2.5 allpass/velvet → 2.3 Haas**. The mono-safe modes

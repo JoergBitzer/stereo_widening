@@ -9,6 +9,11 @@ StereoWidenerAudio::StereoWidenerAudio(StereoWidenerAudioProcessor* processor)
     // must stay in the same order as g_algorithmNames (StereoWidener.h)
     m_algorithms.push_back(std::make_unique<MSWidthBroadband>());
     m_algorithms.push_back(std::make_unique<MSWidthFiltered>());
+
+    // user-configurable default (plan2.md Phase 4, "Global ini file"), previously a
+    // fixed compiled-in constant -- see GlobalSettings.h
+    if (auto* filtered = dynamic_cast<MSWidthFiltered*>(m_algorithms[1].get()))
+        filtered->setHighShelfGainDb(m_globalSettings.getHighShelfGainDb());
 }
 
 void StereoWidenerAudio::prepareToPlay(double sampleRate, int max_samplesPerBlock, int max_channels)

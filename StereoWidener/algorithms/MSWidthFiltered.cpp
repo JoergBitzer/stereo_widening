@@ -42,7 +42,7 @@ void MSWidthFiltered::updateFiltersIfNeeded(float bassCutoffHz, float highShelfH
         highShelfBypassed = highShelfHz > kHighShelfOffThreshold;
         if (!highShelfBypassed)
         {
-            const float gainFactor = juce::Decibels::decibelsToGain(kHighShelfGainDb);
+            const float gainFactor = juce::Decibels::decibelsToGain(highShelfGainDb);
             *sideHighShelf.coefficients = *juce::dsp::IIR::Coefficients<float>::makeHighShelf(sampleRate, highShelfHz, kFilterQ, gainFactor);
         }
         lastHighShelfHz = highShelfHz;
@@ -80,9 +80,11 @@ juce::String MSWidthFiltered::getDescription() const
            "it is forced into the mid signal (i.e. mono) regardless of the Width "
            "setting -- low frequencies translate poorly to mono playback if left wide "
            "and carry most of a mix's energy. A high shelf at the High Shelf frequency "
-           "(fixed +3 dB in this first version) then restores some high-frequency "
-           "\"air\" to the widened side signal. Either stage can be switched off "
-           "entirely: turn Bass Cutoff below 40 Hz, or High Shelf above 16 kHz.\n\n"
+           "(currently " + juce::String(highShelfGainDb, 1) + " dB, configurable in "
+           "the global settings file -- see GlobalSettings.h) then restores some "
+           "high-frequency \"air\" to the widened side signal. Either stage can be "
+           "switched off entirely: turn Bass Cutoff below 40 Hz, or High Shelf above "
+           "16 kHz.\n\n"
            "Source: B. Katz, \"Mastering Audio: The Art and the Science\", 3rd ed., "
            "Focal Press, 2015, ch. 3 (\"Mono Compatibility and M-S Processing\").";
 }
