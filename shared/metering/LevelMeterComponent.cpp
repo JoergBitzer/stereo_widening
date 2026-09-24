@@ -2,12 +2,13 @@
 
 namespace
 {
-    constexpr float kBarSideMarginFraction = 0.15f; // horizontal gap between adjacent bars, as a fraction of bar width
+    constexpr float kBarSideMarginFraction = 0.15f; // horizontal gap between adjacent bars, as a fraction of bar width (not scaled)
+    constexpr int kNumBars = 4; // L, R, M, S
+
+    // pixel sizes at scaleFactor 1.0
     constexpr float kNameLabelHeight = 14.0f;  // "L"/"R"/"M"/"S" label above each bar
     constexpr float kValueLabelHeight = 11.0f; // numeric peak-dB readout, between the name and the bar
     constexpr float kWidthReadoutHeight = 16.0f; // "S-M x.x dB" row below the bars
-    constexpr int kNumBars = 4; // L, R, M, S
-
     constexpr float kScaleColumnWidth = 26.0f; // dB scale, to the right of the bars
     constexpr float kTickLabelHeight = 10.0f;
     const float kTickValuesDb[] = { 0.0f, -6.0f, -12.0f, -18.0f, -24.0f, -36.0f, -48.0f, -60.0f };
@@ -46,7 +47,8 @@ float LevelMeterComponent::dbToFraction(float db) const noexcept
 void LevelMeterComponent::drawScale(juce::Graphics& g, juce::Rectangle<float> barsBounds,
                                      juce::Rectangle<float> scaleBounds) const
 {
-    g.setFont(MeterLookAndFeel::smallLabelFontSize);
+    const float tickLabelHeight = kTickLabelHeight * scaleFactor;
+    g.setFont(MeterLookAndFeel::smallLabelFontSize * scaleFactor);
     for (float db : kTickValuesDb)
     {
         if (db < rangeMinDb || db > rangeMaxDb)
@@ -57,8 +59,8 @@ void LevelMeterComponent::drawScale(juce::Graphics& g, juce::Rectangle<float> ba
         g.drawHorizontalLine((int) y, barsBounds.getX(), barsBounds.getRight());
 
         g.setColour(MeterLookAndFeel::text);
-        g.drawText(juce::String((int) db), scaleBounds.getX(), y - 0.5f * kTickLabelHeight,
-                   scaleBounds.getWidth(), kTickLabelHeight, juce::Justification::centredLeft);
+        g.drawText(juce::String((int) db), scaleBounds.getX(), y - 0.5f * tickLabelHeight,
+                   scaleBounds.getWidth(), tickLabelHeight, juce::Justification::centredLeft);
     }
 }
 
@@ -66,14 +68,14 @@ void LevelMeterComponent::drawBar(juce::Graphics& g, juce::Rectangle<float> boun
                                    float rmsDb, float peakDb) const
 {
     g.setColour(MeterLookAndFeel::text);
-    g.setFont(MeterLookAndFeel::labelFontSize);
-    g.drawText(name, bounds.removeFromTop(kNameLabelHeight), juce::Justification::centred);
+    g.setFont(MeterLookAndFeel::labelFontSize * scaleFactor);
+    g.drawText(name, bounds.removeFromTop(kNameLabelHeight * scaleFactor), juce::Justification::centred);
 
     // peak text follows the same colour zone as the peak line drawn below (green/amber/red)
     const auto peakColour = zoneColourForDb(peakDb);
     g.setColour(peakColour);
-    g.setFont(MeterLookAndFeel::smallLabelFontSize);
-    g.drawText(formatDb(peakDb), bounds.removeFromTop(kValueLabelHeight), juce::Justification::centred);
+    g.setFont(MeterLookAndFeel::smallLabelFontSize * scaleFactor);
+    g.drawText(formatDb(peakDb), bounds.removeFromTop(kValueLabelHeight * scaleFactor), juce::Justification::centred);
 
     // "bounds" is now the meter area proper, matching drawScale()'s barsBounds (both are
     // barsArea with the name/value label rows trimmed off the top)
@@ -105,13 +107,14 @@ void LevelMeterComponent::drawBar(juce::Graphics& g, juce::Rectangle<float> boun
 
 void LevelMeterComponent::paint(juce::Graphics& g)
 {
-    auto content = MeterLookAndFeel::drawPanel(g, getLocalBounds().toFloat(), label);
+    auto content = MeterLookAndFeel::drawPanel(g, getLocalBounds().toFloat(), label, scaleFactor);
 
-    auto widthReadoutRow = content.removeFromBottom(kWidthReadoutHeight);
-    auto scaleColumn = content.removeFromRight(kScaleColumnWidth);
+    auto widthReadoutRow = content.removeFromBottom(kWidthReadoutHeight * scaleFactor);
+    auto scaleColumn = content.removeFromRight(kScaleColumnWidth * scaleFactor);
     auto barsArea = content; // 4 bars: name label + value label + coloured meter, left to right
 
-    auto meterArea = barsArea.withTrimmedTop(kNameLabelHeight + kValueLabelHeight);
+    // matches what drawBar() itself trims off the top of each bar's bounds
+    auto meterArea = barsArea.withTrimmedTop((kNameLabelHeight + kValueLabelHeight) * scaleFactor);
     drawScale(g, meterArea, scaleColumn);
 
     const float barWidth = barsArea.getWidth() / (float) kNumBars;
@@ -126,7 +129,7 @@ void LevelMeterComponent::paint(juce::Graphics& g)
 
     // width estimate readout (S - M in dB): 0 dB = equal power, very negative = narrow/mono
     g.setColour(MeterLookAndFeel::text);
-    g.setFont(MeterLookAndFeel::labelFontSize);
+    g.setFont(MeterLookAndFeel::labelFontSize * scaleFactor);
     juce::String widthText = "S-M " + juce::String(state.getWidthEstimateDb(), 1) + " dB";
     g.drawText(widthText, widthReadoutRow, juce::Justification::centred);
 }

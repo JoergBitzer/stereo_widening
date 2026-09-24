@@ -7,7 +7,9 @@ namespace
     // 0.3 means the bar covers ~70% of a step change within one timer tick (~33 ms).
     constexpr float kDisplaySmoothingFactor = 0.3f;
 
-    constexpr float kTickStep = 0.5f; // scale ticks at -1, -0.5, 0, +0.5, +1
+    constexpr float kTickStep = 0.5f; // scale ticks at -1, -0.5, 0, +0.5, +1 (a fraction, not scaled)
+
+    // pixel sizes at scaleFactor 1.0
     constexpr float kBarInsetX = 4.0f;
     constexpr float kBarInsetY = 1.0f;
     constexpr float kEndpointLabelRowHeight = 12.0f;
@@ -42,9 +44,9 @@ void CorrelationMeterComponent::refresh()
 
 void CorrelationMeterComponent::paint(juce::Graphics& g)
 {
-    auto content = MeterLookAndFeel::drawPanel(g, getLocalBounds().toFloat(), label);
-    auto endpointLabelsRow = content.removeFromBottom(kEndpointLabelRowHeight);
-    auto bounds = content.reduced(kBarInsetX, kBarInsetY);
+    auto content = MeterLookAndFeel::drawPanel(g, getLocalBounds().toFloat(), label, scaleFactor);
+    auto endpointLabelsRow = content.removeFromBottom(kEndpointLabelRowHeight * scaleFactor);
+    auto bounds = content.reduced(kBarInsetX * scaleFactor, kBarInsetY * scaleFactor);
 
     g.setColour(MeterLookAndFeel::grid);
     for (float v = -1.0f; v <= 1.0001f; v += kTickStep)
@@ -61,11 +63,11 @@ void CorrelationMeterComponent::paint(juce::Graphics& g)
     g.fillRect(juce::jmin(centreX, valueX), bounds.getY(), std::abs(valueX - centreX), bounds.getHeight());
 
     g.setColour(MeterLookAndFeel::text);
-    g.setFont(MeterLookAndFeel::labelFontSize);
+    g.setFont(MeterLookAndFeel::labelFontSize * scaleFactor);
     g.drawText(juce::String(value, 2), bounds, juce::Justification::centred);
 
     const float thirdWidth = endpointLabelsRow.getWidth() / 3.0f;
-    g.setFont(MeterLookAndFeel::smallLabelFontSize);
+    g.setFont(MeterLookAndFeel::smallLabelFontSize * scaleFactor);
     g.drawText("-1 OUT OF PHASE", endpointLabelsRow.removeFromLeft(thirdWidth), juce::Justification::centredLeft);
     g.drawText("0 WIDE", endpointLabelsRow.removeFromLeft(thirdWidth), juce::Justification::centred);
     g.drawText("+1 MONO", endpointLabelsRow, juce::Justification::centredRight);

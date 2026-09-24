@@ -3,7 +3,8 @@
 namespace
 {
     // circle radius = this fraction of half the smaller bounds dimension, so the
-    // outer grid circle never quite touches the component edge
+    // outer grid circle never quite touches the component edge (a fraction, not a
+    // pixel size, so it does not need to scale with scaleFactor)
     constexpr float kCircleMarginFraction = 0.95f;
 
     // cos(45 deg) = sin(45 deg): projects the L and R grid diagonals onto the S/M axes
@@ -12,8 +13,9 @@ namespace
     // oldest/newest history point opacity ("phosphor" persistence: newer = brighter)
     constexpr float kOldestPointAlpha = 0.10f;
     constexpr float kNewestPointAlpha = 0.65f;
-    constexpr float kPointDiameter = 2.0f;
 
+    // pixel sizes at scaleFactor 1.0
+    constexpr float kPointDiameter = 2.0f;
     constexpr float kAxisLineThickness = 1.0f;
     constexpr float kDiagonalLineThickness = 0.5f;
 
@@ -53,27 +55,33 @@ juce::Point<float> GoniometerComponent::toScreen(float s, float m) const
 
 void GoniometerComponent::paint(juce::Graphics& g)
 {
-    contentBounds = MeterLookAndFeel::drawPanel(g, getLocalBounds().toFloat(), label);
+    contentBounds = MeterLookAndFeel::drawPanel(g, getLocalBounds().toFloat(), label, scaleFactor);
+
+    const float labelBoxWidth = kLabelBoxWidth * scaleFactor;
+    const float labelBoxHeight = kLabelBoxHeight * scaleFactor;
+    const float mLabelGap = kMLabelGapAboveCircle * scaleFactor;
+    const float lrLabelGap = kLRLabelGapBeyondDiagonal * scaleFactor;
+    const float pointDiameter = kPointDiameter * scaleFactor;
 
     // grid: outer circle, L/R diagonals (+-45 deg), M/S cross
     g.setColour(MeterLookAndFeel::grid);
     const float radius = 0.5f * juce::jmin(contentBounds.getWidth(), contentBounds.getHeight()) * kCircleMarginFraction;
     juce::Point<float> centre = contentBounds.getCentre();
-    g.drawEllipse(centre.x - radius, centre.y - radius, 2.0f * radius, 2.0f * radius, kAxisLineThickness);
-    g.drawLine(centre.x, centre.y - radius, centre.x, centre.y + radius, kAxisLineThickness); // M axis (mono)
-    g.drawLine(centre.x - radius, centre.y, centre.x + radius, centre.y, kAxisLineThickness); // S axis (side)
+    g.drawEllipse(centre.x - radius, centre.y - radius, 2.0f * radius, 2.0f * radius, kAxisLineThickness * scaleFactor);
+    g.drawLine(centre.x, centre.y - radius, centre.x, centre.y + radius, kAxisLineThickness * scaleFactor); // M axis (mono)
+    g.drawLine(centre.x - radius, centre.y, centre.x + radius, centre.y, kAxisLineThickness * scaleFactor); // S axis (side)
     const float d = radius * kCos45Deg;
-    g.drawLine(centre.x - d, centre.y - d, centre.x + d, centre.y + d, kDiagonalLineThickness); // L axis
-    g.drawLine(centre.x - d, centre.y + d, centre.x + d, centre.y - d, kDiagonalLineThickness); // R axis
+    g.drawLine(centre.x - d, centre.y - d, centre.x + d, centre.y + d, kDiagonalLineThickness * scaleFactor); // L axis
+    g.drawLine(centre.x - d, centre.y + d, centre.x + d, centre.y - d, kDiagonalLineThickness * scaleFactor); // R axis
 
     g.setColour(MeterLookAndFeel::text);
-    g.setFont(MeterLookAndFeel::labelFontSize);
-    g.drawText("M", centre.x - 0.5f * kLabelBoxWidth, centre.y - radius - kMLabelGapAboveCircle,
-               kLabelBoxWidth, kLabelBoxHeight, juce::Justification::centred);
-    g.drawText("L", centre.x - d - kLRLabelGapBeyondDiagonal, centre.y - d - kLabelBoxHeight,
-               kLabelBoxWidth, kLabelBoxHeight, juce::Justification::centred);
-    g.drawText("R", centre.x + d - kLabelBoxWidth + kLRLabelGapBeyondDiagonal * 0.5f, centre.y - d - kLabelBoxHeight,
-               kLabelBoxWidth, kLabelBoxHeight, juce::Justification::centred);
+    g.setFont(MeterLookAndFeel::labelFontSize * scaleFactor);
+    g.drawText("M", centre.x - 0.5f * labelBoxWidth, centre.y - radius - mLabelGap,
+               labelBoxWidth, labelBoxHeight, juce::Justification::centred);
+    g.drawText("L", centre.x - d - lrLabelGap, centre.y - d - labelBoxHeight,
+               labelBoxWidth, labelBoxHeight, juce::Justification::centred);
+    g.drawText("R", centre.x + d - labelBoxWidth + lrLabelGap * 0.5f, centre.y - d - labelBoxHeight,
+               labelBoxWidth, labelBoxHeight, juce::Justification::centred);
 
     // points, oldest = dimmest ("phosphor" persistence)
     const int numPoints = (int) history.size();
@@ -85,7 +93,7 @@ void GoniometerComponent::paint(juce::Graphics& g)
             const float age = (float) i / (float) numPoints; // 0 = oldest, 1 = newest
             g.setColour(MeterLookAndFeel::meterGood.withAlpha(kOldestPointAlpha + (kNewestPointAlpha - kOldestPointAlpha) * age));
             auto screenPoint = toScreen(p.x, p.y);
-            g.fillEllipse(screenPoint.x - 0.5f * kPointDiameter, screenPoint.y - 0.5f * kPointDiameter, kPointDiameter, kPointDiameter);
+            g.fillEllipse(screenPoint.x - 0.5f * pointDiameter, screenPoint.y - 0.5f * pointDiameter, pointDiameter, pointDiameter);
             ++i;
         }
     }

@@ -135,15 +135,26 @@ void StereoAnalyzerGUI::paint(juce::Graphics &g)
 
 void StereoAnalyzerGUI::resized()
 {
+    // dragging the plugin's corner resizes this component; propagate the same scale
+    // factor the template already uses for the preset handler/MIDI keyboard (see
+    // PluginEditor.cpp) to the meters, so their fonts and other pixel-unit details
+    // scale too, and scale the row sizes below the same way so nothing overflows them
+    const float scale = m_processor.getScaleFactor();
+    m_goniometer.setScaleFactor(scale);
+    m_correlationMeter.setScaleFactor(scale);
+    m_levelMeter.setScaleFactor(scale);
+
 	auto r = getLocalBounds();
 
-    auto controlsRow = r.removeFromBottom(g_controlsRowHeight);
-    m_settingsButton.setBounds(controlsRow.removeFromRight(g_settingsButtonWidth).reduced(g_controlPadding));
+    auto controlsRow = r.removeFromBottom(juce::roundToInt(g_controlsRowHeight * scale));
+    m_settingsButton.setBounds(controlsRow.removeFromRight(juce::roundToInt(g_settingsButtonWidth * scale))
+                                           .reduced(juce::roundToInt(g_controlPadding * scale)));
 
-    auto correlationRow = r.removeFromBottom(g_correlationRowHeight);
-    m_correlationMeter.setBounds(correlationRow.reduced(g_correlationPaddingX, g_correlationPaddingY));
+    auto correlationRow = r.removeFromBottom(juce::roundToInt(g_correlationRowHeight * scale));
+    m_correlationMeter.setBounds(correlationRow.reduced(juce::roundToInt(g_correlationPaddingX * scale),
+                                                          juce::roundToInt(g_correlationPaddingY * scale)));
 
-    const int levelWidth = juce::jmin(g_levelMeterMaxWidth, r.getWidth() / g_levelMeterWidthDivisor);
-    m_levelMeter.setBounds(r.removeFromRight(levelWidth).reduced(g_levelMeterPadding));
-    m_goniometer.setBounds(r.reduced(g_goniometerPadding));
+    const int levelWidth = juce::jmin(juce::roundToInt(g_levelMeterMaxWidth * scale), r.getWidth() / g_levelMeterWidthDivisor);
+    m_levelMeter.setBounds(r.removeFromRight(levelWidth).reduced(juce::roundToInt(g_levelMeterPadding * scale)));
+    m_goniometer.setBounds(r.reduced(juce::roundToInt(g_goniometerPadding * scale)));
 }
