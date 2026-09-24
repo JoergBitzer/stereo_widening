@@ -88,14 +88,14 @@ void StereoAnalyzerGUI::resized()
 {
 	auto r = getLocalBounds();
 
-    auto controlsRow = r.removeFromBottom(24);
-    m_integrationBox.setBounds(controlsRow.removeFromRight(160).reduced(2));
-    m_integrationLabel.setBounds(controlsRow.removeFromRight(90).reduced(2));
+    auto controlsRow = r.removeFromBottom(g_controlsRowHeight);
+    m_integrationBox.setBounds(controlsRow.removeFromRight(g_integrationBoxWidth).reduced(g_controlPadding));
+    m_integrationLabel.setBounds(controlsRow.removeFromRight(g_integrationLabelWidth).reduced(g_controlPadding));
 
-    auto correlationRow = r.removeFromBottom(28);
-    m_correlationMeter.setBounds(correlationRow.reduced(4, 2));
+    auto correlationRow = r.removeFromBottom(g_correlationRowHeight);
+    m_correlationMeter.setBounds(correlationRow.reduced(g_correlationPaddingX, g_correlationPaddingY));
 
-    const int levelWidth = juce::jmin(160, r.getWidth() / 4);
-    m_levelMeter.setBounds(r.removeFromRight(levelWidth).reduced(2));
-    m_goniometer.setBounds(r.reduced(4));
+    const int levelWidth = juce::jmin(g_levelMeterMaxWidth, r.getWidth() / g_levelMeterWidthDivisor);
+    m_levelMeter.setBounds(r.removeFromRight(levelWidth).reduced(g_levelMeterPadding));
+    m_goniometer.setBounds(r.reduced(g_goniometerPadding));
 }

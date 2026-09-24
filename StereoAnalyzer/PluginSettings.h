@@ -28,4 +28,19 @@ const float g_midikeyboardratio(0.13f); // in percent of height()
 const float g_wheelstokeyboardratio(0.1f);
 
 // -------Your defines for GUI --------
+// layout of StereoAnalyzerGUI::resized() (all in pixels, at scaleFactor 1.0)
+const int g_controlsRowHeight(24);        // bottom row: Integration label + combo box
+const int g_integrationBoxWidth(160);
+const int g_integrationLabelWidth(90);
+const int g_controlPadding(2);            // shrink-to-fit gap around the Integration controls
+
+const int g_correlationRowHeight(28);     // row above the controls: the correlation bar
+const int g_correlationPaddingX(4);
+const int g_correlationPaddingY(2);
+
+const int g_levelMeterMaxWidth(160);      // level meter panel: min(this, remaining width / divisor)
+const int g_levelMeterWidthDivisor(4);
+const int g_levelMeterPadding(2);
+
+const int g_goniometerPadding(4);         // goniometer fills whatever remains
 
