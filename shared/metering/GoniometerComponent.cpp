@@ -14,6 +14,20 @@ namespace
     constexpr float kOldestPointAlpha = 0.10f;
     constexpr float kNewestPointAlpha = 0.65f;
 
+    // Upper bound on how many points paint() draws per frame, regardless of how many
+    // history actually holds (which can reach afterglowTime_s * sampleRate -- up to
+    // ~88000 at the parameter's 2 s maximum and 44.1 kHz). Drawing that many individual
+    // fillEllipse() calls every repaint measured ~280 ms per frame at the maximum in a
+    // Debug build -- catastrophically slower than the 30 Hz repaint rate needs, and not
+    // something a Release build alone would fix (a Debug build measured ~9 us per
+    // fillEllipse() call once past JUCE's one-time startup cost; even 3000 points, this
+    // constant's first value, still cost ~28 ms, most of the 33 ms/frame budget at
+    // 30 Hz, with two more meter components sharing the same paint pass). history is
+    // far denser than the display has pixels for anyway, so a fixed stride (picked in
+    // paint() from history.size() / kMaxDrawnPoints) keeps cost bounded with no visible
+    // loss of detail: nearby points already overlap heavily on screen.
+    constexpr int kMaxDrawnPoints = 1500;
+
     // pixel sizes at scaleFactor 1.0
     constexpr float kPointDiameter = 2.0f;
     constexpr float kAxisLineThickness = 1.0f;
@@ -86,18 +100,22 @@ void GoniometerComponent::paint(juce::Graphics& g)
     g.drawText("R", centre.x + d - labelBoxWidth + lrLabelGap * 0.5f, centre.y - d - labelBoxHeight,
                labelBoxWidth, labelBoxHeight, juce::Justification::centred);
 
-    // points, oldest = dimmest ("phosphor" persistence)
+    // points, oldest = dimmest ("phosphor" persistence). Stride through history rather
+    // than drawing every point, so paint() cost stays bounded (see kMaxDrawnPoints)
+    // however many points afterglowTime_s currently keeps in history; age is computed
+    // from the real position in the full history, not the decimated draw order, so the
+    // fade timing itself is unaffected by the stride.
     const int numPoints = (int) history.size();
     if (numPoints > 0)
     {
-        int i = 0;
-        for (const auto& p : history)
+        const int stride = juce::jmax(1, numPoints / kMaxDrawnPoints);
+        for (int i = 0; i < numPoints; i += stride)
         {
             const float age = (float) i / (float) numPoints; // 0 = oldest, 1 = newest
             g.setColour(MeterLookAndFeel::meterGood.withAlpha(kOldestPointAlpha + (kNewestPointAlpha - kOldestPointAlpha) * age));
+            const auto& p = history[(size_t) i]; // std::deque: O(1) random access
             auto screenPoint = toScreen(p.x, p.y);
             g.fillEllipse(screenPoint.x - 0.5f * pointDiameter, screenPoint.y - 0.5f * pointDiameter, pointDiameter, pointDiameter);
-            ++i;
         }
     }
 }

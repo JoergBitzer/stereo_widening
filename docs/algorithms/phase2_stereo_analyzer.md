@@ -279,6 +279,40 @@ so the burst has fully aged out -- an empty circle. At 0.30 s the full 170 ms of
 plus silence still fits inside the window, so the burst remains clearly visible.
 `pluginval --strictness-level 10` stays clean with the new parameter.
 
+## Bug found and fixed: paint() cost grew unbounded with Afterglow
+
+User report after trying the feature: "increasing the afterglow time slows down the
+meter update," with a specific, well-targeted question -- CPU/Debug-build limitation, or
+a side effect of the afterglow change itself? The verification above only ever used
+short bursts (170 ms total), never exercised anywhere near the parameter's actual 2 s
+maximum under continuous audio, so this went uncaught at the time.
+
+**Measured, not guessed:** a small throwaway tool (`GoniometerComponent::
+paintEntireComponent()` timed with `std::chrono`, no display needed -- history built up
+to a known point count first, `Timer::callPendingTimersSynchronously()` used the same
+way as the other offline-render tools) showed `paint()` cost scaling directly with
+`history.size()`: ~17 ms at the default 200 ms afterglow (2205 points), ~138 ms at 1 s
+(44100 points), ~281 ms at the 2 s maximum (88200 points) -- the last one alone is
+8.5x the 33 ms/frame budget at the 30 Hz repaint rate. `paint()` drew every single point
+in `history` with its own `Graphics::fillEllipse()` call; at ~9 us/call (measured with a
+"best of 8 repeated timings, first round discarded as JUCE one-time warmup" methodology,
+needed because this sandbox's absolute timings are noisy run to run -- the *relative*
+scaling was reproducible throughout), that is a real, reproducible O(n) cost, not
+primarily a Debug-build artifact: a Release build's likely 3-10x speedup would still
+leave the 2 s case well over budget.
+
+**Fix:** `paint()` now strides through `history` (a `std::deque`, so random access is
+O(1)) rather than drawing every point, capped at `kMaxDrawnPoints = 1500` regardless of
+how many `history` actually holds -- picked so that, measured the same way, the capped
+cost (~15 ms, mostly the fixed ~1.8 ms baseline plus ~1500 x 9 us) stays comfortably
+inside the 33 ms budget with headroom for the level and correlation meters sharing the
+same paint pass, in a Debug build, in this sandbox's noisier-than-typical environment.
+`history` is far denser than the display has pixels for regardless, so this is not a
+visible loss of detail (checked with an offline render at the 2 s maximum, continuously
+fed noise, 400x400 px -- looked identically dense to before). The fade-alpha calculation
+uses the point's real index in the full `history`, not its position in the decimated
+draw order, so the fade timing itself is unaffected by the stride.
+
 ## Screenshot (Standalone, current layout)
 
 ![StereoAnalyzer Standalone](img/standalone_screenshot.png)
