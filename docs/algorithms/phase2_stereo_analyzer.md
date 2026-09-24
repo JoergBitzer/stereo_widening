@@ -13,26 +13,34 @@ A pass-through plugin (it never modifies the audio) with:
   Python plot and the on-screen display can be compared directly. Points fade with age
   ("phosphor" persistence).
 - **Correlation meter** (`CorrelationMeterComponent`): −1 … +1 bar, three colour zones
-  (green ≥ 0, amber −0.5…0, red < −0.5 — a rule of thumb, not a formal standard) and
-  endpoint labels ("OUT OF PHASE" / "WIDE" / "MONO").
-- **Level meter** (`LevelMeterComponent`): RMS bar (green/amber/red zones at −18/−6 dBFS)
-  and peak line + numeric readout for L, R, M, S, a shared dB scale to the right
-  (0, −6, −12, −18, −24, −36, −48, −60), and a "S−M" width-estimate readout in dB
-  (0 dB = M and S equal power, matches `stereo_eval.measures.levels()["S_minus_M_dB"]`).
-- **Integration** parameter (Fast 100 ms / Medium 300 ms / Slow 1000 ms): the time
-  constant shared by the RMS and correlation meters.
-- All three components share a panel chrome (border + title, `MeterLookAndFeel::drawPanel`)
-  and a colour/size vocabulary (`MeterLookAndFeel.h`), so they read as one instrument
-  panel rather than three independently-styled widgets.
+  (green ≥ +0.3, amber −0.3…+0.3, red < −0.3 — a rule of thumb, not a formal standard)
+  and endpoint labels ("OUT OF PHASE" / "WIDE" / "MONO").
+- **Level meter** (`LevelMeterComponent`): RMS bar (green/amber/red zones at −18/−6 dBFS),
+  peak line + numeric readout (coloured by the same zone, and held for a configurable
+  time before it decays, see `StereoMeterState::setPeakHoldTime`) for L, R, M, S, a
+  shared dB scale to the right (0, −6, −12, −18, −24, −36, −48, −60), and a "S−M"
+  width-estimate readout in dB (0 dB = M and S equal power, matches
+  `stereo_eval.measures.levels()["S_minus_M_dB"]`).
+- **Settings popup** (`SettingsPanel`, opened from the main view's "Settings..." button
+  via a `juce::CallOutBox`): three continuous parameters — Integration time (the RMS and
+  correlation meters' shared time constant, 50 ms – 2 s), Peak Hold (0 – 5 s), and Peak
+  Decay (3 – 60 dB/s once the hold expires). All three are ordinary `AudioParameterFloat`s
+  (automatable, saved with the plugin state), not just GUI-local settings.
+- All three meter components share a panel chrome (border + title,
+  `MeterLookAndFeel::drawPanel`) and a colour/size vocabulary (`MeterLookAndFeel.h`), so
+  they read as one instrument panel rather than three independently-styled widgets.
 
 ![level meter colour zones](img/level_meter_zones.png)
 ![correlation meter colour zones](img/correlation_zones.png)
 
 (Offline-rendered with synthetic test signals via a throwaway console tool, not part of
 the repo — no display needed: `juce::Image` + `Component::paintEntireComponent`. Level
-meter: L driven to a −3 dBFS-RMS sine (peak hits 0 dBFS, red), R to −30 dBFS (green); M/S
-land wherever that mix puts them. Correlation: three separate signals built from a common
-plus an orthogonal component, at ρ = 0.8/−0.25/−0.9.)
+meter: L driven to a −3 dBFS-RMS sine (peak hits 0 dBFS, red), R to −30 dBFS (green); M
+and S land wherever that mix puts them (−5.6 dBFS red, −6.4 dBFS amber here) — the peak
+line and its numeric readout are coloured by the same zone as the RMS bar. Correlation:
+three separate signals built from a common plus an orthogonal component, at
+ρ = 0.8/+0.15/−0.9 — the middle one is inside the new −0.3…+0.3 amber band, which used
+to read as green before the fix below.)
 
 Not yet implemented (deferred, see plan2.md Phase 2 step 2, marked optional there):
 spectrum display of the mono sum L+R and the side signal L−R. Candidate for a later pass
@@ -159,6 +167,42 @@ fuzzing), across all tested sample rates (44.1/48/96 kHz) and block sizes
 save/load, automation, editor-whilst-processing, bus enable/disable. `pluginval` itself
 is not part of this repository; it was downloaded to `AudioDev/tools/pluginval/` for
 this session (not versioned).
+
+## User feedback after first look: colour zones, peak hold, settings page
+
+Three changes made after looking at the running plugin:
+
+1. **Correlation amber zone made symmetric** (−0.3…+0.3, was 0…−0.5 -- amber only showed
+   for negative values, so e.g. ρ = +0.15 read as green even though it is just as
+   "moderate" as −0.15).
+2. **Peak now genuinely holds.** `StereoMeterState` previously decayed the peak from
+   every sample; it now freezes the peak for `peakHoldTime_s` (default 1.5 s) after the
+   last new peak, then decays at `peakDecay_dBPerSecond` -- verified with a synthetic
+   burst-then-silence test: the peak dB value was bit-identical 0.5 s into the hold, and
+   had dropped by exactly decay-rate × elapsed-time once past it. The peak line and its
+   numeric readout are also now coloured by the same green/amber/red zone as the RMS bar
+   (previously always white/grey), via a small `zoneColourForDb()` helper.
+3. **Settings popup** for the ballistics that do not need to live on the main view.
+   `StereoAnalyzerGUI`'s old inline "Integration" combo box is gone; a "Settings..."
+   button opens `SettingsPanel` (three `APVTS` `SliderAttachment`s) in a
+   `juce::CallOutBox`. Integration, Peak Hold and Peak Decay are now continuous
+   `AudioParameterFloat`s (`g_paramIntegration`/`g_paramPeakHold`/`g_paramPeakDecay` in
+   `StereoAnalyzer.h`) instead of Integration being a 3-choice discrete parameter --
+   automatable and saved with the plugin state like any other parameter. Their display
+   precision (e.g. "0.30 s" rather than "0.300000 s") comes from the parameter's own
+   `NormalisableRange` interval (`10^-numDecimalPlaces`), not from the slider, so a
+   host's generic parameter view shows the same formatting our own popup does.
+
+Verified with `pluginval --strictness-level 10` (clean, including fuzzing) and two
+rounds of offline rendering (see below): one confirming the peak-hold timing/value
+numerically and the corrected amber threshold visually, a second regenerating the
+documentation screenshots below to match. The Settings popup itself was verified with a
+small standalone test that constructs a real `AudioProcessorValueTreeState` with the
+three parameters and renders `SettingsPanel` to a PNG the same way -- catching, along
+the way, that the slider text box's decimal precision comes from the *parameter's*
+`getText()`/interval, not from `Slider::setNumDecimalPlacesToDisplay()`, and that the
+unit suffix needs `Slider::setTextValueSuffix()` explicitly (the label passed via
+`AudioParameterFloatAttributes::withLabel()` is not appended by the slider on its own).
 
 ## Screenshot (Standalone, current layout)
 

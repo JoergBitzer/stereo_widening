@@ -12,15 +12,45 @@
 
 class StereoAnalyzerAudioProcessor;
 
-// integration time for the RMS and correlation meters (see StereoMeterState)
+// The three meter ballistics settings, all continuous AudioParameterFloats (so they are
+// automatable and saved with the plugin state, like every other parameter here) shown
+// together on the Settings popup (see SettingsPanel.h) rather than cluttering the main
+// view. See StereoMeterState.h for what each one actually does.
 const struct
 {
 	const std::string ID = "integration";
 	const std::string name = "Integration";
-	const juce::StringArray choices { "Fast (100 ms)", "Medium (300 ms)", "Slow (1000 ms)" };
-	const float timeConstants_s[3] = { 0.1f, 0.3f, 1.0f };
-	const int defaultIndex = 1;
+	const std::string unitName = "s";
+	const float minValue = 0.05f;
+	const float maxValue = 2.0f;
+	const float defaultValue = 0.3f;
+	const float skew = 0.4f; // biases the slider towards the shorter, more commonly used times
+	const int numDecimalPlaces = 2;
 }g_paramIntegration;
+
+const struct
+{
+	const std::string ID = "peakHold";
+	const std::string name = "Peak Hold";
+	const std::string unitName = "s";
+	const float minValue = 0.0f;
+	const float maxValue = 5.0f;
+	const float defaultValue = 1.5f;
+	const float skew = 1.0f;
+	const int numDecimalPlaces = 2;
+}g_paramPeakHold;
+
+const struct
+{
+	const std::string ID = "peakDecay";
+	const std::string name = "Peak Decay";
+	const std::string unitName = "dB/s";
+	const float minValue = 3.0f;
+	const float maxValue = 60.0f;
+	const float defaultValue = 20.0f;
+	const float skew = 1.0f;
+	const int numDecimalPlaces = 1;
+}g_paramPeakDecay;
 
 
 class StereoAnalyzerAudio : public SynchronBlockProcessor
@@ -43,8 +73,14 @@ public:
 private:
 	StereoAnalyzerAudioProcessor* m_processor;
     double m_sampleRate = 44100.0;
-    juce::AudioParameterChoice* m_integrationParam = nullptr;
-    int m_lastIntegrationIndex = -1;
+    juce::AudioParameterFloat* m_integrationParam = nullptr;
+    juce::AudioParameterFloat* m_peakHoldParam = nullptr;
+    juce::AudioParameterFloat* m_peakDecayParam = nullptr;
+    // last value applied to m_meterState, to avoid recomputing every block; -1 forces
+    // the first processSynchronBlock() call to always apply the (possibly loaded) state
+    float m_lastIntegration = -1.0f;
+    float m_lastPeakHold = -1.0f;
+    float m_lastPeakDecay = -1.0f;
 };
 
 class StereoAnalyzerGUI : public juce::Component
@@ -55,13 +91,13 @@ public:
 	void paint(juce::Graphics& g) override;
 	void resized() override;
 private:
+    void showSettings();
+
 	StereoAnalyzerAudioProcessor& m_processor;
     juce::AudioProcessorValueTreeState& m_apvts;
 
     GoniometerComponent m_goniometer;
     CorrelationMeterComponent m_correlationMeter;
     LevelMeterComponent m_levelMeter;
-    juce::ComboBox m_integrationBox;
-    juce::Label m_integrationLabel;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> m_integrationAttachment;
+    juce::TextButton m_settingsButton { "Settings..." };
 };

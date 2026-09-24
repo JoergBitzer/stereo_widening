@@ -29,10 +29,9 @@ const float g_wheelstokeyboardratio(0.1f);
 
 // -------Your defines for GUI --------
 // layout of StereoAnalyzerGUI::resized() (all in pixels, at scaleFactor 1.0)
-const int g_controlsRowHeight(24);        // bottom row: Integration label + combo box
-const int g_integrationBoxWidth(160);
-const int g_integrationLabelWidth(90);
-const int g_controlPadding(2);            // shrink-to-fit gap around the Integration controls
+const int g_controlsRowHeight(24);        // bottom row: the Settings button
+const int g_settingsButtonWidth(100);
+const int g_controlPadding(2);            // shrink-to-fit gap around the Settings button
 
 const int g_correlationRowHeight(56);     // row above the controls: title + bar + endpoint labels
 const int g_correlationPaddingX(4);       // gap between the correlation panel and its neighbours

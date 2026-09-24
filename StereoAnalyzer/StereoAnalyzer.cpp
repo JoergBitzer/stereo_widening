@@ -1,5 +1,6 @@
 #include <math.h>
 #include "StereoAnalyzer.h"
+#include "SettingsPanel.h"
 
 #include "PluginProcessor.h"
 
@@ -18,25 +19,54 @@ void StereoAnalyzerAudio::prepareToPlay(double sampleRate, int max_samplesPerBlo
     // metering math in StereoMeterState is a per-sample recursive filter, not block-based.
     prepareSynchronProcessing(max_channels, 0);
 
-    const int index = m_integrationParam != nullptr ? m_integrationParam->getIndex() : g_paramIntegration.defaultIndex;
-    m_meterState.prepare(sampleRate, g_paramIntegration.timeConstants_s[index]);
-    m_lastIntegrationIndex = index;
+    m_lastIntegration = m_integrationParam != nullptr ? m_integrationParam->get() : g_paramIntegration.defaultValue;
+    m_lastPeakHold = m_peakHoldParam != nullptr ? m_peakHoldParam->get() : g_paramPeakHold.defaultValue;
+    m_lastPeakDecay = m_peakDecayParam != nullptr ? m_peakDecayParam->get() : g_paramPeakDecay.defaultValue;
+    m_meterState.prepare(sampleRate, m_lastIntegration, m_lastPeakDecay, m_lastPeakHold);
+}
+
+namespace
+{
+    bool hasChanged(float value, float lastValue) noexcept
+    {
+        return std::abs(value - lastValue) > 1.0e-6f;
+    }
 }
 
 int StereoAnalyzerAudio::processSynchronBlock(juce::AudioBuffer<float> & buffer, juce::MidiBuffer &midiMessages, int NrOfBlocksSinceLastProcessBlock)
 {
     juce::ignoreUnused(midiMessages, NrOfBlocksSinceLastProcessBlock);
 
-    // apply a changed Integration setting. Re-preparing resets the running RMS/correlation
-    // state, which is the expected behaviour when the user changes the meter ballistics
-    // (comparable to switching ballistics on a hardware meter).
+    // Apply changed settings. A changed Integration time re-prepares the meter state,
+    // which resets the running RMS/correlation state -- expected when the user changes
+    // that ballistic (comparable to switching ballistics on a hardware meter). Peak hold
+    // and peak decay use the lighter setters instead: they only affect the peak meter,
+    // so there is no reason to also blank out the RMS/correlation readout.
     if (m_integrationParam != nullptr)
     {
-        const int index = m_integrationParam->getIndex();
-        if (index != m_lastIntegrationIndex)
+        const float value = m_integrationParam->get();
+        if (hasChanged(value, m_lastIntegration))
         {
-            m_meterState.prepare(m_sampleRate, g_paramIntegration.timeConstants_s[index]);
-            m_lastIntegrationIndex = index;
+            m_meterState.prepare(m_sampleRate, value, m_lastPeakDecay, m_lastPeakHold);
+            m_lastIntegration = value;
+        }
+    }
+    if (m_peakHoldParam != nullptr)
+    {
+        const float value = m_peakHoldParam->get();
+        if (hasChanged(value, m_lastPeakHold))
+        {
+            m_meterState.setPeakHoldTime(value);
+            m_lastPeakHold = value;
+        }
+    }
+    if (m_peakDecayParam != nullptr)
+    {
+        const float value = m_peakDecayParam->get();
+        if (hasChanged(value, m_lastPeakDecay))
+        {
+            m_meterState.setPeakDecayRate(value);
+            m_lastPeakDecay = value;
         }
     }
 
@@ -45,17 +75,36 @@ int StereoAnalyzerAudio::processSynchronBlock(juce::AudioBuffer<float> & buffer,
     return 0;
 }
 
+namespace
+{
+    // Builds a float parameter. The slider step (interval) is set to
+    // 10^-numDecimalPlaces, e.g. 0.01 for numDecimalPlaces = 2: this both limits how
+    // finely the value can be dragged and, because JUCE derives a parameter's displayed
+    // decimal count from its interval, gives a clean "0.30 s" instead of "0.300000 s" in
+    // our own SettingsPanel slider and in any host's generic parameter/automation view.
+    template <typename ParamDef>
+    std::unique_ptr<juce::AudioParameterFloat> makeFloatParameter(const ParamDef& p)
+    {
+        const float interval = std::pow(10.0f, (float) -p.numDecimalPlaces);
+        return std::make_unique<juce::AudioParameterFloat>(p.ID, p.name,
+            juce::NormalisableRange<float>(p.minValue, p.maxValue, interval, p.skew),
+            p.defaultValue,
+            juce::AudioParameterFloatAttributes().withLabel(p.unitName));
+    }
+}
+
 void StereoAnalyzerAudio::addParameter(std::vector<std::unique_ptr<juce::RangedAudioParameter>> &paramVector)
 {
-    paramVector.push_back(std::make_unique<AudioParameterChoice>(g_paramIntegration.ID,
-        g_paramIntegration.name,
-        g_paramIntegration.choices,
-        g_paramIntegration.defaultIndex));
+    paramVector.push_back(makeFloatParameter(g_paramIntegration));
+    paramVector.push_back(makeFloatParameter(g_paramPeakHold));
+    paramVector.push_back(makeFloatParameter(g_paramPeakDecay));
 }
 
 void StereoAnalyzerAudio::prepareParameter(std::unique_ptr<juce::AudioProcessorValueTreeState> &vts)
 {
-    m_integrationParam = dynamic_cast<AudioParameterChoice*>(vts->getParameter(g_paramIntegration.ID));
+    m_integrationParam = dynamic_cast<AudioParameterFloat*>(vts->getParameter(g_paramIntegration.ID));
+    m_peakHoldParam = dynamic_cast<AudioParameterFloat*>(vts->getParameter(g_paramPeakHold.ID));
+    m_peakDecayParam = dynamic_cast<AudioParameterFloat*>(vts->getParameter(g_paramPeakDecay.ID));
 }
 
 
@@ -69,14 +118,14 @@ StereoAnalyzerGUI::StereoAnalyzerGUI(StereoAnalyzerAudioProcessor& p, juce::Audi
     addAndMakeVisible(m_correlationMeter);
     addAndMakeVisible(m_levelMeter);
 
-    m_integrationLabel.setText(g_paramIntegration.name, juce::dontSendNotification);
-    m_integrationLabel.setJustificationType(juce::Justification::centredRight);
-    addAndMakeVisible(m_integrationLabel);
+    m_settingsButton.onClick = [this] { showSettings(); };
+    addAndMakeVisible(m_settingsButton);
+}
 
-    m_integrationBox.addItemList(g_paramIntegration.choices, 1);
-    addAndMakeVisible(m_integrationBox);
-    m_integrationAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        m_apvts, g_paramIntegration.ID, m_integrationBox);
+void StereoAnalyzerGUI::showSettings()
+{
+    auto panel = std::make_unique<SettingsPanel>(m_apvts);
+    juce::CallOutBox::launchAsynchronously(std::move(panel), m_settingsButton.getScreenBounds(), nullptr);
 }
 
 void StereoAnalyzerGUI::paint(juce::Graphics &g)
@@ -89,8 +138,7 @@ void StereoAnalyzerGUI::resized()
 	auto r = getLocalBounds();
 
     auto controlsRow = r.removeFromBottom(g_controlsRowHeight);
-    m_integrationBox.setBounds(controlsRow.removeFromRight(g_integrationBoxWidth).reduced(g_controlPadding));
-    m_integrationLabel.setBounds(controlsRow.removeFromRight(g_integrationLabelWidth).reduced(g_controlPadding));
+    m_settingsButton.setBounds(controlsRow.removeFromRight(g_settingsButtonWidth).reduced(g_controlPadding));
 
     auto correlationRow = r.removeFromBottom(g_correlationRowHeight);
     m_correlationMeter.setBounds(correlationRow.reduced(g_correlationPaddingX, g_correlationPaddingY));
