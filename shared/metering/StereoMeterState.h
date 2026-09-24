@@ -11,7 +11,8 @@
  *
  * RMS and correlation use the same one-pole ("leaky integrator") time constant, so a
  * correlation meter and a level meter built on this class always agree on how fast they
- * react. Peak meters decay linearly in dB per second, like a hardware peak meter.
+ * react. Peak meters hold their value for peakHoldTime_s after the last new peak, then
+ * decay linearly in dB per second, like a hardware peak meter.
  *
  * Cross-check against python/stereo_eval: the broadband correlation and the RMS levels
  * should match stereo_eval.measures within the difference given by the integration time
@@ -36,11 +37,20 @@ public:
 
     /** Call from prepareToPlay. rmsTimeConstant_s is used for both the RMS meters and
      *  the correlation meter (typical hardware correlation meters use 100 ms - 1 s). */
-    void prepare(double sampleRate, float rmsTimeConstant_s = 0.3f, float peakDecay_dBPerSecond = 20.0f);
+    void prepare(double sampleRate, float rmsTimeConstant_s = 0.3f, float peakDecay_dBPerSecond = 20.0f,
+                 float peakHoldTime_s = 1.5f);
 
     /** Resets all running state to silence (e.g. on playback stop). Not audio-thread safe
      *  against a concurrent processBlock() call; call only when processing is stopped. */
     void reset();
+
+    /** Change the peak ballistics without resetting the running RMS/correlation state
+     *  (unlike calling prepare() again). Safe to call from the audio thread; not safe to
+     *  call concurrently with processBlock() from a different thread (matches the
+     *  Integration parameter's own "read once per block on the audio thread" pattern,
+     *  see StereoAnalyzer.cpp). */
+    void setPeakDecayRate(float dBPerSecond) noexcept;
+    void setPeakHoldTime(float seconds) noexcept;
 
     /** Audio thread. Reads buffer (1 or 2 channels), updates all meters, and pushes one
      *  (S, M) goniometer point per sample. Does not modify buffer: purely an observer. */
@@ -61,12 +71,14 @@ public:
 private:
     double fs = 44100.0;
     float rmsAlpha = 0.0f;      // one-pole coefficient for RMS and correlation power sums
-    float peakDecayFactor = 1.0f; // per-sample multiplicative peak decay
+    float peakDecayFactor = 1.0f; // per-sample multiplicative peak decay, once the hold expires
+    int peakHoldSamples = 0;      // samples a new peak is held before peakDecayFactor kicks in
 
     float sumSquare[NumChannels] { 0.0f, 0.0f, 0.0f, 0.0f }; // leaky mean of L^2, R^2, M^2, S^2
     float sumLR = 0.0f; // leaky mean of L * R, for the correlation numerator
 
     float peakLinear[NumChannels] { 0.0f, 0.0f, 0.0f, 0.0f };
+    int peakHoldCounter[NumChannels] { 0, 0, 0, 0 }; // samples remaining before this channel's peak may decay
 
     std::atomic<float> rmsDb[NumChannels] { { minusInfDb }, { minusInfDb }, { minusInfDb }, { minusInfDb } };
     std::atomic<float> peakDb[NumChannels] { { minusInfDb }, { minusInfDb }, { minusInfDb }, { minusInfDb } };

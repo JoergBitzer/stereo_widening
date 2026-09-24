@@ -1,15 +1,27 @@
 #include "StereoMeterState.h"
 
-void StereoMeterState::prepare(double sampleRate, float rmsTimeConstant_s, float peakDecay_dBPerSecond)
+void StereoMeterState::prepare(double sampleRate, float rmsTimeConstant_s, float peakDecay_dBPerSecond,
+                                float peakHoldTime_s)
 {
     fs = sampleRate;
     // one-pole coefficient so that after rmsTimeConstant_s the response of a step input
     // has reached (1 - 1/e): alpha = exp(-1 / (tau * fs))
     rmsAlpha = std::exp(-1.0f / (rmsTimeConstant_s * (float) fs));
-    // linear-amplitude decay factor so that the peak falls by peakDecay_dBPerSecond
-    // dB every second: 20*log10(factor^fs) = -peakDecay_dBPerSecond
-    peakDecayFactor = std::pow(10.0f, -peakDecay_dBPerSecond / (20.0f * (float) fs));
+    setPeakDecayRate(peakDecay_dBPerSecond);
+    setPeakHoldTime(peakHoldTime_s);
     reset();
+}
+
+void StereoMeterState::setPeakDecayRate(float dBPerSecond) noexcept
+{
+    // linear-amplitude decay factor so that the peak falls by dBPerSecond dB every
+    // second, once the hold time has expired: 20*log10(factor^fs) = -dBPerSecond
+    peakDecayFactor = std::pow(10.0f, -dBPerSecond / (20.0f * (float) fs));
+}
+
+void StereoMeterState::setPeakHoldTime(float seconds) noexcept
+{
+    peakHoldSamples = (int) std::lround(std::max(0.0f, seconds) * (float) fs);
 }
 
 void StereoMeterState::reset()
@@ -18,6 +30,7 @@ void StereoMeterState::reset()
     {
         sumSquare[c] = 0.0f;
         peakLinear[c] = 0.0f;
+        peakHoldCounter[c] = 0;
         rmsDb[c].store(minusInfDb, std::memory_order_relaxed);
         peakDb[c].store(minusInfDb, std::memory_order_relaxed);
     }
@@ -47,7 +60,24 @@ void StereoMeterState::processBlock(const juce::AudioBuffer<float>& buffer) noex
         for (int c = 0; c < NumChannels; ++c)
         {
             sumSquare[c] = rmsAlpha * sumSquare[c] + oneMinusAlpha * values[c] * values[c];
-            peakLinear[c] = std::max(std::abs(values[c]), peakLinear[c] * peakDecayFactor);
+
+            const float absValue = std::abs(values[c]);
+            if (absValue >= peakLinear[c])
+            {
+                // new peak: jump to it and (re)start the hold
+                peakLinear[c] = absValue;
+                peakHoldCounter[c] = peakHoldSamples;
+            }
+            else if (peakHoldCounter[c] > 0)
+            {
+                // still within the hold time: peak stays exactly where it is
+                --peakHoldCounter[c];
+            }
+            else
+            {
+                // hold expired: decay towards the current signal
+                peakLinear[c] *= peakDecayFactor;
+            }
         }
         sumLR = rmsAlpha * sumLR + oneMinusAlpha * l * r;
 

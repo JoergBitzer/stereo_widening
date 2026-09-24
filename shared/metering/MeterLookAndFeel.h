@@ -30,7 +30,6 @@ namespace MeterLookAndFeel
     const juce::Colour meterGood    = juce::Colours::limegreen;
     const juce::Colour meterCaution = juce::Colours::orange;
     const juce::Colour meterDanger  = juce::Colours::red;
-    const juce::Colour peakLine     = juce::Colours::white;
 
     // -- shared sizes --------------------------------------------------------------
     constexpr float labelFontSize      = 11.0f; // small readouts (dB values, axis labels, "L"/"R"/"M")

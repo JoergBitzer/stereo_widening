@@ -13,11 +13,11 @@ namespace
     constexpr float kEndpointLabelRowHeight = 12.0f;
 
     // Zone boundaries for the bar colour: same green/amber/red language as
-    // LevelMeterComponent. A rule of thumb, not a formal standard: correlation is
-    // "safe" (in phase, or decorrelated/wide, both normal) from 0 upward, "worth
-    // watching" between -0.5 and 0, and "a real phase problem" below -0.5.
-    constexpr float kDangerThreshold = -0.5f;
-    constexpr float kCautionThreshold = 0.0f;
+    // LevelMeterComponent. A rule of thumb, not a formal standard: "safe" above +0.3,
+    // "worth watching" between -0.3 and +0.3 (decorrelated/wide, or drifting negative),
+    // "a real phase problem" below -0.3.
+    constexpr float kDangerThreshold = -0.3f;
+    constexpr float kCautionThreshold = 0.3f;
 
     juce::Colour zoneColour(float value)
     {

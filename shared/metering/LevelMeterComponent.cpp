@@ -18,6 +18,15 @@ namespace
     constexpr float kCautionThresholdDb = -18.0f;
     constexpr float kDangerThresholdDb = -6.0f;
 
+    juce::Colour zoneColourForDb(float db)
+    {
+        if (db < kCautionThresholdDb)
+            return MeterLookAndFeel::meterGood;
+        if (db < kDangerThresholdDb)
+            return MeterLookAndFeel::meterCaution;
+        return MeterLookAndFeel::meterDanger;
+    }
+
     juce::String formatDb(float db)
     {
         return db <= -99.0f ? "-inf" : juce::String(db, 1);
@@ -60,6 +69,9 @@ void LevelMeterComponent::drawBar(juce::Graphics& g, juce::Rectangle<float> boun
     g.setFont(MeterLookAndFeel::labelFontSize);
     g.drawText(name, bounds.removeFromTop(kNameLabelHeight), juce::Justification::centred);
 
+    // peak text follows the same colour zone as the peak line drawn below (green/amber/red)
+    const auto peakColour = zoneColourForDb(peakDb);
+    g.setColour(peakColour);
     g.setFont(MeterLookAndFeel::smallLabelFontSize);
     g.drawText(formatDb(peakDb), bounds.removeFromTop(kValueLabelHeight), juce::Justification::centred);
 
@@ -84,9 +96,10 @@ void LevelMeterComponent::drawBar(juce::Graphics& g, juce::Rectangle<float> boun
     fillZone(cautionFraction, dangerFraction, MeterLookAndFeel::meterCaution);
     fillZone(dangerFraction, 1.0f, MeterLookAndFeel::meterDanger);
 
-    // peak: a thin horizontal line at the peak level
+    // peak: a thin horizontal line at the peak level, held in place for a while after the
+    // last new peak before it starts to fall again (see StereoMeterState::setPeakHoldTime)
     const float peakY = barArea.getBottom() - dbToFraction(peakDb) * barArea.getHeight();
-    g.setColour(MeterLookAndFeel::peakLine);
+    g.setColour(peakColour);
     g.drawHorizontalLine((int) peakY, barArea.getX(), barArea.getRight());
 }
 
