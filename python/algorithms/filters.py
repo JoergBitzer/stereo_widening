@@ -36,6 +36,16 @@ def lowpass(fc_hz, fs, q=1 / np.sqrt(2)):
     return _normalize(b, a)
 
 
+def allpass(fc_hz, fs, q=1 / np.sqrt(2)):
+    """2nd-order allpass. With q = 1/sqrt(2) it equals the sum LP4 + HP4 of an LR4 crossover."""
+    w0 = 2 * np.pi * fc_hz / fs
+    alpha = np.sin(w0) / (2 * q)
+    cos_w0 = np.cos(w0)
+    b = [1 - alpha, -2 * cos_w0, 1 + alpha]
+    a = [1 + alpha, -2 * cos_w0, 1 - alpha]
+    return _normalize(b, a)
+
+
 def high_shelf(fc_hz, gain_db, fs, slope=1.0):
     """2nd-order high shelf. gain_db above fc_hz, 0 dB below. slope = 1: steepest without overshoot."""
     big_a = 10 ** (gain_db / 40)

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from scipy import signal
 
-from algorithms import filters
+from algorithms import bass_mono, filters
 from algorithms.ms_width import ms_width
 from stereo_eval import measures
 from stereo_eval import signals as sig
@@ -31,16 +31,31 @@ def test_width_zero_is_mono(x_uncorrelated):
 def test_mono_input_is_unchanged():
     mono = sig.pink_noise(N, np.random.default_rng(1))
     x = np.column_stack([mono, mono])
-    y = ms_width(x, FS, width=2.0, bass_mono_hz=120.0, side_shelf_db=6.0)
+    y = ms_width(x, FS, width=2.0, side_shelf_db=6.0)
     assert np.max(np.abs(y - x)) < 1e-12
 
 
-@pytest.mark.parametrize("params", [
-    dict(width=0.0), dict(width=2.0), dict(width=1.5, bass_mono_hz=150.0, side_shelf_db=6.0),
-])
-def test_mono_sum_is_never_coloured(x_uncorrelated, params):
+def test_mono_input_stays_mono_with_bass_mono():
+    # the allpass on M changes the waveform, but L' = R' and the spectrum is unchanged
+    mono = sig.pink_noise(N, np.random.default_rng(1))
+    x = np.column_stack([mono, mono])
+    y = ms_width(x, FS, width=2.0, bass_mono_hz=120.0)
+    assert np.max(np.abs(y[:, 0] - y[:, 1])) < 1e-12
+    assert measures.mono_sum_coloration(x, y, FS)["coloration_dB"] < 0.1
+
+
+@pytest.mark.parametrize("params", [dict(width=0.0), dict(width=2.0), dict(width=1.5, side_shelf_db=6.0)])
+def test_mono_sum_is_never_changed(x_uncorrelated, params):
     y = ms_width(x_uncorrelated, FS, **params)
     assert np.max(np.abs((y[:, 0] + y[:, 1]) - (x_uncorrelated[:, 0] + x_uncorrelated[:, 1]))) < 1e-12
+
+
+@pytest.mark.parametrize("mode", ["hp2", "complementary", "lr4_allpass", "linear_phase"])
+def test_mono_sum_is_not_coloured_by_bass_mono(x_uncorrelated, mode):
+    y = ms_width(x_uncorrelated, FS, width=1.5, bass_mono_hz=150.0, bass_mono_mode=mode)
+    delay = bass_mono.latency_samples(mode)  # compare time-aligned signals
+    x_aligned, y_aligned = x_uncorrelated[: len(y) - delay], y[delay:]
+    assert measures.mono_sum_coloration(x_aligned, y_aligned, FS)["coloration_dB"] < 0.1
 
 
 def test_width_changes_side_level(x_uncorrelated):
