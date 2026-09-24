@@ -313,6 +313,28 @@ fed noise, 400x400 px -- looked identically dense to before). The fade-alpha cal
 uses the point's real index in the full `history`, not its position in the decimated
 draw order, so the fade timing itself is unaffected by the stride.
 
+## Bug found and fixed: goniometer L/R labels were swapped
+
+User report: "if I pan a signal to the left (no signal in the right channel), I see a
+line to R not L." Checked independently rather than taken on trust, both algebraically
+and numerically (`python3` one-liner with real sample arrays): with R = 0 (hard left),
+S = M = L/2 -- **same** sign, so the trace runs along the "/" diagonal (bottom-left to
+top-right), ending near the top-right corner. With L = 0 (hard right), S = -M --
+**opposite** sign, so the trace runs along the "\" diagonal, ending near the top-left
+corner. The "L" text was drawn at the top-left corner and "R" at the top-right --
+exactly backwards from where each signal's own trace actually points. (The grid lines
+themselves needed no change, only which text goes at which corner; the diagonal line
+comments were fixed too, since they had the same swap.)
+
+![goniometer L/R fix: hard-left traces to L, hard-right traces to R](img/goniometer_lr_fix.png)
+
+Verified offline (same technique as above): a 100 Hz tone routed hard left (R = 0, left
+render) now traces towards the "L" label; the same tone routed hard right (L = 0, right
+render) traces towards "R". `pluginval --strictness-level 5` stays clean. The existing
+Standalone and Reaper screenshots earlier in this page were taken before this fix and
+still show the old (backwards) label placement; not worth re-capturing them just for a
+label position, but worth knowing if the two are compared side by side.
+
 ## Screenshot (Standalone, current layout)
 
 ![StereoAnalyzer Standalone](img/standalone_screenshot.png)

@@ -87,17 +87,23 @@ void GoniometerComponent::paint(juce::Graphics& g)
     g.drawEllipse(centre.x - radius, centre.y - radius, 2.0f * radius, 2.0f * radius, kAxisLineThickness * scaleFactor);
     g.drawLine(centre.x, centre.y - radius, centre.x, centre.y + radius, kAxisLineThickness * scaleFactor); // M axis (mono)
     g.drawLine(centre.x - radius, centre.y, centre.x + radius, centre.y, kAxisLineThickness * scaleFactor); // S axis (side)
+    // A hard-left signal (R=0) has S = M = L/2 (same sign): it traces the "/" diagonal
+    // (bottom-left to top-right), ending near the top-right corner. A hard-right signal
+    // (L=0) has S = -M (opposite sign): it traces the "\" diagonal (top-left to
+    // bottom-right), ending near the top-left corner. The L/R text labels below are
+    // placed accordingly, at the corner each one's own diagonal actually points to --
+    // not at the corner that would match the (misleading) name of the *other* diagonal.
     const float d = radius * kCos45Deg;
-    g.drawLine(centre.x - d, centre.y - d, centre.x + d, centre.y + d, kDiagonalLineThickness * scaleFactor); // L axis
-    g.drawLine(centre.x - d, centre.y + d, centre.x + d, centre.y - d, kDiagonalLineThickness * scaleFactor); // R axis
+    g.drawLine(centre.x - d, centre.y - d, centre.x + d, centre.y + d, kDiagonalLineThickness * scaleFactor); // "\", hard-right diagonal
+    g.drawLine(centre.x - d, centre.y + d, centre.x + d, centre.y - d, kDiagonalLineThickness * scaleFactor); // "/", hard-left diagonal
 
     g.setColour(MeterLookAndFeel::text);
     g.setFont(MeterLookAndFeel::labelFontSize * scaleFactor);
     g.drawText("M", centre.x - 0.5f * labelBoxWidth, centre.y - radius - mLabelGap,
                labelBoxWidth, labelBoxHeight, juce::Justification::centred);
-    g.drawText("L", centre.x - d - lrLabelGap, centre.y - d - labelBoxHeight,
+    g.drawText("R", centre.x - d - lrLabelGap, centre.y - d - labelBoxHeight,
                labelBoxWidth, labelBoxHeight, juce::Justification::centred);
-    g.drawText("R", centre.x + d - labelBoxWidth + lrLabelGap * 0.5f, centre.y - d - labelBoxHeight,
+    g.drawText("L", centre.x + d - labelBoxWidth + lrLabelGap * 0.5f, centre.y - d - labelBoxHeight,
                labelBoxWidth, labelBoxHeight, juce::Justification::centred);
 
     // points, oldest = dimmest ("phosphor" persistence). Stride through history rather
