@@ -126,8 +126,9 @@ Details, findings and the cross-check numbers: `docs/algorithms/phase2_stereo_an
    confirmed running (screenshot in the docs page). Along the way, found and fixed a
    real heap-corruption bug in the (per-plugin copied) `SynchronBlockProcessor`'s
    direct-through mode — worth backporting to AdvancedAudioTemplate, see the docs page.
-   `pluginval --strictness-level 10` now passes cleanly. GUI verification in an actual
-   DAW (Reaper) is still open — this session only had the sandbox's Standalone.
+   `pluginval --strictness-level 10` now passes cleanly. **Verified live in Reaper**
+   with a real audio file playing through it — goniometer, level meters and correlation
+   meter all update correctly (screenshot and notes in the docs page).
 2. ✅ Metering components in `shared/metering/` (`StereoMeterState`, `MeterFifo`,
    `GoniometerComponent`, `CorrelationMeterComponent`, `LevelMeterComponent`):
    - lock-free FIFO from the audio thread to the GUI, and a timer-based repaint

@@ -215,8 +215,50 @@ audio. `MeterCrossCheck` calls `StereoMeterState::processBlock()` directly and n
 goes through `SynchronBlockProcessor`, so that cross-check was unaffected by the bug
 above and was trustworthy throughout.
 
-**Still open:** loading the plugin in an actual DAW (Reaper) as originally planned --
-this session only had the sandbox's Standalone and pluginval available.
+## Verified live in Reaper
+
+The plugin loads and runs correctly in an actual DAW (Reaper v6.68, installed on this
+machine), processing real audio through `~/.vst3/StereoAnalyzer.vst3`. No `xdotool`/
+`xautomation` was available in this sandbox to drive Reaper's GUI, so this used
+`python-xlib` (installed into a throwaway venv, not part of the repo) to send real X11
+XTEST key/mouse events -- click, type into the FX browser's filter box, click the
+transport's Play button.
+
+Two real snags along the way, both about Reaper's own plugin cache rather than the
+plugin itself:
+- Reaper's `reaper-vstplugins64.ini` had a stale entry from before the plugin was last
+  rebuilt (the class ID it cached still matched -- a fresh rescan reproduced the exact
+  same ID -- so this alone was not the actual problem).
+- A hand-written `<VST ...>` block in a `.rpp` project file (to script a test project
+  without any GUI interaction) reliably failed to load ("The following effect plug-in
+  could not be loaded"), even with Reaper's own cached ID copied in verbatim -- some
+  field in the block was subtly wrong. Inserting the same plugin live through Reaper's
+  own FX browser (Track > FX > Add > filter "StereoAnalyzer" > double-click) worked on
+  the first try. The RPP project format is undocumented enough that hand-authoring an
+  FX block is not a reliable path; driving the real UI is.
+
+With a track holding `mix_loop_let_it_be.wav` (one of the Phase-1 test samples) playing
+through the plugin:
+
+![StereoAnalyzer running live in Reaper](img/reaper_live_meters.png)
+
+Goniometer, level meters (colour zones, numeric peak readouts) and the correlation meter
+(0.95, strongly green -- this particular mix is quite mono-centric) all update live and
+match what the offline-rendered verification predicted. Reaper's own track/master meters
+(visible at the left edge of the full screenshot) confirm real audio was flowing, not
+just the plugin's internal state.
+
+## Screenshot (Standalone, current layout)
+
+![StereoAnalyzer Standalone](img/standalone_screenshot.png)
+
+Audio input is muted by default (JUCE Standalone's feedback-loop safety), hence the
+empty goniometer and 0.00 correlation in this screenshot; the headless `MeterCrossCheck`
+run (above, "Cross-check against Python") and the live Reaper run (above) both confirm
+the actual metering math against real audio. `MeterCrossCheck` calls
+`StereoMeterState::processBlock()` directly and never goes through
+`SynchronBlockProcessor`, so that cross-check was unaffected by the bug above and was
+trustworthy throughout.
 
 ## Build
 
