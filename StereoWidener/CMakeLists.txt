@@ -6,7 +6,7 @@
 
 set(TARGET_NAME StereoWidener)
 
-project(${TARGET_NAME} VERSION 0.1.1)
+project(${TARGET_NAME} VERSION 0.1.2)
 
 configure_file(Versioning.h.in Versioning.h)
 
@@ -36,6 +36,7 @@ target_sources(${TARGET_NAME}
         StereoWidener.cpp
         AlgorithmHelpPanel.cpp
         GlobalSettings.cpp
+        UtilityProcessor.cpp
         algorithms/MSWidthBroadband.cpp
         algorithms/MSWidthFiltered.cpp
         tools/MidiModPitchState.cpp

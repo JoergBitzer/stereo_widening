@@ -59,7 +59,12 @@ private:
     //Parameterhandling
     std::vector <std::unique_ptr<RangedAudioParameter>> m_paramVector;
 	PresetHandler m_presets;
-    float m_pluginScaleFactor = 1.0;
+    // Default (before any DAW project state is restored, which always overrides this)
+    // comes from the global settings file's "last used" GUI size -- see
+    // GlobalSettings.h. Safe to read m_algo here: default member initializers run in
+    // declaration order, and m_algo is declared (and so fully constructed) earlier in
+    // this class.
+    float m_pluginScaleFactor = m_algo.getGlobalSettings().getGuiScaleFactor();
 #if WITH_MIDIKEYBOARD
     MidiKeyboardState m_keyboardState;
     MidiModPitchBendState m_wheelState;

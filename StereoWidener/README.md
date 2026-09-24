@@ -48,18 +48,35 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     the right knob sets the **High Shelf** frequency (1000-16000 Hz, turn above 16 kHz
     for "Off" -- bypasses the shelf entirely). The shelf's gain (default 3 dB) is not a
     parameter; it's read from the global settings file, see below.
+- **Utilities** (below the algorithm selector; applied regardless of which algorithm is
+  selected, see [phase4_settings.md](../docs/algorithms/phase4_settings.md)):
+  - **Rotation**: -45..+45 degrees, the stereo image's rotation in the L/R plane.
+  - **Balance**: -100..+100 %. Positive attenuates L (image moves right), negative
+    attenuates R (image moves left).
+  - **Swap / Inv L / Inv R**: swap the two channels, or invert either channel's polarity.
+  - **Monitor**: Normal / Mono Check (listen to L+R) / Solo Side (listen to S) --
+    auditioning modes that override the final output; always switch back to Normal
+    before bouncing/exporting.
 
 ## Global settings file
 
 See [../docs/algorithms/phase4_settings.md](../docs/algorithms/phase4_settings.md).
 `~/.config/StereoWidener/settings.json` (created automatically on first run) stores
-user-wide defaults that aren't (yet) automatable parameters:
+user-wide defaults that aren't part of a DAW project's own saved state -- a project's
+saved parameter values and GUI size always take priority over these once they exist:
 
 ```json
 {
-  "highShelfGainDb": 3.0
+  "highShelfGainDb": 3.0,
+  "guiScaleFactor": 1.0,
+  "meterIntegrationTimeS": 0.3,
+  "meterPeakHoldTimeS": 1.5,
+  "meterPeakDecayDbPerS": 20.0,
+  "lastUsedState": { "width": 100.0, "algorithm": 0, "...": "..." }
 }
 ```
 
 Edit and save while the plugin/DAW is closed; it's read once when a plugin instance is
-created, not watched live.
+created, not watched live. `lastUsedState` is written automatically (whenever a plugin
+instance closes) and used to seed a brand new instance's starting values -- editing it
+by hand works too, but it will be overwritten the next time an instance closes.

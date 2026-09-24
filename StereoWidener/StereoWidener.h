@@ -9,6 +9,7 @@
 #include "PluginSettings.h"
 #include "AlgorithmHelpPanel.h"
 #include "GlobalSettings.h"
+#include "UtilityProcessor.h"
 #include "algorithms/StereoAlgorithm.h"
 #include "algorithms/MSWidthBroadband.h"
 #include "algorithms/MSWidthFiltered.h"
@@ -88,6 +89,57 @@ constexpr const char* g_paramAlgorithmName = "Algorithm";
 // something audibly different to exercise: 2.1 M/S width, broadband vs. bass-mono.
 const juce::StringArray g_algorithmNames { "M/S Width (Broadband)", "M/S Width (Filtered / Bass Mono)" };
 
+// ---- Utilities (Phase 4 step 2: planing.md 2.13 + 2.2) -------------------------
+// Applied by UtilityProcessor after the selected width algorithm, regardless of which
+// one is active -- see UtilityProcessor.h for the processing order and rationale.
+
+const struct
+{
+	const std::string ID = "rotation";
+	const std::string name = "Rotation";
+	const std::string unitName = "deg";
+	const float minValue = -45.0f;
+	const float maxValue = 45.0f;
+	const float defaultValue = 0.0f;
+	const float skew = 1.0f;
+	const int numDecimalPlaces = 1;
+}g_paramRotation;
+
+const struct
+{
+	const std::string ID = "balance";
+	const std::string name = "Balance";
+	const std::string unitName = "%";
+	const float minValue = -100.0f;
+	const float maxValue = 100.0f;
+	const float defaultValue = 0.0f;
+	const float skew = 1.0f;
+	const int numDecimalPlaces = 0;
+}g_paramBalance;
+
+const struct
+{
+	const std::string ID = "invertL";
+	const std::string name = "Invert L";
+}g_paramInvertL;
+
+const struct
+{
+	const std::string ID = "invertR";
+	const std::string name = "Invert R";
+}g_paramInvertR;
+
+const struct
+{
+	const std::string ID = "swapLR";
+	const std::string name = "Swap L/R";
+}g_paramSwapLR;
+
+constexpr const char* g_paramMonitorModeID = "monitorMode";
+constexpr const char* g_paramMonitorModeName = "Monitor";
+// indices must match UtilityParams::MonitorMode (UtilityProcessor.h)
+const juce::StringArray g_monitorModeNames { "Normal", "Mono Check (L+R)", "Solo Side (S)" };
+
 class StereoWidenerAudio : public SynchronBlockProcessor
 {
 public:
@@ -112,6 +164,14 @@ public:
     int getNumAlgorithms() const noexcept { return (int) m_algorithms.size(); }
     const StereoAlgorithm& getAlgorithm(int index) const noexcept { return *m_algorithms[(size_t) index]; }
 
+    // StereoWidenerAudioProcessor reads/writes this from its own constructor/destructor
+    // (GUI scale factor default, "last used state" persistence) -- GlobalSettings must
+    // stay owned here rather than by the processor, since the processor's constructor
+    // builds this whole object (m_algo) via its member-initializer-list before its own
+    // constructor *body* runs, so only members already constructed by then (i.e. ones
+    // that live inside m_algo, not siblings of it) are safe to use at that point.
+    GlobalSettings& getGlobalSettings() noexcept { return m_globalSettings; }
+
     StereoMeterState m_meterStateIn;
     StereoMeterState m_meterStateOut;
 
@@ -124,10 +184,18 @@ private:
     juce::AudioParameterFloat* m_highShelfFreqParam = nullptr;
     juce::AudioParameterChoice* m_algorithmParam = nullptr;
 
+    juce::AudioParameterFloat* m_rotationParam = nullptr;
+    juce::AudioParameterFloat* m_balanceParam = nullptr;
+    juce::AudioParameterBool* m_invertLParam = nullptr;
+    juce::AudioParameterBool* m_invertRParam = nullptr;
+    juce::AudioParameterBool* m_swapLRParam = nullptr;
+    juce::AudioParameterChoice* m_monitorModeParam = nullptr;
+    UtilityProcessor m_utilityProcessor;
+
     std::vector<std::unique_ptr<StereoAlgorithm>> m_algorithms;
     int m_activeIndex = 0;
 
-    // loaded once in the constructor (plan2.md Phase 4, "Global ini file"), not
+    // loaded once in the constructor (plan2.md Phase 4, "Global settings file"), not
     // re-read afterwards -- see GlobalSettings.h
     GlobalSettings m_globalSettings;
 
@@ -183,4 +251,28 @@ private:
     juce::TextButton m_helpButton { "?" };
     juce::ComboBox m_algorithmBox;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> m_algorithmAttachment;
+
+    // Utilities (Phase 4 step 2), applied regardless of the selected algorithm -- see
+    // UtilityProcessor.h
+    juce::Label m_utilitiesTitle;
+
+    juce::Label m_rotationLabel;
+    juce::Slider m_rotationKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> m_rotationAttachment;
+
+    juce::Label m_balanceLabel;
+    juce::Slider m_balanceKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> m_balanceAttachment;
+
+    juce::TextButton m_swapLRButton { "Swap" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> m_swapLRAttachment;
+
+    juce::TextButton m_invertLButton { "Inv L" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> m_invertLAttachment;
+
+    juce::TextButton m_invertRButton { "Inv R" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> m_invertRAttachment;
+
+    juce::ComboBox m_monitorModeBox;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> m_monitorModeAttachment;
 };

@@ -24,8 +24,13 @@ void StereoWidenerAudio::prepareToPlay(double sampleRate, int max_samplesPerBloc
     // beyond whatever the active algorithm itself reports (currently always 0).
     prepareSynchronProcessing(max_channels, 0);
 
-    m_meterStateIn.prepare(sampleRate);
-    m_meterStateOut.prepare(sampleRate);
+    // meter ballistics: StereoWidener has no per-project override for these yet (unlike
+    // StereoAnalyzer's Settings popup), so the global settings file's defaults are the
+    // only source for now -- see GlobalSettings.h
+    m_meterStateIn.prepare(sampleRate, m_globalSettings.getMeterIntegrationTimeS(),
+                            m_globalSettings.getMeterPeakDecayDbPerS(), m_globalSettings.getMeterPeakHoldTimeS());
+    m_meterStateOut.prepare(sampleRate, m_globalSettings.getMeterIntegrationTimeS(),
+                             m_globalSettings.getMeterPeakDecayDbPerS(), m_globalSettings.getMeterPeakHoldTimeS());
 
     for (auto& algorithm : m_algorithms)
     {
@@ -106,6 +111,18 @@ int StereoWidenerAudio::processSynchronBlock(juce::AudioBuffer<float> & buffer, 
         m_algorithms[(size_t) m_activeIndex]->process(buffer, params);
     }
 
+    // Utilities (Phase 4 step 2, planing.md 2.13 + 2.2): applied once, after whichever
+    // width algorithm just ran, regardless of which one is active -- see
+    // UtilityProcessor.h.
+    UtilityParams utilityParams;
+    utilityParams.rotationDeg = m_rotationParam != nullptr ? m_rotationParam->get() : 0.0f;
+    utilityParams.balance = m_balanceParam != nullptr ? m_balanceParam->get() * 0.01f : 0.0f; // % -> -1..1
+    utilityParams.invertL = m_invertLParam != nullptr && m_invertLParam->get();
+    utilityParams.invertR = m_invertRParam != nullptr && m_invertRParam->get();
+    utilityParams.swapLR = m_swapLRParam != nullptr && m_swapLRParam->get();
+    utilityParams.monitorMode = m_monitorModeParam != nullptr ? m_monitorModeParam->getIndex() : 0;
+    m_utilityProcessor.process(buffer, utilityParams);
+
     m_meterStateOut.processBlock(buffer);
     return 0;
 }
@@ -116,13 +133,18 @@ namespace
     // slider step (interval) is set to 10^-numDecimalPlaces, e.g. 1 for
     // numDecimalPlaces = 0, so both the knob and any host's generic parameter view show
     // a clean "150 Hz" instead of "150.000000 Hz" (see StereoAnalyzer.cpp, same pattern).
+    // defaultValue is passed explicitly (rather than always using p.defaultValue) so the
+    // caller can seed it from GlobalSettings' "last used" state (Phase 4 step 2) --
+    // clamped defensively, in case a hand-edited settings file has a stale/out-of-range
+    // value from before a range changed.
     template <typename ParamDef>
-    std::unique_ptr<juce::AudioParameterFloat> makeFloatParameter(const ParamDef& p)
+    std::unique_ptr<juce::AudioParameterFloat> makeFloatParameter(const ParamDef& p, float defaultValue)
     {
+        defaultValue = juce::jlimit(p.minValue, p.maxValue, defaultValue);
         const float interval = std::pow(10.0f, (float) -p.numDecimalPlaces);
         return std::make_unique<juce::AudioParameterFloat>(p.ID, p.name,
             juce::NormalisableRange<float>(p.minValue, p.maxValue, interval, p.skew),
-            p.defaultValue,
+            defaultValue,
             juce::AudioParameterFloatAttributes().withLabel(p.unitName));
     }
 
@@ -134,8 +156,10 @@ namespace
     // the threshold counts as "off": true for Bass Cutoff (off below 40 Hz), false for
     // High Shelf (off above 16 kHz).
     template <typename ParamDef>
-    std::unique_ptr<juce::AudioParameterFloat> makeFrequencyParameterWithOff(const ParamDef& p, float offThreshold, bool offIsBelow)
+    std::unique_ptr<juce::AudioParameterFloat> makeFrequencyParameterWithOff(const ParamDef& p, float offThreshold,
+                                                                              bool offIsBelow, float defaultValue)
     {
+        defaultValue = juce::jlimit(p.minValue, p.maxValue, defaultValue);
         const float interval = std::pow(10.0f, (float) -p.numDecimalPlaces);
         auto attributes = juce::AudioParameterFloatAttributes()
             .withStringFromValueFunction([offThreshold, offIsBelow](float value, int) -> juce::String
@@ -151,7 +175,7 @@ namespace
             });
         return std::make_unique<juce::AudioParameterFloat>(p.ID, p.name,
             juce::NormalisableRange<float>(p.minValue, p.maxValue, interval, p.skew),
-            p.defaultValue, attributes);
+            defaultValue, attributes);
     }
 
     // Like makeFrequencyParameterWithOff, but with a *true* logarithmic mapping (equal
@@ -163,8 +187,10 @@ namespace
     // compression at the top of the range keeps that Off zone a small rotation sliver
     // on its own, without needing to also keep it narrow in absolute Hz.
     template <typename ParamDef>
-    std::unique_ptr<juce::AudioParameterFloat> makeLogFrequencyParameterWithOff(const ParamDef& p, float offThreshold)
+    std::unique_ptr<juce::AudioParameterFloat> makeLogFrequencyParameterWithOff(const ParamDef& p, float offThreshold,
+                                                                                 float defaultValue)
     {
+        defaultValue = juce::jlimit(p.minValue, p.maxValue, defaultValue);
         juce::NormalisableRange<float> range(p.minValue, p.maxValue,
             [](float rangeStart, float rangeEnd, float normalised) // convertFrom0To1
             {
@@ -189,18 +215,47 @@ namespace
                 return text.trim().equalsIgnoreCase("off") ? offThreshold + 1.0f : text.getFloatValue();
             });
 
-        return std::make_unique<juce::AudioParameterFloat>(p.ID, p.name, range, p.defaultValue, attributes);
+        return std::make_unique<juce::AudioParameterFloat>(p.ID, p.name, range, defaultValue, attributes);
     }
 }
 
 void StereoWidenerAudio::addParameter(std::vector<std::unique_ptr<juce::RangedAudioParameter>> &paramVector)
 {
-    paramVector.push_back(makeFloatParameter(g_paramWidth));
-    paramVector.push_back(makeFrequencyParameterWithOff(g_paramBassCutoff, MSWidthFiltered::kBassCutoffOffThreshold, true));
-    paramVector.push_back(makeLogFrequencyParameterWithOff(g_paramHighShelfFreq, MSWidthFiltered::kHighShelfOffThreshold));
+    // "Last used state" (plan2.md Phase 4 step 1): a brand new instance starts from
+    // whatever was last saved to the global settings file (StereoWidenerAudioProcessor's
+    // destructor), or the compiled-in default if there is none yet (e.g. the very first
+    // run). A DAW project's own saved state, restored afterwards via
+    // setStateInformation(), always overrides this -- it unconditionally replaces the
+    // whole parameter tree, which runs strictly after this constructor-time code.
+    const auto lastUsed = [this](const std::string& id, double fallback)
+    {
+        return m_globalSettings.getLastUsedParam(id, fallback);
+    };
 
+    paramVector.push_back(makeFloatParameter(g_paramWidth, (float) lastUsed(g_paramWidth.ID, g_paramWidth.defaultValue)));
+    paramVector.push_back(makeFrequencyParameterWithOff(g_paramBassCutoff, MSWidthFiltered::kBassCutoffOffThreshold, true,
+        (float) lastUsed(g_paramBassCutoff.ID, g_paramBassCutoff.defaultValue)));
+    paramVector.push_back(makeLogFrequencyParameterWithOff(g_paramHighShelfFreq, MSWidthFiltered::kHighShelfOffThreshold,
+        (float) lastUsed(g_paramHighShelfFreq.ID, g_paramHighShelfFreq.defaultValue)));
+
+    const int lastAlgorithmIndex = juce::jlimit(0, g_algorithmNames.size() - 1,
+        (int) lastUsed(g_paramAlgorithmID, 0.0));
     paramVector.push_back(std::make_unique<juce::AudioParameterChoice>(g_paramAlgorithmID, g_paramAlgorithmName,
-        g_algorithmNames, 0));
+        g_algorithmNames, lastAlgorithmIndex));
+
+    // Utilities (Phase 4 step 2)
+    paramVector.push_back(makeFloatParameter(g_paramRotation, (float) lastUsed(g_paramRotation.ID, g_paramRotation.defaultValue)));
+    paramVector.push_back(makeFloatParameter(g_paramBalance, (float) lastUsed(g_paramBalance.ID, g_paramBalance.defaultValue)));
+    paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramInvertL.ID, g_paramInvertL.name,
+        lastUsed(g_paramInvertL.ID, 0.0) > 0.5));
+    paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramInvertR.ID, g_paramInvertR.name,
+        lastUsed(g_paramInvertR.ID, 0.0) > 0.5));
+    paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramSwapLR.ID, g_paramSwapLR.name,
+        lastUsed(g_paramSwapLR.ID, 0.0) > 0.5));
+    const int lastMonitorMode = juce::jlimit(0, g_monitorModeNames.size() - 1,
+        (int) lastUsed(g_paramMonitorModeID, 0.0));
+    paramVector.push_back(std::make_unique<juce::AudioParameterChoice>(g_paramMonitorModeID, g_paramMonitorModeName,
+        g_monitorModeNames, lastMonitorMode));
 }
 
 void StereoWidenerAudio::prepareParameter(std::unique_ptr<juce::AudioProcessorValueTreeState> &vts)
@@ -209,6 +264,13 @@ void StereoWidenerAudio::prepareParameter(std::unique_ptr<juce::AudioProcessorVa
     m_bassCutoffParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramBassCutoff.ID));
     m_highShelfFreqParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramHighShelfFreq.ID));
     m_algorithmParam = dynamic_cast<juce::AudioParameterChoice*>(vts->getParameter(g_paramAlgorithmID));
+
+    m_rotationParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramRotation.ID));
+    m_balanceParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramBalance.ID));
+    m_invertLParam = dynamic_cast<juce::AudioParameterBool*>(vts->getParameter(g_paramInvertL.ID));
+    m_invertRParam = dynamic_cast<juce::AudioParameterBool*>(vts->getParameter(g_paramInvertR.ID));
+    m_swapLRParam = dynamic_cast<juce::AudioParameterBool*>(vts->getParameter(g_paramSwapLR.ID));
+    m_monitorModeParam = dynamic_cast<juce::AudioParameterChoice*>(vts->getParameter(g_paramMonitorModeID));
 }
 
 
@@ -288,6 +350,49 @@ StereoWidenerGUI::StereoWidenerGUI(StereoWidenerAudioProcessor& p, juce::AudioPr
         m_apvts, g_paramAlgorithmID, m_algorithmBox);
 
     updateAuxKnobsForActiveAlgorithm(); // onChange above only fires on a later *change*, not this initial state
+
+    // Utilities (Phase 4 step 2), applied regardless of the selected algorithm -- see
+    // UtilityProcessor.h
+    m_utilitiesTitle.setText("Utilities", juce::dontSendNotification);
+    m_utilitiesTitle.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(m_utilitiesTitle);
+
+    m_rotationLabel.setText("Rotation", juce::dontSendNotification);
+    m_rotationLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(m_rotationLabel);
+    m_rotationKnob.setTextValueSuffix(juce::String::fromUTF8(" \xc2\xb0")); // degree sign
+    addAndMakeVisible(m_rotationKnob);
+    m_rotationAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        m_apvts, g_paramRotation.ID, m_rotationKnob);
+
+    m_balanceLabel.setText("Balance", juce::dontSendNotification);
+    m_balanceLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(m_balanceLabel);
+    m_balanceKnob.setTextValueSuffix(" %");
+    addAndMakeVisible(m_balanceKnob);
+    m_balanceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        m_apvts, g_paramBalance.ID, m_balanceKnob);
+
+    m_swapLRButton.setClickingTogglesState(true);
+    addAndMakeVisible(m_swapLRButton);
+    m_swapLRAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        m_apvts, g_paramSwapLR.ID, m_swapLRButton);
+
+    m_invertLButton.setClickingTogglesState(true);
+    addAndMakeVisible(m_invertLButton);
+    m_invertLAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        m_apvts, g_paramInvertL.ID, m_invertLButton);
+
+    m_invertRButton.setClickingTogglesState(true);
+    addAndMakeVisible(m_invertRButton);
+    m_invertRAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        m_apvts, g_paramInvertR.ID, m_invertRButton);
+
+    for (int i = 0; i < g_monitorModeNames.size(); ++i)
+        m_monitorModeBox.addItem(g_monitorModeNames[i], i + 1);
+    addAndMakeVisible(m_monitorModeBox);
+    m_monitorModeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+        m_apvts, g_paramMonitorModeID, m_monitorModeBox);
 }
 
 void StereoWidenerGUI::showAlgorithmHelp()
@@ -374,8 +479,9 @@ void StereoWidenerGUI::resized()
     m_auxRightLabel.setBounds(auxRightStack.removeFromTop(auxLabelHeight));
     m_auxRightKnob.setBounds(auxRightStack);
 
-    // bottom row: the "?" help button, then the algorithm selector, centred as a group
+    // algorithm row: the "?" help button, then the algorithm selector, centred as a group
     auto algoRow = r.removeFromTop(juce::roundToInt(g_algorithmRowHeight * scale));
+    r.removeFromTop(rowGap);
     const int helpSize = juce::roundToInt(g_helpButtonSize * scale);
     const int helpGap = juce::roundToInt(g_helpButtonGap * scale);
     const int boxWidth = juce::jmin(juce::roundToInt(g_algorithmBoxWidth * scale),
@@ -384,4 +490,49 @@ void StereoWidenerGUI::resized()
     m_helpButton.setBounds(algoGroup.removeFromLeft(helpSize).withSizeKeepingCentre(helpSize, helpSize));
     algoGroup.removeFromLeft(helpGap);
     m_algorithmBox.setBounds(algoGroup);
+
+    // Utilities section (Phase 4 step 2): a title, Rotation/Balance knobs, then a row
+    // of toggle buttons and the Monitor selector -- applied regardless of the selected
+    // algorithm, see UtilityProcessor.h.
+    m_utilitiesTitle.setBounds(r.removeFromTop(juce::roundToInt(g_utilitiesTitleHeight * scale)));
+    r.removeFromTop(rowGap);
+
+    auto utilKnobRow = r.removeFromTop(juce::roundToInt(g_utilitiesKnobSize * scale)
+                                        + 2 * juce::roundToInt(g_utilitiesKnobLabelHeight * scale));
+    r.removeFromTop(rowGap);
+
+    const int utilKnobSize = juce::roundToInt(g_utilitiesKnobSize * scale);
+    const int utilLabelHeight = juce::roundToInt(g_utilitiesKnobLabelHeight * scale);
+    const int utilKnobGap = juce::roundToInt(g_utilitiesKnobGap * scale);
+    const int totalUtilKnobsWidth = utilKnobSize + utilKnobGap + utilKnobSize;
+    auto utilKnobsCentred = utilKnobRow.withSizeKeepingCentre(totalUtilKnobsWidth, utilKnobRow.getHeight());
+    auto rotationArea = utilKnobsCentred.removeFromLeft(utilKnobSize);
+    utilKnobsCentred.removeFromLeft(utilKnobGap);
+    auto balanceArea = utilKnobsCentred;
+
+    m_rotationKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
+    auto rotationStack = rotationArea.withSizeKeepingCentre(utilKnobSize, utilLabelHeight + utilKnobSize + utilLabelHeight);
+    m_rotationLabel.setBounds(rotationStack.removeFromTop(utilLabelHeight));
+    m_rotationKnob.setBounds(rotationStack);
+
+    m_balanceKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
+    auto balanceStack = balanceArea.withSizeKeepingCentre(utilKnobSize, utilLabelHeight + utilKnobSize + utilLabelHeight);
+    m_balanceLabel.setBounds(balanceStack.removeFromTop(utilLabelHeight));
+    m_balanceKnob.setBounds(balanceStack);
+
+    auto toggleRow = r.removeFromTop(juce::roundToInt(g_utilitiesToggleRowHeight * scale));
+    const int toggleWidth = juce::roundToInt(g_utilitiesToggleWidth * scale);
+    const int toggleGap = juce::roundToInt(g_utilitiesToggleGap * scale);
+    const int toggleMonitorGap = juce::roundToInt(g_utilitiesToggleMonitorGap * scale);
+    const int monitorWidth = juce::jmin(juce::roundToInt(g_monitorBoxWidth * scale), toggleRow.getWidth());
+    const int totalToggleGroupWidth = 3 * toggleWidth + 2 * toggleGap + toggleMonitorGap + monitorWidth;
+    auto toggleGroup = toggleRow.withSizeKeepingCentre(totalToggleGroupWidth, toggleRow.getHeight());
+
+    m_swapLRButton.setBounds(toggleGroup.removeFromLeft(toggleWidth));
+    toggleGroup.removeFromLeft(toggleGap);
+    m_invertLButton.setBounds(toggleGroup.removeFromLeft(toggleWidth));
+    toggleGroup.removeFromLeft(toggleGap);
+    m_invertRButton.setBounds(toggleGroup.removeFromLeft(toggleWidth));
+    toggleGroup.removeFromLeft(toggleMonitorGap);
+    m_monitorModeBox.setBounds(toggleGroup);
 }

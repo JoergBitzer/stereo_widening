@@ -186,22 +186,30 @@ Details, findings and verification: `docs/algorithms/phase3_stereo_widener.md`.
    correlation plot for `MSWidthFiltered` visibly shows the bass staying correlated
    below the Bass Cutoff and decorrelating above it, exactly as designed.
 
-### Phase 4 – Settings, utilities, latency — started
+### Phase 4 – Settings, utilities, latency — settings and utilities done
 Details and verification: `docs/algorithms/phase4_settings.md`.
-1. 🟡 **Global settings file** -- format changed from the original plan's
+1. ✅ **Global settings file** -- format changed from the original plan's
    `juce::PropertiesFile` (XML/binary only) to **JSON** (user preference: "a simple
    YAML or TOML format. JSON is also OK"; JUCE has no built-in YAML/TOML parser, and
    `juce::JSON` needs no extra dependency). `StereoWidener/GlobalSettings.h`/`.cpp`
-   reads/creates `~/.config/StereoWidener/settings.json`. So far it stores only one
-   value, the side high-shelf's gain (`MSWidthFiltered`, previously a fixed 3 dB
-   constant, user request); still to do:
-   - profile (Mastering / Creative)
-   - last used state, used as the default for new instances
-   - GUI size and meter options (integration time, goniometer persistence)
+   reads/creates `~/.config/StereoWidener/settings.json`, storing:
+   - the side high-shelf's gain (`MSWidthFiltered`, previously a fixed 3 dB constant)
+   - last used state (every parameter value), used as the default for a brand new
+     instance -- a DAW project's own saved state always overrides this once it exists
+     (see the docs page for exactly how/why, no extra "which wins" logic needed)
+   - GUI size (same "project always wins once it exists" behaviour)
+   - meter options (integration time, peak hold, peak decay) -- defaults only, since
+     StereoWidener has no per-project override mechanism for these yet (unlike
+     StereoAnalyzer's Settings popup)
+   - profile (Mastering / Creative): deliberately **skipped**, per the user's own
+     stated uncertainty about whether it belongs in this file at all
    The state of each instance is still saved in the DAW project as usual. The settings
    file only provides the defaults and user preferences.
-2. Utilities (2.13 and 2.2): mono, L/R swap, polarity invert, rotation, balance, mono
-   check (listen to L+R), and solo side. Not started.
+2. ✅ Utilities (2.13 and 2.2): mono, L/R swap, polarity invert, rotation, balance, mono
+   check (listen to L+R), and solo side. New `UtilityProcessor`, applied after the
+   selected width algorithm regardless of which one is active. "Mono (sum)" and "mono
+   check" consolidated into one 3-way Monitor selector (Normal / Mono Check / Solo
+   Side) with "solo side", since they are the same DSP operation.
 3. Latency: each mode reports its latency with `setLatencySamples()` when it is
    selected, and the GUI shows the current latency in ms. If a mode switch during
    playback turns out to be a problem in hosts, add an option "constant latency"

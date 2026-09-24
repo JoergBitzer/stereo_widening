@@ -8,14 +8,17 @@ const bool g_forcePowerOf2(false); // should be true for FFT Processing
 // global GUI setting for StereoWidener
 const int g_minGuiSize_x(480);
 const int g_maxGuiSize_x(1200);
-// 456 for StereoWidenerGUI's own content (meterRow 260 + rowGap 8 + knobRow 150 +
+// 456 for StereoWidenerGUI's original content (meterRow 260 + rowGap 8 + knobRow 150 +
 // rowGap 8 + algorithmRow 30, see the layout constants below) + 31 for the preset
-// control now reserved above it (g_minPresetHandlerHeight = 30, plus the 1px gap
+// control reserved above it (g_minPresetHandlerHeight = 30, plus the 1px gap
 // PluginEditor.cpp's resized() adds) now that WITH_PRESETHANDLERGUI is enabled
 // (StereoWidener/CMakeLists.txt) -- without this, the preset bar simply ate into
 // StereoWidenerGUI's own height instead of the window growing to fit both, pushing the
-// algorithm selector below the visible window.
-const int g_minGuiSize_y(491);
+// algorithm selector below the visible window -- plus another ~156 for the Utilities
+// row added below the algorithm selector in Phase 4 step 2 (rowGap 8 + title 18 +
+// rowGap 8 + utilities knob row ~84 + rowGap 8 + utilities toggle row 28, see the
+// g_utilities* constants below), with a small margin.
+const int g_minGuiSize_y(655);
 const float g_guiratio = float(g_minGuiSize_y)/g_minGuiSize_x;
 
 // ---------- presethandler ----------
@@ -59,3 +62,16 @@ const int g_algorithmBoxWidth(260);
 const int g_helpButtonSize(22);           // small square "?" button, left of the algorithm box
 const int g_helpButtonGap(6);
 const int g_algorithmHelpPanelWidth(340);
+
+// Utilities row (Phase 4 step 2: planing.md 2.13 + 2.2), below the algorithm selector.
+// See UtilityProcessor.h.
+const int g_utilitiesTitleHeight(18);
+const int g_utilitiesKnobSize(56);        // Rotation/Balance: smaller than the aux knobs (64),
+const int g_utilitiesKnobLabelHeight(14); // since this row also needs space for the toggles/Monitor box
+const int g_utilitiesKnobGap(16);
+
+const int g_utilitiesToggleRowHeight(28);
+const int g_utilitiesToggleWidth(64);     // Swap / Inv L / Inv R buttons
+const int g_utilitiesToggleGap(6);
+const int g_utilitiesToggleMonitorGap(12); // gap between the toggle buttons and the Monitor box
+const int g_monitorBoxWidth(150);
