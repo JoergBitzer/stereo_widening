@@ -12,12 +12,27 @@ A pass-through plugin (it never modifies the audio) with:
   (vertical), same convention as `python/stereo_eval/report.py`'s goniometer plots, so a
   Python plot and the on-screen display can be compared directly. Points fade with age
   ("phosphor" persistence).
-- **Correlation meter** (`CorrelationMeterComponent`): −1 … +1 bar.
-- **Level meter** (`LevelMeterComponent`): RMS (bar) and peak (line) for L, R, M, S, plus
-  a "S−M" width-estimate readout in dB (0 dB = M and S equal power, matches
-  `stereo_eval.measures.levels()["S_minus_M_dB"]`).
+- **Correlation meter** (`CorrelationMeterComponent`): −1 … +1 bar, three colour zones
+  (green ≥ 0, amber −0.5…0, red < −0.5 — a rule of thumb, not a formal standard) and
+  endpoint labels ("OUT OF PHASE" / "WIDE" / "MONO").
+- **Level meter** (`LevelMeterComponent`): RMS bar (green/amber/red zones at −18/−6 dBFS)
+  and peak line + numeric readout for L, R, M, S, a shared dB scale to the right
+  (0, −6, −12, −18, −24, −36, −48, −60), and a "S−M" width-estimate readout in dB
+  (0 dB = M and S equal power, matches `stereo_eval.measures.levels()["S_minus_M_dB"]`).
 - **Integration** parameter (Fast 100 ms / Medium 300 ms / Slow 1000 ms): the time
   constant shared by the RMS and correlation meters.
+- All three components share a panel chrome (border + title, `MeterLookAndFeel::drawPanel`)
+  and a colour/size vocabulary (`MeterLookAndFeel.h`), so they read as one instrument
+  panel rather than three independently-styled widgets.
+
+![level meter colour zones](img/level_meter_zones.png)
+![correlation meter colour zones](img/correlation_zones.png)
+
+(Offline-rendered with synthetic test signals via a throwaway console tool, not part of
+the repo — no display needed: `juce::Image` + `Component::paintEntireComponent`. Level
+meter: L driven to a −3 dBFS-RMS sine (peak hits 0 dBFS, red), R to −30 dBFS (green); M/S
+land wherever that mix puts them. Correlation: three separate signals built from a common
+plus an orthogonal component, at ρ = 0.8/−0.25/−0.9.)
 
 Not yet implemented (deferred, see plan2.md Phase 2 step 2, marked optional there):
 spectrum display of the mono sum L+R and the side signal L−R. Candidate for a later pass
@@ -145,7 +160,7 @@ save/load, automation, editor-whilst-processing, bus enable/disable. `pluginval`
 is not part of this repository; it was downloaded to `AudioDev/tools/pluginval/` for
 this session (not versioned).
 
-## Screenshot (Standalone, after the fix)
+## Screenshot (Standalone, current layout)
 
 ![StereoAnalyzer Standalone](img/standalone_screenshot.png)
 

@@ -9,7 +9,7 @@ const bool g_forcePowerOf2(false); // should be true for FFT Processing
 // squarer than the template default: the goniometer needs a roughly square area
 const int g_minGuiSize_x(560);
 const int g_maxGuiSize_x(1200);
-const int g_minGuiSize_y(440);
+const int g_minGuiSize_y(470);
 const float g_guiratio = float(g_minGuiSize_y)/g_minGuiSize_x;
 
 // ---------- presethandler ----------
@@ -34,11 +34,11 @@ const int g_integrationBoxWidth(160);
 const int g_integrationLabelWidth(90);
 const int g_controlPadding(2);            // shrink-to-fit gap around the Integration controls
 
-const int g_correlationRowHeight(28);     // row above the controls: the correlation bar
-const int g_correlationPaddingX(4);
+const int g_correlationRowHeight(56);     // row above the controls: title + bar + endpoint labels
+const int g_correlationPaddingX(4);       // gap between the correlation panel and its neighbours
 const int g_correlationPaddingY(2);
 
-const int g_levelMeterMaxWidth(160);      // level meter panel: min(this, remaining width / divisor)
+const int g_levelMeterMaxWidth(190);      // level meter panel: min(this, remaining width / divisor)
 const int g_levelMeterWidthDivisor(4);
 const int g_levelMeterPadding(2);
 

@@ -34,6 +34,7 @@ private:
 
     StereoMeterState& state;
     juce::String label;
+    juce::Rectangle<float> contentBounds; // set by paint() (post title/border), used by toScreen()
 
     std::deque<juce::Point<float>> history; // in normalised (-1..1, -1..1) S/M coordinates
     int maxHistoryPoints = 6000; // ~130 ms of points at 48 kHz, redrawn every timer tick

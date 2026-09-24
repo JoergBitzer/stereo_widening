@@ -62,8 +62,8 @@ void StereoAnalyzerAudio::prepareParameter(std::unique_ptr<juce::AudioProcessorV
 StereoAnalyzerGUI::StereoAnalyzerGUI(StereoAnalyzerAudioProcessor& p, juce::AudioProcessorValueTreeState& apvts)
 :m_processor(p), m_apvts(apvts),
  m_goniometer(p.m_algo.m_meterState, "Goniometer"),
- m_correlationMeter(p.m_algo.m_meterState),
- m_levelMeter(p.m_algo.m_meterState)
+ m_correlationMeter(p.m_algo.m_meterState, "Correlation"),
+ m_levelMeter(p.m_algo.m_meterState, "Levels")
 {
     addAndMakeVisible(m_goniometer);
     addAndMakeVisible(m_correlationMeter);

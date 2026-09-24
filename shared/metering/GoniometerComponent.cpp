@@ -22,8 +22,6 @@ namespace
     constexpr float kLabelBoxHeight = 12.0f;
     constexpr float kMLabelGapAboveCircle = 14.0f;
     constexpr float kLRLabelGapBeyondDiagonal = 12.0f;
-
-    constexpr float kTitleBoxHeight = 16.0f;
 }
 
 GoniometerComponent::GoniometerComponent(StereoMeterState& stateToDisplay, juce::String labelText)
@@ -44,23 +42,23 @@ void GoniometerComponent::refresh()
 juce::Point<float> GoniometerComponent::toScreen(float s, float m) const
 {
     // the goniometer is rotated 45 degrees from the L/R axes: draw M (mono) upward and
-    // S (side) to the right, so the plot fits a square bounds without wasted corners
-    auto bounds = getLocalBounds().toFloat();
-    const float radius = 0.5f * juce::jmin(bounds.getWidth(), bounds.getHeight()) * kCircleMarginFraction;
-    const float cx = bounds.getCentreX();
-    const float cy = bounds.getCentreY();
+    // S (side) to the right, so the plot fits a square bounds without wasted corners.
+    // Uses contentBounds (set by paint(), after the panel title/border are reserved),
+    // not getLocalBounds(), so the plotted points always line up with the grid.
+    const float radius = 0.5f * juce::jmin(contentBounds.getWidth(), contentBounds.getHeight()) * kCircleMarginFraction;
+    const float cx = contentBounds.getCentreX();
+    const float cy = contentBounds.getCentreY();
     return { cx + s * radius, cy - m * radius };
 }
 
 void GoniometerComponent::paint(juce::Graphics& g)
 {
-    auto bounds = getLocalBounds().toFloat();
-    g.fillAll(MeterLookAndFeel::background);
+    contentBounds = MeterLookAndFeel::drawPanel(g, getLocalBounds().toFloat(), label);
 
     // grid: outer circle, L/R diagonals (+-45 deg), M/S cross
     g.setColour(MeterLookAndFeel::grid);
-    const float radius = 0.5f * juce::jmin(bounds.getWidth(), bounds.getHeight()) * kCircleMarginFraction;
-    juce::Point<float> centre = bounds.getCentre();
+    const float radius = 0.5f * juce::jmin(contentBounds.getWidth(), contentBounds.getHeight()) * kCircleMarginFraction;
+    juce::Point<float> centre = contentBounds.getCentre();
     g.drawEllipse(centre.x - radius, centre.y - radius, 2.0f * radius, 2.0f * radius, kAxisLineThickness);
     g.drawLine(centre.x, centre.y - radius, centre.x, centre.y + radius, kAxisLineThickness); // M axis (mono)
     g.drawLine(centre.x - radius, centre.y, centre.x + radius, centre.y, kAxisLineThickness); // S axis (side)
@@ -85,18 +83,11 @@ void GoniometerComponent::paint(juce::Graphics& g)
         for (const auto& p : history)
         {
             const float age = (float) i / (float) numPoints; // 0 = oldest, 1 = newest
-            g.setColour(MeterLookAndFeel::meterFill.withAlpha(kOldestPointAlpha + (kNewestPointAlpha - kOldestPointAlpha) * age));
+            g.setColour(MeterLookAndFeel::meterGood.withAlpha(kOldestPointAlpha + (kNewestPointAlpha - kOldestPointAlpha) * age));
             auto screenPoint = toScreen(p.x, p.y);
             g.fillEllipse(screenPoint.x - 0.5f * kPointDiameter, screenPoint.y - 0.5f * kPointDiameter, kPointDiameter, kPointDiameter);
             ++i;
         }
-    }
-
-    if (label.isNotEmpty())
-    {
-        g.setColour(MeterLookAndFeel::text);
-        g.setFont(MeterLookAndFeel::titleFontSize);
-        g.drawText(label, getLocalBounds().removeFromTop((int) kTitleBoxHeight), juce::Justification::centred);
     }
 }
 

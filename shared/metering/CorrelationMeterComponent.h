@@ -13,7 +13,7 @@
 class CorrelationMeterComponent : public MeterComponentBase
 {
 public:
-    explicit CorrelationMeterComponent(StereoMeterState& stateToDisplay);
+    explicit CorrelationMeterComponent(StereoMeterState& stateToDisplay, juce::String labelText = {});
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -22,6 +22,7 @@ private:
     void refresh() override; // smooths displayedValue towards state.getCorrelation()
 
     StereoMeterState& state;
+    juce::String label;
     float displayedValue = 0.0f; // smoothed for a less jittery needle
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CorrelationMeterComponent)
