@@ -36,11 +36,21 @@ AudioDev/
 └── stereo_widening/   # this repository
 ```
 
-Test samples:
+Python environment, test signals and evaluation (run from the project folder):
 
 ```console
-./copy_test_samples.sh            # copies from ~/Music/samples to test_signals/samples
+python3 -m venv .venv && .venv/bin/pip install -r python/requirements.txt
+./copy_test_samples.sh                              # samples from ~/Music/samples
+cd python
+../.venv/bin/python generate_test_signals.py        # -> test_signals/generated/
+../.venv/bin/python -m pytest                       # validates measures and algorithms
+../.venv/bin/python evaluate_ms_width.py            # -> python/results/ms_width/
 ```
+
+`stereo_eval` provides correlation (broadband, per 1/3 octave, over time), L/R/M/S
+levels, loudness (BS.1770), mono-sum colouration, and IACC for loudspeaker playback
+(spherical head model, speakers at ±30°). `report.evaluate(x_in, x_out, fs)` runs all
+of them.
 
 ## License
 

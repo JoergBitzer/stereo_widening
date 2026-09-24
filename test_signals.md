@@ -35,8 +35,21 @@ Notes:
 - The wet speech has the same phrases as the dry speech, so it can be used to compare
   "widening by algorithm" with "width from real reverb".
 
-## Generated signals (Phase 1)
+## Generated signals
 
-Written by `python/generate_test_signals.py` with a fixed seed. Planned: mono pink noise,
-independent pink noise L/R, polarity-inverted noise, log sweep, panned sources, mono
-speech with a synthetic stereo reverb, and a small mix built from the samples above.
+Written by `python/generate_test_signals.py` (seed 20260924, 44.1 kHz, 32-bit float).
+The samples above must be copied first.
+
+| File | Length | Content | Known values |
+|------|--------|---------|--------------|
+| noise_pink_mono.wav | 10 s | pink noise, L = R, −20 dBFS RMS | ρ = 1, S = −∞ |
+| noise_pink_rho050.wav | 10 s | pink noise with partial correlation | ρ = 0.5 |
+| noise_pink_uncorrelated.wav | 10 s | independent pink noise L/R | ρ = 0, S − M = 0 dB |
+| noise_pink_antiphase.wav | 10 s | pink noise, R = −L | ρ = −1, M = −∞ |
+| sweep_mono.wav | 10 s | log sweep 20 Hz – 20 kHz, L = R, −6 dBFS | ρ = 1 |
+| speech_pan_{L100,L50,C,R50,R100}.wav | 6.9 s | dry speech, constant-power pan −1 … +1 | ρ = 1 (undefined for hard pan) |
+| speech_mono_synthreverb.wav | 8.7 s | dry speech centre + uncorrelated reverb (RT60 1.2 s, wet −6 dB) | ρ ≈ 0.8 |
+| mix_small.wav | 9.6 s | bass (mono, centre) + stereo synth + vocal 30 % left | ρ ≈ 0.97 |
+
+Processed audio for listening (e.g. `python evaluate_ms_width.py --write-audio`) goes to
+`test_signals/processed/`.
