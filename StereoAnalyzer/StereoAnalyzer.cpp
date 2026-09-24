@@ -108,6 +108,51 @@ void StereoAnalyzerAudio::prepareParameter(std::unique_ptr<juce::AudioProcessorV
 }
 
 
+namespace
+{
+    void drawGearIcon(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour colour)
+    {
+        const auto centre = bounds.getCentre();
+        const float outerRadius = 0.5f * juce::jmin(bounds.getWidth(), bounds.getHeight());
+        const float rootRadius = outerRadius * 0.72f;  // between teeth
+        const float innerRadius = outerRadius * 0.42f; // centre hole
+        constexpr int numTeeth = 8;
+
+        juce::Path gear;
+        for (int i = 0; i < numTeeth * 2; ++i)
+        {
+            const float angle = juce::MathConstants<float>::twoPi * (float) i / (float) (numTeeth * 2);
+            const float r = (i % 2 == 0) ? outerRadius : rootRadius;
+            const auto point = centre.getPointOnCircumference(r, angle);
+            if (i == 0)
+                gear.startNewSubPath(point);
+            else
+                gear.lineTo(point);
+        }
+        gear.closeSubPath();
+        gear.addEllipse(centre.x - innerRadius, centre.y - innerRadius, innerRadius * 2.0f, innerRadius * 2.0f);
+        gear.setUsingNonZeroWinding(false); // even-odd fill: the ellipse subpath cuts a hole
+
+        g.setColour(colour);
+        g.fillPath(gear);
+    }
+}
+
+void GearButton::paintButton(juce::Graphics& g, bool isMouseOverButton, bool isButtonDown)
+{
+    auto bounds = getLocalBounds().toFloat();
+
+    auto background = findColour(juce::TextButton::buttonColourId);
+    if (isButtonDown)
+        background = background.brighter(0.3f);
+    else if (isMouseOverButton)
+        background = background.brighter(0.15f);
+    g.setColour(background);
+    g.fillRoundedRectangle(bounds, 0.15f * juce::jmin(bounds.getWidth(), bounds.getHeight()));
+
+    drawGearIcon(g, bounds.reduced(bounds.getWidth() * 0.18f), findColour(juce::TextButton::textColourOffId));
+}
+
 StereoAnalyzerGUI::StereoAnalyzerGUI(StereoAnalyzerAudioProcessor& p, juce::AudioProcessorValueTreeState& apvts)
 :m_processor(p), m_apvts(apvts),
  m_goniometer(p.m_algo.m_meterState, "Goniometer"),
@@ -123,6 +168,15 @@ StereoAnalyzerGUI::StereoAnalyzerGUI(StereoAnalyzerAudioProcessor& p, juce::Audi
 
     // fixed, not user-adjustable -- see the comment on kGoniometerAfterglowSeconds
     m_goniometer.setAfterglowTime(kGoniometerAfterglowSeconds);
+
+    // the goniometer's bottom-left corner stays empty of grid/points (especially now
+    // that overload points are clamped onto the circle instead), so it is a natural spot
+    // for a quiet build/version footnote. A logo image was tried here first, but its
+    // raster artwork did not scale well to this corner's size -- plain text renders
+    // crisply at any size instead (see docs/algorithms/phase2_stereo_analyzer.md).
+    const juce::String versionText = "Version: " + juce::String(PLUGIN_VERSION_MAJOR) + "."
+                                    + juce::String(PLUGIN_VERSION_MINOR) + "." + juce::String(PLUGIN_VERSION_PATCH);
+    m_goniometer.setCornerText({ "Built at Jade Hochschule Oldenburg", versionText });
 }
 
 void StereoAnalyzerGUI::showSettings()
@@ -149,15 +203,19 @@ void StereoAnalyzerGUI::resized()
 
 	auto r = getLocalBounds();
 
-    auto controlsRow = r.removeFromBottom(juce::roundToInt(g_controlsRowHeight * scale));
-    m_settingsButton.setBounds(controlsRow.removeFromRight(juce::roundToInt(g_settingsButtonWidth * scale))
-                                           .reduced(juce::roundToInt(g_controlPadding * scale)));
-
     auto correlationRow = r.removeFromBottom(juce::roundToInt(g_correlationRowHeight * scale));
     m_correlationMeter.setBounds(correlationRow.reduced(juce::roundToInt(g_correlationPaddingX * scale),
                                                           juce::roundToInt(g_correlationPaddingY * scale)));
 
     const int levelWidth = juce::jmin(juce::roundToInt(g_levelMeterMaxWidth * scale), r.getWidth() / g_levelMeterWidthDivisor);
-    m_levelMeter.setBounds(r.removeFromRight(levelWidth).reduced(juce::roundToInt(g_levelMeterPadding * scale)));
+    auto levelBounds = r.removeFromRight(levelWidth).reduced(juce::roundToInt(g_levelMeterPadding * scale));
+    m_levelMeter.setBounds(levelBounds);
     m_goniometer.setBounds(r.reduced(juce::roundToInt(g_goniometerPadding * scale)));
+
+    // the gear button shares the Levels panel's own top-left corner (to the left of its
+    // centred "Levels" title) instead of a dedicated row, freeing that space for the meters
+    const int buttonSize = juce::roundToInt(g_settingsButtonSize * scale);
+    const int buttonMargin = juce::roundToInt(g_settingsButtonMargin * scale);
+    m_settingsButton.setBounds(levelBounds.getX() + buttonMargin, levelBounds.getY() + buttonMargin,
+                                buttonSize, buttonSize);
 }

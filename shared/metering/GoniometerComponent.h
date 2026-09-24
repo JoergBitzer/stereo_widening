@@ -35,6 +35,14 @@ public:
      *  a fixed point count would be. */
     void setAfterglowTime(float seconds) noexcept { afterglowTime_s = juce::jmax(0.001f, seconds); }
 
+    /** Optional footer text (e.g. build info / version), drawn one line per entry in the
+     *  panel's bottom-left corner -- the area that stays empty of grid/points, especially
+     *  now that overload points are clamped onto the circle (see the file header). An
+     *  empty array (the default) draws nothing, so this reusable component stays
+     *  application-agnostic; the caller supplies whatever text (or none) fits its own
+     *  plugin. */
+    void setCornerText(juce::StringArray lines) { cornerTextLines = std::move(lines); }
+
 private:
     void refresh() override; // drains the FIFO into history, then trims it to the afterglow time
     juce::Point<float> toScreen(float s, float m) const;
@@ -45,6 +53,7 @@ private:
 
     std::deque<juce::Point<float>> history; // in normalised (-1..1, -1..1) S/M coordinates
     float afterglowTime_s = 0.2f;
+    juce::StringArray cornerTextLines; // optional, see setCornerText()
 
     std::vector<float> drainX, drainY; // reused scratch buffers for MeterFifo::drainInto
 

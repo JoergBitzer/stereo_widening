@@ -89,6 +89,22 @@ private:
     float m_lastPeakDecay = -1.0f;
 };
 
+// Simple vector-drawn "settings" gear icon button. A Unicode gear glyph (U+2699) in a
+// plain TextButton looked crisp at a large size (~28pt, confirmed with an offline render
+// test) but degraded into illegible noise at the small size this button actually needs,
+// since TextButton's LookAndFeel caps its font size well below that -- so the icon is
+// hand-drawn as a Path instead, which stays crisp at any size.
+class GearButton : public juce::Button
+{
+public:
+    GearButton() : juce::Button("Settings") {}
+
+private:
+    void paintButton(juce::Graphics& g, bool isMouseOverButton, bool isButtonDown) override;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GearButton)
+};
+
 class StereoAnalyzerGUI : public juce::Component
 {
 public:
@@ -105,5 +121,5 @@ private:
     GoniometerComponent m_goniometer;
     CorrelationMeterComponent m_correlationMeter;
     LevelMeterComponent m_levelMeter;
-    juce::TextButton m_settingsButton { "Settings..." };
+    GearButton m_settingsButton;
 };

@@ -40,6 +40,14 @@ namespace
     constexpr float kLabelBoxHeight = 12.0f;
     constexpr float kMLabelGapAboveCircle = 14.0f;
     constexpr float kLRLabelGapBeyondDiagonal = 12.0f;
+
+    // optional corner text (see setCornerText()): stacked lines anchored at the panel's
+    // bottom-left corner, in a grey a bit darker than the usual label text so it reads
+    // as a quiet footnote rather than competing with the actual meter readouts
+    constexpr float kCornerTextMargin = 4.0f;
+    constexpr float kCornerTextFontSize = 10.0f;
+    constexpr float kCornerTextLineHeight = 12.0f;
+    const juce::Colour kCornerTextColour = MeterLookAndFeel::text.darker(0.4f);
 }
 
 GoniometerComponent::GoniometerComponent(StereoMeterState& stateToDisplay, juce::String labelText)
@@ -107,6 +115,24 @@ void GoniometerComponent::paint(juce::Graphics& g)
                labelBoxWidth, labelBoxHeight, juce::Justification::centred);
     g.drawText("L", centre.x + d - labelBoxWidth + lrLabelGap * 0.5f, centre.y - d - labelBoxHeight,
                labelBoxWidth, labelBoxHeight, juce::Justification::centred);
+
+    if (!cornerTextLines.isEmpty())
+    {
+        const float margin = kCornerTextMargin * scaleFactor;
+        const float lineHeight = kCornerTextLineHeight * scaleFactor;
+        const float textWidth = contentBounds.getWidth() * 0.7f;
+
+        g.setColour(kCornerTextColour);
+        g.setFont(kCornerTextFontSize * scaleFactor);
+        for (int i = 0; i < cornerTextLines.size(); ++i)
+        {
+            // stack upward from the bottom margin, so the last line sits lowest and the
+            // array's own top-to-bottom order matches the drawn reading order
+            const float y = contentBounds.getBottom() - margin - (float) (cornerTextLines.size() - i) * lineHeight;
+            g.drawText(cornerTextLines[i], contentBounds.getX() + margin, y, textWidth, lineHeight,
+                       juce::Justification::centredLeft);
+        }
+    }
 
     // points, oldest = dimmest ("phosphor" persistence). Stride through history rather
     // than drawing every point, so paint() cost stays bounded (see kMaxDrawnPoints)

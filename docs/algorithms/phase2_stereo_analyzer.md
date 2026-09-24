@@ -377,6 +377,65 @@ second render with the same signal scaled down to ±0.6 (comfortably below 0 dBF
 plain green throughout, confirming the clamping only engages when it should.
 `pluginval --strictness-level 10` stays clean.
 
+## Gear-icon Settings button and a build/version footer
+
+User feedback, two "optics" requests together: move the Settings button off its own
+dedicated bottom row and into the Levels panel's own top-right corner (a simple gear
+icon instead of a text button), so the freed row gives the meters more room; and since
+the goniometer's bottom-left corner reliably stays empty (see "Goniometer overload
+clamping" above -- overload points are clamped onto the circle, never drawn outside it),
+put some branding/build info there.
+
+**Settings button.** `StereoAnalyzerGUI::resized()` no longer reserves a bottom
+`controlsRow`; the button now sits at the top-left corner of the Levels panel's own
+bounds (`g_settingsButtonSize` = 20px, `g_settingsButtonMargin` = 2px, both in
+PluginSettings.h), to the left of the panel's centred "Levels" title. The button itself
+was first tried as a plain `juce::TextButton` with a Unicode gear glyph (U+2699) as its
+text -- confirmed rendering cleanly in an isolated offline test at 28pt, but at the
+button's actual ~20px size it degraded into illegible noise, because `TextButton`'s
+`LookAndFeel_V4` caps its automatic font size well below what the glyph needs to stay
+legible. Fixed by hand-drawing the icon instead: a new `GearButton : public juce::Button`
+(StereoAnalyzer.h/.cpp) overrides `paintButton()` and draws an 8-tooth gear as a
+`juce::Path` (outer/root radius alternating per vertex, even-odd fill so the centre
+ellipse cuts a hole), which stays crisp at any size since it is not text/font-dependent.
+
+**Corner branding: a logo, then reverted to plain text.** First attempt added the Jade
+Hochschule logo (`LogoJadeHochschuleTrans.png`, transparent background, the same asset
+used in Stereoids/JadeSpectrogram/EQoder) as an image in the goniometer's corner, sized
+dynamically each repaint to fill the space up to the grid circle. It required a
+semi-transparent white backing plate to read at all (the artwork is black-on-transparent,
+made for a light host background, so it was otherwise invisible on this panel's black
+background), and even with that fix the raster logo did not scale well to a
+readable size in this corner -- user feedback: "the logo was not a good idea, it does not
+render well." Reverted: `GoniometerComponent::setCornerLogo(juce::Image)` was replaced
+with `setCornerText(juce::StringArray lines)`, which draws stacked plain-text lines
+instead (`GoniometerComponent.cpp`, `kCornerTextColour` = the usual label grey darkened
+by `.darker(0.4f)`, so it reads as a quiet footnote rather than competing with the actual
+meter readouts). Plain text sidesteps the whole scaling problem: JUCE's font renderer
+stays crisp at any size, unlike a fixed-resolution raster image. The image asset, its
+`juce_add_binary_data` embedding, and `StereoAnalyzer/images/` were all removed again.
+
+`StereoAnalyzerGUI`'s constructor now calls
+`m_goniometer.setCornerText({ "Built at Jade Hochschule Oldenburg", "Version: " + ... })`,
+building the version string from the `PLUGIN_VERSION_MAJOR`/`MINOR`/`PATCH` macros
+(`Versioning.h`, generated from the project version in `StereoAnalyzer/CMakeLists.txt`)
+so it can never drift out of sync with the plugin's actual reported version.
+
+**Version bump to 1.0.0.** User judgement: Phase 2 (StereoAnalyzer) is feature-complete.
+`project(StereoAnalyzer VERSION 1.0.0)` in `StereoAnalyzer/CMakeLists.txt` (previously
+0.0.1); `juce_add_plugin`'s `VERSION` argument is left unset, so it defaults to the CMake
+project version, meaning the VST3's own reported version (`moduleinfo.json`) and the
+on-screen "Version: 1.0.0" footer both come from this one place.
+
+![Settings gear button (top-right) and build/version footer text (bottom-left)](img/settings_gear_and_footer.png)
+
+Verified offline (same render technique as above, with the button composited in) at both
+the plugin's default startup size (560x470) and a larger window (900x750): the gear icon
+renders as a clean 8-tooth ring at its actual ~20px size, and the footer text is legible
+and clear of the circle and the "R" label at both sizes.
+`pluginval --strictness-level 10` stays clean on the rebuilt VST3, and the generated
+`Versioning.h` and the VST3's `moduleinfo.json` both confirm 1.0.0.
+
 ## Screenshot (Standalone, current layout)
 
 ![StereoAnalyzer Standalone](img/standalone_screenshot.png)
