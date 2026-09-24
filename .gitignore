@@ -1,0 +1,99 @@
+# ---------------------------------------------------------------
+# Test material (licensed samples and generated signals)
+# ---------------------------------------------------------------
+test_signals/
+
+# Rendered audio anywhere else in the project
+*.wav
+*.aif
+*.aiff
+*.flac
+*.mp3
+
+# ---------------------------------------------------------------
+# C++ / CMake / JUCE
+# ---------------------------------------------------------------
+build/
+build-*/
+cmake-build-*/
+out/
+Builds/
+JuceLibraryCode/
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+_deps/
+compile_commands.json
+Makefile
+*.ninja
+.ninja_deps
+.ninja_log
+
+# Generated version header (from Versioning.h.in)
+Versioning.h
+
+# Object files, libraries, binaries
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+*.pdb
+*.ilk
+*.exp
+*.gch
+*.pch
+*.d
+
+# Plugin bundles
+*.vst3/
+*.component/
+*.clap
+*.lv2/
+
+# Clangd / ccache caches
+.cache/
+.clangd/
+.ccache/
+
+# ---------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Plots and reports produced by the evaluation scripts
+python/results/
+
+# ---------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
