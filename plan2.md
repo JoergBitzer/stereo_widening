@@ -145,7 +145,7 @@ Details, findings and the cross-check numbers: `docs/algorithms/phase2_stereo_an
    tolerance; correlation is exactly +1 / −1 / ≈0 as expected.
 4. The analyzer is usable as a standalone tool once GUI verification is done in a DAW.
 
-### Phase 3 – StereoWidener, first algorithm — GUI, switch and both M/S variants done
+### Phase 3 – StereoWidener, first algorithm — done
 Details, findings and verification: `docs/algorithms/phase3_stereo_widener.md`.
 1. ✅ Copied StereoAnalyzer to `StereoWidener` (same tools/, template plumbing).
    Meters now show **input and output**: two `StereoMeterState`s, two `LevelMeterComponent`s
@@ -173,8 +173,18 @@ Details, findings and verification: `docs/algorithms/phase3_stereo_widener.md`.
 4. ✅ Null test: width = 100 % gives output = input for `MSWidthBroadband`
    (-144 dBFS, C++/JUCE only so far -- no Python reference for this algorithm yet).
    `MSWidthFiltered` deliberately does *not* pass this test (see the docs page for why).
-5. Rendering the test signals through the plugin and running the Python evaluation
-   report: not done yet.
+5. ✅ Rendered the test signal corpus (7 signals: pink noise, panned speech, speech with
+   synthetic reverb, a small mix, and three sample-based files including dual-mono
+   speech) through the real C++ algorithm classes via a new headless console tool,
+   `tools/widener_render` (same pattern as `tools/meter_crosscheck`), and measured the
+   results with `python/stereo_eval.report` via a new `python/evaluate_widener_plugin.py`
+   -- results and one plot per signal in `python/results/widener_plugin/` (gitignored,
+   regenerate with that script). Width scaling matched theory exactly (dS-M = +3.5 /
+   +6.0 dB at 150 % / 200 %, i.e. 20·log10(1.5) / 20·log10(2.0)), mono-sum colouration
+   was exactly 0.0 dB everywhere (M/S width's mono-compatibility-by-construction,
+   confirmed on real program material, not just synthetic signals), and the per-octave
+   correlation plot for `MSWidthFiltered` visibly shows the bass staying correlated
+   below the Bass Cutoff and decorrelating above it, exactly as designed.
 
 ### Phase 4 – Settings, utilities, latency
 1. **Global ini file** using `juce::PropertiesFile` (in the user's application-data

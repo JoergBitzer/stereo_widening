@@ -17,6 +17,18 @@ cmake --build . --target StereoWidener_VST3 -j8
 cmake --build . --target StereoWidener_Standalone -j8
 ```
 
+## Evaluating the algorithms
+
+`tools/widener_render` (built the same way, target `WidenerRender`) renders a wav file
+through the real algorithm classes headlessly. `python/evaluate_widener_plugin.py` runs
+it across the project's test-signal corpus and measures the results with
+`python/stereo_eval`, writing a summary and plots to `python/results/widener_plugin/`:
+
+```console
+cmake --build . --target WidenerRender -j8
+cd ../stereo_widening/python && python evaluate_widener_plugin.py
+```
+
 ## Parameters
 
 - **Width**: 0-200 %. 0 collapses the side signal to mono, 100 is unity (unchanged from

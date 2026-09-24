@@ -316,6 +316,63 @@ Verified both ways: StereoWidener's one-line footer now renders in full with no
 truncation, and a re-render of StereoAnalyzer's existing two-line footer confirmed no
 regression there (still fits comfortably, still clear of the circle).
 
+## Rendering the test signals through the plugin (Phase 3, step 5)
+
+Every check so far in this phase either used synthetic buffers built inline in a C++
+console tool (the null test, the Off-zone bypass check) or the Python *reference*
+implementation (`python/algorithms/ms_width.py`, which models a more elaborate,
+not-yet-implemented design -- an allpass-aligned bass mono for phase coherence, a
+configurable-gain side shelf, optional level compensation -- see that module's
+docstring). Neither exercises the actual C++ algorithm classes against the project's
+real test-signal corpus.
+
+**`tools/widener_render`** (new, permanent, same pattern as `tools/meter_crosscheck`
+from Phase 2) is a headless console tool: `WidenerRender <in.wav> <out.wav>
+<broadband|filtered> [width%] [bassCutoffHz] [highShelfHz]`. It loads a wav file
+(duplicating mono to L=R, matching `stereo_eval.audio_io.read_stereo`'s convention,
+since the algorithm classes require exactly 2 channels), instantiates the real
+`MSWidthBroadband`/`MSWidthFiltered` class, processes it in 512-sample blocks (not one
+giant call, so `MSWidthFiltered`'s per-sample IIR filter state behaves the same as it
+would inside the real plugin's block-based `processSynchronBlock()`), and writes a
+32-bit float wav. One gotcha along the way, the same `FileOutputStream`-appends-by-
+default bug already hit twice earlier in this project (StereoAnalyzer's screenshot tool,
+Phase 2/3 docs): running the tool twice at the same output path silently produced a
+corrupt (doubled, unparseable) wav file; fixed with `outputFile.deleteFile()` before
+opening the writer, same as the earlier fixes.
+
+**`python/evaluate_widener_plugin.py`** (new) runs this tool across the same 7-signal
+corpus `evaluate_ms_width.py` uses (pink noise, panned speech, speech with synthetic
+reverb, a small mix, and three sample-based files including dual-mono speech) at five
+settings (`broadband` width 0/150/200 %, `filtered` at width 150 % with Bass Cutoff
+120 Hz / High Shelf 8000 Hz, and `filtered` at width 150 % with both knobs in their Off
+zone), measures each (input, output) pair with `stereo_eval.report.evaluate()` exactly
+as `evaluate_ms_width.py` does, and writes a summary table plus one plot per signal to
+`python/results/widener_plugin/` (gitignored, like all of `python/results/` --
+regenerate with `python python/evaluate_widener_plugin.py`).
+
+![StereoWidener plugin, filtered algorithm on pink noise: per-octave correlation clearly stays high below the 120 Hz Bass Cutoff and drops above it, and mono-sum colouration is exactly 0 dB across the whole spectrum](img/phase3_widener_eval_pink_noise.png)
+
+Results across the whole corpus matched theory and design intent:
+- **Width scaling is exact**: broadband width 150 %/200 % changed S-M by +3.5/+6.0 dB
+  on every signal, exactly `20*log10(1.5)` / `20*log10(2.0)` -- confirms the M/S
+  recombination introduces no unexpected level error.
+- **Mono-sum colouration is exactly 0.0 dB on every signal at every setting**: M/S
+  width changes only S, so `L'+R' = 2M` is untouched by construction, and this holds
+  in practice, not just in theory -- the plotted "Mono sum out - in" curve (see figure)
+  is a flat line at 0 dB across the whole spectrum.
+- **`MSWidthFiltered` with both knobs in their Off zone is bit-exact with
+  `MSWidthBroadband`** at the same width, re-confirming the Off-zone bypass check from
+  earlier in this phase, now on the real test-signal corpus instead of only synthetic
+  noise (the script asserts this and fails if it ever stops holding).
+- **The bass-mono effect is visible exactly where designed**: the per-octave
+  correlation plot for pink noise (figure above) shows "in" and "out" correlation
+  nearly identical below the 120 Hz Bass Cutoff, then "out" drops sharply above it --
+  a direct visual confirmation that `MSWidthFiltered` keeps the bass centred and only
+  widens the highs, not an approximation.
+- Dual-mono material (`speech_dry_answers`, S already ~-119 dBFS) showed no meaningful
+  change under any setting, as expected: M/S width cannot create stereo width that
+  was never there.
+
 ## Not yet implemented (deferred to later phases, per plan2.md)
 
 - Mono input / mono->stereo bus layout (currently stereo->stereo only, like the
