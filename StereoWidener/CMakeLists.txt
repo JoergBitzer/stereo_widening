@@ -1,0 +1,70 @@
+
+
+# The top-level CMakeLists.txt file for a project must contain a literal, direct call to the
+# `project()` command. `project()` sets up some helpful variables that describe source/binary
+# directories, and the current project version. This is a standard CMake command.
+
+set(TARGET_NAME StereoWidener)
+
+project(${TARGET_NAME} VERSION 0.1.0)
+
+configure_file(Versioning.h.in Versioning.h)
+
+# add_compile_definitions(FACTORY_PRESETS) # use this if you have finally some presets to add (see binary files below)
+# add_compile_definitions(WITH_MIDIKEYBOARD)
+# add_compile_definitions(WITH_PRESETHANDLERGUI)
+
+juce_add_plugin(${TARGET_NAME}
+    COMPANY_NAME  "Jade_Hochschule"             # Specify the name of the plugin's author
+    IS_SYNTH FALSE                       # Is this a synth or an effect?
+    NEEDS_MIDI_INPUT FALSE               # Does the plugin need midi input?
+    NEEDS_MIDI_OUTPUT FALSE              # Does the plugin need midi output?
+    VST3_CATEGORIES "Fx" "Stereo"
+    AU_MAIN_TYPE "kAudioUnitType_Effect"
+    COPY_PLUGIN_AFTER_BUILD FALSE               # Should the plugin be installed to a default location after building?
+    PLUGIN_MANUFACTURER_CODE IHAJ               # A four-character manufacturer id with at least one upper-case character
+    PLUGIN_CODE sWi1                            # A unique four-character plugin id with at least one upper-case character
+    FORMATS AU VST3 Standalone                  # The formats to build. Other valid formats are: AAX Unity VST AU AUv3
+    PRODUCT_NAME "StereoWidener")     # The name of the final executable, which can differ from the target name
+
+juce_generate_juce_header(${TARGET_NAME})
+
+target_sources(${TARGET_NAME}
+    PRIVATE
+        PluginEditor.cpp
+        PluginProcessor.cpp
+        StereoWidener.cpp
+        algorithms/MSWidthBroadband.cpp
+        algorithms/MSWidthFiltered.cpp
+        tools/MidiModPitchState.cpp
+        tools/PresetHandler.cpp
+        tools/SynchronBlockProcessor.cpp
+        ../shared/metering/StereoMeterState.cpp
+        ../shared/metering/MeterFifo.cpp
+        ../shared/metering/GoniometerComponent.cpp
+        ../shared/metering/CorrelationMeterComponent.cpp
+        ../shared/metering/LevelMeterComponent.cpp
+        )
+
+target_compile_definitions(${TARGET_NAME}
+    PUBLIC
+        # JUCE_WEB_BROWSER and JUCE_USE_CURL would be on by default, but you might not need them.
+        JUCE_WEB_BROWSER=0  # If you remove this, add `NEEDS_WEB_BROWSER TRUE` to the `juce_add_plugin` call
+        JUCE_USE_CURL=0     # If you remove this, add `NEEDS_CURL TRUE` to the `juce_add_plugin` call
+        JUCE_VST3_CAN_REPLACE_VST2=0)
+
+# juce_add_binary_data(${TARGET_NAME}-binary SOURCES ...)
+
+target_link_libraries(${TARGET_NAME}
+    PRIVATE
+        juce::juce_audio_utils
+        juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags)
+
+target_include_directories(${TARGET_NAME} PUBLIC
+        "${PROJECT_BINARY_DIR}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/.."
+        )

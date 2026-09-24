@@ -145,18 +145,31 @@ Details, findings and the cross-check numbers: `docs/algorithms/phase2_stereo_an
    tolerance; correlation is exactly +1 / −1 / ≈0 as expected.
 4. The analyzer is usable as a standalone tool once GUI verification is done in a DAW.
 
-### Phase 3 – StereoWidener, first algorithm
-1. Copy StereoAnalyzer to `StereoWidener`. Meters now show **input and output**.
-2. Core infrastructure:
-   - `StereoAlgorithm` interface (see `planing.md` 4.1). The interface gets
-     `getName()`, `isMonoSafe()` and `getLatencySamples()`.
-   - Algorithm switching with an equal-power crossfade (20–50 ms).
-   - Common parameters: Width (0–200 %), Mix, Output gain, Bass mono, Auto gain, Bypass.
-   - Bus layouts: stereo→stereo (default) and mono→stereo.
-3. **Algorithm 2.1**, M/S width + bass mono + side shelf.
-4. Null tests: width = 100 % gives output = input, and C++ output matches the Python
-   reference (difference below −100 dBFS for float).
-5. Render the test signals through the plugin and run the evaluation report.
+### Phase 3 – StereoWidener, first algorithm — GUI, switch and both M/S variants done
+Details, findings and verification: `docs/algorithms/phase3_stereo_widener.md`.
+1. ✅ Copied StereoAnalyzer to `StereoWidener` (same tools/, template plumbing).
+   Meters now show **input and output**: two `StereoMeterState`s, two `LevelMeterComponent`s
+   (left/right), and one `GoniometerComponent` with the input/output overlaid as two
+   colours in the same circle (green/blue) via a new `setSecondarySeries()` -- kept
+   generic in `shared/metering/`, so `StereoAnalyzer`'s single-series goniometer is
+   unaffected.
+2. ✅ Core infrastructure:
+   - `StereoAlgorithm` interface (`algorithms/StereoAlgorithm.h`), with `getName()`,
+     `isMonoSafe()` and `getLatencySamples()` as specified.
+   - Algorithm switching with an equal-power (cos/sin) crossfade, 30 ms.
+   - Width (0–200 %) implemented. Mix, Output gain, Bass mono (as a separate control),
+     Auto gain and Bypass deferred to Phase 4 -- not needed yet to exercise the switch.
+   - Bus layout: stereo→stereo only so far (mono→stereo deferred to Phase 4; a mono
+     buffer is currently passed through unprocessed as a safety guard).
+3. ✅ **Algorithm 2.1**, split into two variants specifically so switching between them
+   is audible: `MSWidthBroadband` (plain broadband width) and `MSWidthFiltered` (the
+   same control with the side signal high-pass filtered first, forcing bass mono). The
+   side-shelf part of "M/S width + bass mono + side shelf" is not yet implemented.
+4. ✅ Null test: width = 100 % gives output = input for `MSWidthBroadband`
+   (-144 dBFS, C++/JUCE only so far -- no Python reference for this algorithm yet).
+   `MSWidthFiltered` deliberately does *not* pass this test (see the docs page for why).
+5. Rendering the test signals through the plugin and running the Python evaluation
+   report: not done yet.
 
 ### Phase 4 – Settings, utilities, latency
 1. **Global ini file** using `juce::PropertiesFile` (in the user's application-data

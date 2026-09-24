@@ -43,19 +43,40 @@ public:
      *  plugin. */
     void setCornerText(juce::StringArray lines) { cornerTextLines = std::move(lines); }
 
+    /** Colour for the primary series' non-overload points (default green, matching the
+     *  established StereoAnalyzer look). */
+    void setPrimaryColour(juce::Colour colour) noexcept { primaryColour = colour; }
+
+    /** Adds a second signal, drawn in its own colour on top of the primary series but
+     *  sharing the same grid/circle -- e.g. StereoWidener overlays input (primary,
+     *  green) and output (secondary, blue) in one goniometer instead of needing two
+     *  separate instances. Pass nullptr to remove it again. Both series still get the
+     *  overload clamp-to-circle-and-turn-red treatment (see the file header). */
+    void setSecondarySeries(StereoMeterState* stateToDisplay, juce::Colour colour);
+
 private:
-    void refresh() override; // drains the FIFO into history, then trims it to the afterglow time
+    void refresh() override; // drains both FIFOs into history, then trims to the afterglow time
     juce::Point<float> toScreen(float s, float m) const;
+    static void drainSeries(StereoMeterState& s, std::deque<juce::Point<float>>& hist,
+                             std::vector<float>& scratchX, std::vector<float>& scratchY);
+    void drawSeries(juce::Graphics& g, const std::deque<juce::Point<float>>& hist,
+                     juce::Colour colour, float pointDiameter) const;
 
     StereoMeterState& state;
+    StereoMeterState* secondaryState = nullptr;
+    juce::Colour primaryColour = MeterLookAndFeel::meterGood;
+    juce::Colour secondaryColour = MeterLookAndFeel::meterGood;
+
     juce::String label;
     juce::Rectangle<float> contentBounds; // set by paint() (post title/border), used by toScreen()
 
-    std::deque<juce::Point<float>> history; // in normalised (-1..1, -1..1) S/M coordinates
+    std::deque<juce::Point<float>> history;          // primary series, normalised (-1..1, -1..1) S/M
+    std::deque<juce::Point<float>> secondaryHistory; // optional secondary series, same coordinates
     float afterglowTime_s = 0.2f;
     juce::StringArray cornerTextLines; // optional, see setCornerText()
 
-    std::vector<float> drainX, drainY; // reused scratch buffers for MeterFifo::drainInto
+    std::vector<float> drainX, drainY;   // reused scratch buffers for the primary series
+    std::vector<float> drainX2, drainY2; // reused scratch buffers for the secondary series
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GoniometerComponent)
 };

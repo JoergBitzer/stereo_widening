@@ -1,0 +1,5 @@
+#pragma once
+// Macros for CMAKE
+#define PLUGIN_VERSION_MAJOR @StereoWidener_VERSION_MAJOR@
+#define PLUGIN_VERSION_MINOR @StereoWidener_VERSION_MINOR@
+#define PLUGIN_VERSION_PATCH @StereoWidener_VERSION_PATCH@

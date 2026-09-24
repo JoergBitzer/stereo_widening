@@ -55,17 +55,36 @@ GoniometerComponent::GoniometerComponent(StereoMeterState& stateToDisplay, juce:
 {
 }
 
+void GoniometerComponent::drainSeries(StereoMeterState& s, std::deque<juce::Point<float>>& hist,
+                                       std::vector<float>& scratchX, std::vector<float>& scratchY)
+{
+    s.getGoniometerFifo().drainInto(scratchX, scratchY);
+    for (size_t i = 0; i < scratchX.size(); ++i)
+        hist.emplace_back(scratchX[i], scratchY[i]);
+}
+
 void GoniometerComponent::refresh()
 {
-    state.getGoniometerFifo().drainInto(drainX, drainY);
-    for (size_t i = 0; i < drainX.size(); ++i)
-        history.emplace_back(drainX[i], drainY[i]);
+    drainSeries(state, history, drainX, drainY);
+    if (secondaryState != nullptr)
+        drainSeries(*secondaryState, secondaryHistory, drainX2, drainY2);
 
     // points arrive one per audio sample, so afterglowTime_s converts directly to a
-    // point count; recomputed every tick since sample rate or afterglowTime_s can change
+    // point count; recomputed every tick since sample rate or afterglowTime_s can
+    // change. Both series share the primary's sample rate (in practice input and
+    // output always run at the same rate).
     const size_t maxHistoryPoints = (size_t) juce::jmax(1.0, afterglowTime_s * state.getSampleRate());
     while (history.size() > maxHistoryPoints)
         history.pop_front();
+    while (secondaryHistory.size() > maxHistoryPoints)
+        secondaryHistory.pop_front();
+}
+
+void GoniometerComponent::setSecondarySeries(StereoMeterState* stateToDisplay, juce::Colour colour)
+{
+    secondaryState = stateToDisplay;
+    secondaryColour = colour;
+    secondaryHistory.clear();
 }
 
 juce::Point<float> GoniometerComponent::toScreen(float s, float m) const
@@ -134,40 +153,51 @@ void GoniometerComponent::paint(juce::Graphics& g)
         }
     }
 
-    // points, oldest = dimmest ("phosphor" persistence). Stride through history rather
-    // than drawing every point, so paint() cost stays bounded (see kMaxDrawnPoints)
-    // however many points afterglowTime_s currently keeps in history; age is computed
-    // from the real position in the full history, not the decimated draw order, so the
-    // fade timing itself is unaffected by the stride.
-    const int numPoints = (int) history.size();
-    if (numPoints > 0)
+    // points, oldest = dimmest ("phosphor" persistence). Primary series first, then the
+    // optional secondary series on top (e.g. StereoWidener's output over its input), so
+    // the more relevant/recent signal isn't hidden underneath the other.
+    drawSeries(g, history, primaryColour, pointDiameter);
+    if (secondaryState != nullptr)
+        drawSeries(g, secondaryHistory, secondaryColour, pointDiameter);
+}
+
+void GoniometerComponent::drawSeries(juce::Graphics& g, const std::deque<juce::Point<float>>& hist,
+                                      juce::Colour colour, float pointDiameter) const
+{
+    // Stride through history rather than drawing every point, so paint() cost stays
+    // bounded (see kMaxDrawnPoints) however many points afterglowTime_s currently keeps
+    // in history; age is computed from the real position in the full history, not the
+    // decimated draw order, so the fade timing itself is unaffected by the stride.
+    const int numPoints = (int) hist.size();
+    if (numPoints == 0)
+        return;
+
+    const int stride = juce::jmax(1, numPoints / kMaxDrawnPoints);
+    for (int i = 0; i < numPoints; i += stride)
     {
-        const int stride = juce::jmax(1, numPoints / kMaxDrawnPoints);
-        for (int i = 0; i < numPoints; i += stride)
+        const float age = (float) i / (float) numPoints; // 0 = oldest, 1 = newest
+        const auto& p = hist[(size_t) i]; // std::deque: O(1) random access
+
+        // sqrt(S^2 + M^2) is the point's distance from the centre in normalised (-1..1)
+        // coordinates, exactly matching the grid circle's radius of 1 (both axes use
+        // the same screen-pixel scale, see toScreen()). Above 0 dBFS input this can
+        // exceed 1: clamp the point onto the circle rather than letting it land
+        // anywhere in the component's rectangle, and colour it red -- a visible
+        // overload marker instead of a silently misleading position, regardless of
+        // which series it belongs to.
+        float s = p.x, m = p.y;
+        const float magnitude = std::sqrt(s * s + m * m);
+        const bool isOverload = magnitude > 1.0f;
+        if (isOverload)
         {
-            const float age = (float) i / (float) numPoints; // 0 = oldest, 1 = newest
-            const auto& p = history[(size_t) i]; // std::deque: O(1) random access
-
-            // sqrt(S^2 + M^2) is the point's distance from the centre in normalised
-            // (-1..1) coordinates, exactly matching the grid circle's radius of 1 (both
-            // axes use the same screen-pixel scale, see toScreen()). Above 0 dBFS input
-            // this can exceed 1: clamp the point onto the circle rather than letting it
-            // land anywhere in the component's rectangle, and colour it red -- a visible
-            // overload marker instead of a silently misleading position.
-            float s = p.x, m = p.y;
-            const float magnitude = std::sqrt(s * s + m * m);
-            const bool isOverload = magnitude > 1.0f;
-            if (isOverload)
-            {
-                s /= magnitude;
-                m /= magnitude;
-            }
-
-            const auto baseColour = isOverload ? MeterLookAndFeel::meterDanger : MeterLookAndFeel::meterGood;
-            g.setColour(baseColour.withAlpha(kOldestPointAlpha + (kNewestPointAlpha - kOldestPointAlpha) * age));
-            auto screenPoint = toScreen(s, m);
-            g.fillEllipse(screenPoint.x - 0.5f * pointDiameter, screenPoint.y - 0.5f * pointDiameter, pointDiameter, pointDiameter);
+            s /= magnitude;
+            m /= magnitude;
         }
+
+        const auto baseColour = isOverload ? MeterLookAndFeel::meterDanger : colour;
+        g.setColour(baseColour.withAlpha(kOldestPointAlpha + (kNewestPointAlpha - kOldestPointAlpha) * age));
+        auto screenPoint = toScreen(s, m);
+        g.fillEllipse(screenPoint.x - 0.5f * pointDiameter, screenPoint.y - 0.5f * pointDiameter, pointDiameter, pointDiameter);
     }
 }
 
