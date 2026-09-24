@@ -21,9 +21,15 @@ cmake --build . --target StereoWidener_Standalone -j8
 
 - **Width**: 0-200 %. 0 collapses the side signal to mono, 100 is unity (unchanged from
   the input), 200 doubles the side signal.
-- **Algorithm**: which stereo-widening algorithm processes the signal. Switching is
-  crossfaded (equal-power, 30 ms) so it never clicks.
-  - *M/S Width (Broadband)*: plain M/S width control across the whole spectrum.
+- **Algorithm**: which stereo-widening algorithm processes the signal, selected from the
+  list below the Width knob. Switching is crossfaded (equal-power, 30 ms) so it never
+  clicks. Click the "?" button next to the selector for an explanation of the active
+  algorithm, with a citation to a written source.
+  - *M/S Width (Broadband)*: plain M/S width control across the whole spectrum. The two
+    knobs flanking Width are unused (greyed out) for this algorithm.
   - *M/S Width (Filtered / Bass Mono)*: the same control, but the side signal is
     high-pass filtered first, so bass content is forced mono and only the highs get
-    widened.
+    widened, then high-shelved to restore some "air". The left knob sets the **Bass
+    Cutoff** (40-500 Hz, turn below 40 Hz for "Off" -- bypasses the high-pass entirely),
+    the right knob sets the **High Shelf** frequency (1000-16000 Hz, fixed +3 dB for
+    this first version; turn above 16 kHz for "Off" -- bypasses the shelf entirely).

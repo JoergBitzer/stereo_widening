@@ -12,7 +12,7 @@ configure_file(Versioning.h.in Versioning.h)
 
 # add_compile_definitions(FACTORY_PRESETS) # use this if you have finally some presets to add (see binary files below)
 # add_compile_definitions(WITH_MIDIKEYBOARD)
-# add_compile_definitions(WITH_PRESETHANDLERGUI)
+add_compile_definitions(WITH_PRESETHANDLERGUI)
 
 juce_add_plugin(${TARGET_NAME}
     COMPANY_NAME  "Jade_Hochschule"             # Specify the name of the plugin's author
@@ -34,6 +34,7 @@ target_sources(${TARGET_NAME}
         PluginEditor.cpp
         PluginProcessor.cpp
         StereoWidener.cpp
+        AlgorithmHelpPanel.cpp
         algorithms/MSWidthBroadband.cpp
         algorithms/MSWidthFiltered.cpp
         tools/MidiModPitchState.cpp

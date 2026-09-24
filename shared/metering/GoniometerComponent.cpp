@@ -139,7 +139,12 @@ void GoniometerComponent::paint(juce::Graphics& g)
     {
         const float margin = kCornerTextMargin * scaleFactor;
         const float lineHeight = kCornerTextLineHeight * scaleFactor;
-        const float textWidth = contentBounds.getWidth() * 0.7f;
+        // Nearly the full panel width, not just a fixed fraction of it: the text sits
+        // right at the bottom margin, well clear of the circle (which occupies the
+        // panel's centre), so there is no risk of overlapping it -- and a smaller
+        // goniometer (StereoWidener's, ~60% of StereoAnalyzer's size) needs every pixel
+        // it can get to fit a one-line build/version footer without truncating.
+        const float textWidth = contentBounds.getWidth() - 2.0f * margin;
 
         g.setColour(kCornerTextColour);
         g.setFont(kCornerTextFontSize * scaleFactor);

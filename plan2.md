@@ -163,8 +163,13 @@ Details, findings and verification: `docs/algorithms/phase3_stereo_widener.md`.
      buffer is currently passed through unprocessed as a safety guard).
 3. ✅ **Algorithm 2.1**, split into two variants specifically so switching between them
    is audible: `MSWidthBroadband` (plain broadband width) and `MSWidthFiltered` (the
-   same control with the side signal high-pass filtered first, forcing bass mono). The
-   side-shelf part of "M/S width + bass mono + side shelf" is not yet implemented.
+   same control with the side signal high-pass filtered first, forcing bass mono, then
+   high-shelved for "air" -- the side-shelf part). Bass Cutoff and High Shelf frequency
+   are adjustable via two aux knobs that flank Width and are relabelled/enabled per
+   algorithm (`StereoAlgorithm::getAuxLeftInfo()`/`getAuxRightInfo()`); the shelf's gain
+   is a fixed +3 dB constant for this first version, not yet its own parameter. A "?"
+   button next to the algorithm selector shows each algorithm's description and a
+   citation to a written source.
 4. ✅ Null test: width = 100 % gives output = input for `MSWidthBroadband`
    (-144 dBFS, C++/JUCE only so far -- no Python reference for this algorithm yet).
    `MSWidthFiltered` deliberately does *not* pass this test (see the docs page for why).

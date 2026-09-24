@@ -8,7 +8,14 @@ const bool g_forcePowerOf2(false); // should be true for FFT Processing
 // global GUI setting for StereoWidener
 const int g_minGuiSize_x(480);
 const int g_maxGuiSize_x(1200);
-const int g_minGuiSize_y(460);
+// 456 for StereoWidenerGUI's own content (meterRow 260 + rowGap 8 + knobRow 150 +
+// rowGap 8 + algorithmRow 30, see the layout constants below) + 31 for the preset
+// control now reserved above it (g_minPresetHandlerHeight = 30, plus the 1px gap
+// PluginEditor.cpp's resized() adds) now that WITH_PRESETHANDLERGUI is enabled
+// (StereoWidener/CMakeLists.txt) -- without this, the preset bar simply ate into
+// StereoWidenerGUI's own height instead of the window growing to fit both, pushing the
+// algorithm selector below the visible window.
+const int g_minGuiSize_y(491);
 const float g_guiratio = float(g_minGuiSize_y)/g_minGuiSize_x;
 
 // ---------- presethandler ----------
@@ -43,5 +50,12 @@ const int g_widthKnobSize(110);           // diameter of the big Width rotary kn
 const int g_widthKnobRowHeight(150);      // reserved height for knob + its label/textbox
 const int g_widthKnobLabelHeight(18);
 
+const int g_auxKnobSize(64);              // diameter of the two smaller flanking knobs
+const int g_auxKnobLabelHeight(16);       // (their meaning depends on the active algorithm,
+const int g_auxKnobGap(16);               // see StereoAlgorithm::getAuxLeftInfo()/getAuxRightInfo())
+
 const int g_algorithmRowHeight(30);
-const int g_algorithmBoxWidth(280);
+const int g_algorithmBoxWidth(260);
+const int g_helpButtonSize(22);           // small square "?" button, left of the algorithm box
+const int g_helpButtonGap(6);
+const int g_algorithmHelpPanelWidth(340);

@@ -40,6 +40,154 @@ listbox for algorithm selection below that."
 - **Algorithm selector ("listbox")**: a `juce::ComboBox` below the knob, bound to the
   Algorithm parameter via `ComboBoxAttachment`, populated from `g_algorithmNames`.
 
+## Follow-up: help button and per-algorithm aux knobs
+
+User feedback, two more additions to the layout above: "add a small question mark symbol
+as a button to the left of the listbox. by clicking an explanation of the algorithm with
+scientific source should be provided" and "we need at least 2 other parameter (smaller
+knobs) left and right from width. These parameter should change their description for
+each algorithm. For this first version the left and right knob are switched off (greyed)
+for the broadband MS algorithm and for the filtered one, the left knob is the bass cutoff
+frequency and the right is the high-shelf frequency."
+
+![StereoWidener GUI with the help button and the two aux knobs (Filtered algorithm selected, so both are enabled and labelled)](img/phase3_widener_gui.png)
+
+**Help button.** A small `juce::TextButton` ("?", `g_helpButtonSize` = 22px) sits to the
+left of the algorithm selector (same row). Clicking it opens a `juce::CallOutBox`
+(`AlgorithmHelpPanel.h`/`.cpp`, same popup pattern as `StereoAnalyzer`'s Settings button)
+showing the *currently selected* algorithm's name and description, captured at click
+time so the popup stays consistent even if the selection changes while it's open. The
+description text -- including a citation to a written source -- now lives on
+`StereoAlgorithm` itself (`getDescription()`), alongside the existing `getName()`: each
+algorithm documents itself, matching the project's teaching-example goal (planing.md
+section 5) directly in the code the student would read. `AlgorithmHelpPanel` measures
+its own height from the wrapped text via `juce::TextLayout` rather than a fixed guess, so
+a longer description just makes a taller popup instead of being clipped.
+
+**Aux knobs.** `StereoAlgorithm::process()` now takes a `StereoAlgorithmParams` struct
+(`width`, `auxLeft`, `auxRight`) instead of a bare `width` float, and two new interface
+methods, `getAuxLeftInfo()`/`getAuxRightInfo()`, return an `AuxKnobInfo { enabled, label
+}` describing how (if at all) the active algorithm uses each of `StereoWidenerGUI`'s two
+smaller knobs flanking Width (`g_auxKnobSize` = 64px, ~58% of the Width knob's diameter).
+`MSWidthBroadband` reports both as disabled (empty `AuxKnobInfo{}`); `StereoWidenerGUI`
+greys them out for it via `juce::Slider::setEnabled(false)` (JUCE's default LookAndFeel
+dims a disabled slider automatically) and blanks their labels. `MSWidthFiltered` enables
+both and labels them "Bass Cutoff" / "High Shelf".
+
+Both knobs are backed by real, always-present APVTS parameters (`g_paramBassCutoff`:
+40-500 Hz, default 150 Hz -- the algorithm's previous fixed constant; `g_paramHighShelfFreq`:
+1000-16000 Hz, default 8000 Hz) rather than a fully generic, per-algorithm-reconfigurable
+control: a single JUCE parameter's numeric range is fixed for the plugin's lifetime, so
+letting a future algorithm reinterpret the same knob as, say, a delay time in
+milliseconds would need its own parameter underneath anyway. `MSWidthFiltered` reads
+`params.auxLeft` as the Bass Cutoff frequency for its existing high-pass filter (now
+adjustable, previously a fixed `kCrossoverHz` constant) and gained a second filter stage,
+a high shelf on the (already bass-mono'd) side signal at `params.auxRight`, boosting by a
+fixed `kHighShelfGainDb` (+3 dB) -- only the frequency is exposed as a parameter for this
+first version, as requested; the gain is a named constant in `MSWidthFiltered.h`,
+documented as a first-version simplification. Both filters recompute their `juce::dsp::IIR`
+coefficients only when their controlling value actually changes (an epsilon comparison,
+`hasChanged()`, matching the pattern already used in `StereoAnalyzer.cpp`), not every
+sample.
+
+`m_algorithmBox.onChange` calls `StereoWidenerGUI::updateAuxKnobsForActiveAlgorithm()`
+to refresh the knobs' enabled state and labels whenever the selection changes -- this
+fires both for a user's click and for host-automation-driven changes to the Algorithm
+parameter (confirmed by reading JUCE's `ComboBoxParameterAttachment::setValue()`: it
+updates the combo box with `sendNotificationSync`, and only suppresses its *own*
+re-entrant listener via a `ScopedValueSetter`, not any other listener registered on the
+same component), plus one explicit call right after constructing the attachment, since
+`onChange` only fires on a later *change*, not the initial state.
+
+**Verification**: rebuilt cleanly with no warnings (an initial `-Wfloat-equal` from the
+new filter-coefficient-change check was fixed by switching to the same epsilon-comparison
+helper `StereoAnalyzer.cpp` already uses). `pluginval --strictness-level 10` passes,
+including its parameter-fuzzing tests now also covering Bass Cutoff and High Shelf.
+Verified offline (same render technique as above) in both algorithm states: the
+broadband render shows both aux knobs visibly dimmed/disabled; the filtered render shows
+them enabled with the correct labels, and the "?" button renders as a clean, legible
+glyph (a plain ASCII character in a standard `TextButton`, unlike the earlier
+Unicode-gear-glyph problem in `StereoAnalyzer`'s Settings button, see
+[phase2_stereo_analyzer.md](phase2_stereo_analyzer.md) -- no such risk here).
+
+### Follow-up: an "Off" position for both aux knobs
+
+User feedback: "It is necessary that the cutoff filter has an off mode. I usually
+implement it by allowing a frequency slightly below the 40 Hz, and than set the filter
+coefficient to a transparant setting and change the display text to off. The same for
+the hp shelv. it should switch off above 16k" -- exactly as described:
+
+- `g_paramBassCutoff`'s range grew from 40-500 Hz to **30-500 Hz**; the 30-40 Hz stretch
+  is the "Off" position. `g_paramHighShelfFreq`'s range grew from 1000-16000 Hz to
+  **1000-16500 Hz**; 16000-16500 Hz is its "Off" position. Both thresholds
+  (`MSWidthFiltered::kBassCutoffOffThreshold` = 40 Hz,
+  `kHighShelfOffThreshold` = 16000 Hz) live on the algorithm class itself, not in
+  `StereoWidener.h`, so the DSP owns the one true definition of "off"; the parameter
+  ranges and the GUI both read those same two constants rather than duplicating the
+  numbers.
+- **Bug found and fixed: the Off zone first occupied a full third of the knob's
+  rotation, not a small sliver.** The first version used `g_paramBassCutoff.minValue`
+  = 20 Hz (skew 0.3) and `g_paramHighShelfFreq.maxValue` = 20000 Hz (skew 0.5) --
+  reasonable-looking ranges, but user testing found the Off zone spanned from 7 o'clock
+  all the way to 10 o'clock on the knob. Cause, confirmed by reading JUCE's
+  `NormalisableRange::convertFrom0to1()`: the skew formula is
+  `value = start + (end-start) * proportion^(1/skew)`, so a skew *below* 1.0 gives the
+  *low* end of the range disproportionately more of the knob's rotation (documented in
+  JUCE's own header: "If the factor is < 1.0, the lower end of the range will fill more
+  of the slider's length") -- exactly where the Bass Cutoff Off zone sits, and (mirrored
+  at the top of the range) where the High Shelf Off zone sits. Fixed by switching both
+  knobs to `skew = 1.0` (linear) and narrowing the Off zone's own value-width relative
+  to the total range (Bass Cutoff: 10 Hz wide, 30-40; High Shelf: 500 Hz wide,
+  16000-16500) -- with a linear mapping, rotation share is directly proportional to
+  value-width share, so a narrow zone reliably stays a narrow sliver. Verified
+  numerically with `NormalisableRange<float>::convertTo0to1()`: the Bass Cutoff Off
+  boundary (40 Hz) now sits at 2.1% of the knob's rotation (i.e. right at the very
+  start, 7 o'clock), and the High Shelf Off boundary (16000 Hz) sits at 96.8% (i.e. its
+  Off zone is the last 3.2% of rotation, at the opposite end since High Shelf switches
+  off *above* its threshold rather than below).
+- **Follow-up: linear is wrong for a four-octave knob.** User feedback: linear is
+  "OK for the lowpass, but not for the high shelf" -- correct: Bass Cutoff's practical
+  range (30-500 Hz) spans under four octaves and linear is a reasonable approximation,
+  but High Shelf's 1000-16500 Hz spans *more than* four octaves, so the fix above's
+  linear mapping crammed the musically useful low end (1-4 kHz) into a small fraction of
+  the knob while wasting most of the rotation on the top octave alone. Fixed with a new
+  `makeLogFrequencyParameterWithOff()` (`StereoWidener.cpp`, next to
+  `makeFrequencyParameterWithOff()`), which gives High Shelf a *true* logarithmic
+  mapping via `NormalisableRange`'s custom-function constructor (not just another
+  skew/power-law approximation): `value = start * (end/start)^proportion` and its
+  inverse `proportion = log(value/start) / log(end/start)`, so equal frequency *ratios*
+  -- octaves -- always get equal rotation, matching how frequency is actually perceived
+  and how every real EQ's frequency knob works. Bass Cutoff is unaffected (stays linear,
+  `makeFrequencyParameterWithOff()`, per the user's own call that linear is fine there).
+  A useful side effect: log compression at the top of a wide range means High Shelf's
+  Off zone (16000-16500 Hz, unchanged) stayed a small sliver "for free" -- verified
+  numerically (same technique as above): 1000->2000 Hz and 8000->16000 Hz, both exactly
+  one octave, land exactly the same 24.7% rotation delta each (confirming the mapping is
+  truly logarithmic, not approximately so), the round-trip through
+  `convertTo0to1`/`convertFrom0to1` is exact, and the Off zone above 16000 Hz now spans
+  just the last 1.1% of rotation (tighter than the earlier linear fix's 3.2%, without
+  needing to narrow the zone's absolute Hz width any further).
+- **Transparent, not just extreme.** In the off zone, `MSWidthFiltered::process()`
+  skips calling `processSample()` on that filter entirely (`bassCutoffBypassed` /
+  `highShelfBypassed`, set in `updateFiltersIfNeeded()`) rather than pushing its
+  frequency to an edge-case extreme -- a real bypass, with no risk of a near-DC
+  high-pass or near-Nyquist shelf doing something subtly audible. Verified with a
+  throwaway console tool: with both knobs in their Off zones, `MSWidthFiltered`'s output
+  is bit-exact (0.0 max abs diff) with `MSWidthBroadband` given the same input and
+  width -- confirming full transparency, not an approximation. A second check with both
+  knobs at their normal defaults (150 Hz, 8000 Hz) confirmed they still genuinely differ
+  from broadband (max abs diff 0.73), so the bypass path isn't accidentally always-on.
+- **"Off" display text**, in three places that all needed to agree: the `AudioParameterFloat`
+  itself, via `AudioParameterFloatAttributes::withStringFromValueFunction()` /
+  `withValueFromStringFunction()` (a new `makeFrequencyParameterWithOff()` helper next to
+  the existing `makeFloatParameter()` in `StereoWidener.cpp`) -- this is what a host's
+  generic parameter/automation view shows; and each aux `juce::Slider`'s own
+  `textFromValueFunction` / `valueFromTextFunction` in `StereoWidenerGUI`, so typing
+  "off" into either knob's text box also works. Both read the same
+  `kBassCutoffOffThreshold` / `kHighShelfOffThreshold` constants as the DSP, so the
+  displayed "Off" boundary can never drift out of sync with where the bypass actually
+  engages.
+
 ## Processing: StereoAlgorithm interface and the crossfaded switch
 
 `algorithms/StereoAlgorithm.h` defines the common interface every algorithm implements
@@ -75,11 +223,14 @@ the crossfade above, not two unrelated algorithms.
 - **`algorithms/MSWidthBroadband.{h,cpp}`**: the plain version, width applied across the
   whole spectrum equally. Stateless.
 - **`algorithms/MSWidthFiltered.{h,cpp}`**: the same control, but S is run through a
-  second-order Butterworth high-pass (`juce::dsp::IIR::Filter`, crossover at 150 Hz)
-  *before* the width scaling. Content below the crossover is removed from S entirely --
-  forced into M, i.e. mono -- so bass always stays centred regardless of the width
-  setting, while only the highs get widened. This is the standard "bass mono" mastering
-  trick (plan2.md 2.1: "M/S width + bass mono").
+  second-order Butterworth high-pass (`juce::dsp::IIR::Filter`, adjustable crossover --
+  the Bass Cutoff aux knob, see "Follow-up" below, default 150 Hz) *before* the width
+  scaling. Content below the crossover is removed from S entirely -- forced into M, i.e.
+  mono -- so bass always stays centred regardless of the width setting, while only the
+  highs get widened. This is the standard "bass mono" mastering trick (plan2.md 2.1:
+  "M/S width + bass mono"). A second stage, a high shelf at the High Shelf aux knob's
+  frequency (default 8000 Hz, fixed +3 dB), then restores some high-frequency "air" --
+  the "+ side shelf" part of the same plan2.md entry.
 
 ## Verification
 
@@ -116,6 +267,54 @@ runs on `MeterComponentBase`'s own `Timer`, which never fires in a synchronous c
 app with no message loop running -- worked around in the test tool with
 `Thread::sleep()` + `Timer::callPendingTimersSynchronously()`; not a real plugin issue,
 since a host always runs a real message loop.
+
+## Follow-up: preset control enabled, and a build/version footer
+
+User feedback, two more small items:
+
+**Preset control.** `StereoWidener/CMakeLists.txt`'s `WITH_PRESETHANDLERGUI` define,
+commented out since the plugin was first created, is now enabled (uncommented) -- one
+line, matching the exact pattern already used to remove it from `StereoAnalyzer`
+earlier in this project. This reserves `g_minPresetHandlerHeight` (30px) at the top of
+the window for the preset bar.
+
+**Bug found and fixed: the window didn't grow to make room, so the algorithm selector
+ran off the bottom.** Enabling `WITH_PRESETHANDLERGUI` alone doesn't grow the plugin
+window; `PluginEditor.cpp`'s `resized()` just gives the preset bar the top
+`g_minPresetHandlerHeight + 1` pixels and shrinks `StereoWidenerGUI`'s own area by the
+same amount, out of the *same* total `g_minGuiSize_y`. Since the widener's internal
+layout (meter row + width-knob row + algorithm row, `PluginSettings.h`) already used
+nearly the entire previous window height with almost no slack, losing 31px at the top
+pushed the algorithm selector below the visible window entirely. Fixed by growing
+`g_minGuiSize_y` from 460 to 491 (the same 456px of actual `StereoWidenerGUI` content,
+plus the 31px now reserved for the preset bar) -- verified by computing the algorithm
+row's bottom-edge pixel coordinate directly (487px, comfortably inside the new 491px
+window) with the same layout math `StereoWidenerGUI::resized()` uses, and confirmed
+visually with an offline render including a stand-in preset bar.
+
+**Build/version footer**, the same idea as `StereoAnalyzer`'s (see "Gear-icon Settings
+button and build/version footer" in [phase2_stereo_analyzer.md](phase2_stereo_analyzer.md)):
+`StereoWidenerGUI`'s goniometer now shows "Built at Jade Hochschule Oldenburg - vX.Y.Z"
+in its bottom-left corner via the same `GoniometerComponent::setCornerText()` used
+there. Two differences, both because this goniometer is much smaller (~60% of the
+analyzer's, per the earlier "GUI layout" request): it is a single combined line rather
+than two stacked ones (as requested), and the version is written as "vX.Y.Z" rather
+than "Version: X.Y.Z" to save a few characters.
+
+**Bug found and fixed: the combined line didn't fit and was silently truncated to
+"...Oldenburg - V..." with the version number cut off entirely** -- defeating the
+point of including it. Cause: `GoniometerComponent`'s corner-text box was sized to a
+fixed 70% of the panel's width, tuned against the analyzer's much larger goniometer
+(where even the longer of its two lines fit comfortably); StereoWidener's smaller panel
+left too little room at that same fraction. Fixed in the shared component (not by
+shortening the string further, which would keep breaking at other window sizes): the
+corner-text box now uses nearly the *full* panel width
+(`contentBounds.getWidth() - 2*margin`) instead of a fixed 70%. This is safe because the
+text sits right at the bottom margin, well clear of the circle (confirmed visually --
+there is a clear black gap between the circle and the text row at every size checked).
+Verified both ways: StereoWidener's one-line footer now renders in full with no
+truncation, and a re-render of StereoAnalyzer's existing two-line footer confirmed no
+regression there (still fits comfortably, still clear of the circle).
 
 ## Not yet implemented (deferred to later phases, per plan2.md)
 
