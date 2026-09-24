@@ -57,6 +57,9 @@ public:
     void processBlock(const juce::AudioBuffer<float>& buffer) noexcept;
 
     // ---- GUI thread ---------------------------------------------------------------
+    /** Set by prepare(); read e.g. by GoniometerComponent to convert a persistence
+     *  time in seconds to a number of points (points arrive one per audio sample). */
+    double getSampleRate() const noexcept { return fs; }
     float getRmsDb(ChannelIndex ch) const noexcept { return rmsDb[(int) ch].load(std::memory_order_relaxed); }
     float getPeakDb(ChannelIndex ch) const noexcept { return peakDb[(int) ch].load(std::memory_order_relaxed); }
     float getCorrelation() const noexcept { return correlation.load(std::memory_order_relaxed); }

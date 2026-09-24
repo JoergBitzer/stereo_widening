@@ -25,11 +25,14 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
-    /** How many of the most recently received points stay visible ("persistence"). */
-    void setHistoryLength(int numPoints) { maxHistoryPoints = juce::jmax(1, numPoints); }
+    /** How long a point stays visible before it is dropped ("phosphor" persistence).
+     *  Points arrive one per audio sample, so this is converted to a point count via
+     *  state.getSampleRate() each refresh() tick -- independent of sample rate, unlike
+     *  a fixed point count would be. */
+    void setAfterglowTime(float seconds) noexcept { afterglowTime_s = juce::jmax(0.001f, seconds); }
 
 private:
-    void refresh() override; // drains the FIFO into history
+    void refresh() override; // drains the FIFO into history, then trims it to the afterglow time
     juce::Point<float> toScreen(float s, float m) const;
 
     StereoMeterState& state;
@@ -37,7 +40,7 @@ private:
     juce::Rectangle<float> contentBounds; // set by paint() (post title/border), used by toScreen()
 
     std::deque<juce::Point<float>> history; // in normalised (-1..1, -1..1) S/M coordinates
-    int maxHistoryPoints = 6000; // ~130 ms of points at 48 kHz, redrawn every timer tick
+    float afterglowTime_s = 0.2f;
 
     std::vector<float> drainX, drainY; // reused scratch buffers for MeterFifo::drainInto
 

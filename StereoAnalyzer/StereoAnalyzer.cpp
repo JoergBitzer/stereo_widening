@@ -98,6 +98,9 @@ void StereoAnalyzerAudio::addParameter(std::vector<std::unique_ptr<juce::RangedA
     paramVector.push_back(makeFloatParameter(g_paramIntegration));
     paramVector.push_back(makeFloatParameter(g_paramPeakHold));
     paramVector.push_back(makeFloatParameter(g_paramPeakDecay));
+    // GUI-only (see the struct's comment in StereoAnalyzer.h), but still declared here:
+    // all parameters must be added in one place so they are saved/restored together.
+    paramVector.push_back(makeFloatParameter(g_paramAfterglow));
 }
 
 void StereoAnalyzerAudio::prepareParameter(std::unique_ptr<juce::AudioProcessorValueTreeState> &vts)
@@ -120,6 +123,26 @@ StereoAnalyzerGUI::StereoAnalyzerGUI(StereoAnalyzerAudioProcessor& p, juce::Audi
 
     m_settingsButton.onClick = [this] { showSettings(); };
     addAndMakeVisible(m_settingsButton);
+
+    m_afterglowParam = dynamic_cast<AudioParameterFloat*>(m_apvts.getParameter(g_paramAfterglow.ID));
+    if (m_afterglowParam != nullptr)
+    {
+        m_lastAfterglow = m_afterglowParam->get();
+        m_goniometer.setAfterglowTime(m_lastAfterglow);
+    }
+    startTimerHz(10); // a settings change need not be picked up as fast as the meters refresh
+}
+
+void StereoAnalyzerGUI::timerCallback()
+{
+    if (m_afterglowParam == nullptr)
+        return;
+    const float value = m_afterglowParam->get();
+    if (hasChanged(value, m_lastAfterglow))
+    {
+        m_goniometer.setAfterglowTime(value);
+        m_lastAfterglow = value;
+    }
 }
 
 void StereoAnalyzerGUI::showSettings()

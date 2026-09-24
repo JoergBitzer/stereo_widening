@@ -132,7 +132,8 @@ Details, findings and the cross-check numbers: `docs/algorithms/phase2_stereo_an
 2. ✅ Metering components in `shared/metering/` (`StereoMeterState`, `MeterFifo`,
    `GoniometerComponent`, `CorrelationMeterComponent`, `LevelMeterComponent`):
    - lock-free FIFO from the audio thread to the GUI, and a timer-based repaint
-   - **Goniometer / vectorscope** (M vs. S, with persistence/fade)
+   - **Goniometer / vectorscope** (M vs. S, with persistence/fade; the fade duration is
+     a settings-page parameter, "Afterglow", in seconds, sample-rate-independent)
    - **Correlation meter** (−1 … +1, selectable integration time: 100/300/1000 ms)
    - **L/R/M/S level meters** (peak and RMS), S/M ratio ("width estimate"); balance
      display deferred to Phase 4 (utilities)

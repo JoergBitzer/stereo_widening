@@ -11,7 +11,10 @@ A pass-through plugin (it never modifies the audio) with:
 - **Goniometer** (`GoniometerComponent`): Lissajous plot of S (horizontal) vs. M
   (vertical), same convention as `python/stereo_eval/report.py`'s goniometer plots, so a
   Python plot and the on-screen display can be compared directly. Points fade with age
-  ("phosphor" persistence).
+  ("phosphor" persistence) over a configurable **Afterglow** time (see Settings below);
+  since points arrive one per audio sample, `GoniometerComponent` converts that time to
+  a point count via `StereoMeterState::getSampleRate()`, so the visible persistence
+  duration is correct regardless of sample rate, unlike a fixed point count would be.
 - **Correlation meter** (`CorrelationMeterComponent`): −1 … +1 bar, three colour zones
   (green ≥ +0.3, amber −0.3…+0.3, red < −0.3 — a rule of thumb, not a formal standard)
   and endpoint labels ("OUT OF PHASE" / "WIDE" / "MONO").
@@ -22,10 +25,15 @@ A pass-through plugin (it never modifies the audio) with:
   width-estimate readout in dB (0 dB = M and S equal power, matches
   `stereo_eval.measures.levels()["S_minus_M_dB"]`).
 - **Settings popup** (`SettingsPanel`, opened from the main view's "Settings..." button
-  via a `juce::CallOutBox`): three continuous parameters — Integration time (the RMS and
-  correlation meters' shared time constant, 50 ms – 2 s), Peak Hold (0 – 5 s), and Peak
-  Decay (3 – 60 dB/s once the hold expires). All three are ordinary `AudioParameterFloat`s
-  (automatable, saved with the plugin state), not just GUI-local settings.
+  via a `juce::CallOutBox`): four continuous parameters — Integration time (the RMS and
+  correlation meters' shared time constant, 50 ms – 2 s), Peak Hold (0 – 5 s), Peak
+  Decay (3 – 60 dB/s once the hold expires), and Afterglow (the goniometer's point
+  persistence, 50 ms – 2 s). All four are ordinary `AudioParameterFloat`s (automatable,
+  saved with the plugin state), not just GUI-local settings — including Afterglow, even
+  though it never reaches `StereoAnalyzerAudio`/the audio thread at all (see "GUI-only
+  settings" below).
+
+![settings popup](img/settings_panel.png)
 - All three meter components share a panel chrome (border + title,
   `MeterLookAndFeel::drawPanel`) and a colour/size vocabulary (`MeterLookAndFeel.h`), so
   they read as one instrument panel rather than three independently-styled widgets.
@@ -198,22 +206,12 @@ rounds of offline rendering (see below): one confirming the peak-hold timing/val
 numerically and the corrected amber threshold visually, a second regenerating the
 documentation screenshots below to match. The Settings popup itself was verified with a
 small standalone test that constructs a real `AudioProcessorValueTreeState` with the
-three parameters and renders `SettingsPanel` to a PNG the same way -- catching, along
-the way, that the slider text box's decimal precision comes from the *parameter's*
+(then three, now four -- see "Goniometer afterglow" below) parameters and renders
+`SettingsPanel` to a PNG the same way -- catching, along the way, that the slider text
+box's decimal precision comes from the *parameter's*
 `getText()`/interval, not from `Slider::setNumDecimalPlacesToDisplay()`, and that the
 unit suffix needs `Slider::setTextValueSuffix()` explicitly (the label passed via
 `AudioParameterFloatAttributes::withLabel()` is not appended by the slider on its own).
-
-## Screenshot (Standalone, current layout)
-
-![StereoAnalyzer Standalone](img/standalone_screenshot.png)
-
-Audio input is muted by default (JUCE Standalone's feedback-loop safety), hence the
-empty goniometer and 0.00 correlation in this screenshot; the headless `MeterCrossCheck`
-run (above, "Cross-check against Python") confirms the actual metering math against real
-audio. `MeterCrossCheck` calls `StereoMeterState::processBlock()` directly and never
-goes through `SynchronBlockProcessor`, so that cross-check was unaffected by the bug
-above and was trustworthy throughout.
 
 ## Verified live in Reaper
 
@@ -247,6 +245,39 @@ Goniometer, level meters (colour zones, numeric peak readouts) and the correlati
 match what the offline-rendered verification predicted. Reaper's own track/master meters
 (visible at the left edge of the full screenshot) confirm real audio was flowing, not
 just the plugin's internal state.
+
+## Goniometer afterglow (GUI-only settings)
+
+The goniometer's "phosphor" persistence used to be a fixed point count
+(`maxHistoryPoints = 6000`, "~130 ms at 48 kHz" per the old comment -- correct only at
+that one sample rate). Replaced with a fourth Settings parameter, **Afterglow**
+(`g_paramAfterglow`, 50 ms - 2 s, default 200 ms): `GoniometerComponent` converts it to a
+point count each `refresh()` tick via `StereoMeterState::getSampleRate()` (points arrive
+one per audio sample, so this conversion is exact, not an approximation), so the visible
+persistence duration is correct at any sample rate.
+
+Afterglow is deliberately **not** read by `StereoAnalyzerAudio`/the audio thread at all
+-- it only ever affects how many of `GoniometerComponent`'s already-received points are
+drawn, never `StereoMeterState`. It is still an ordinary `AudioParameterFloat` (declared
+in `addParameter()` alongside the other three, so it is saved/restored with the plugin
+state and automatable like them), but `StereoAnalyzerGUI` is the only thing that reads
+it: a 10 Hz `Timer` (slower than the meters' 30 Hz -- a settings change does not need to
+be picked up as fast) polls the parameter and calls `m_goniometer.setAfterglowTime()`
+only when the value actually changes, the same poll-and-apply-on-change pattern
+`StereoAnalyzerAudio::processSynchronBlock()` already used for the other three
+parameters, just on the GUI thread. This picks up a change from the Settings slider or
+from host automation the same way, without `SettingsPanel` (a separate popup, recreated
+fresh each time) needing any direct reference back to the goniometer.
+
+![goniometer afterglow, 0.05 s vs 0.30 s](img/goniometer_afterglow.png)
+
+Verified offline (`GoniometerComponent::paintEntireComponent()` to a PNG, no display
+needed, same technique as the colour-zone renders above): a 20 ms noise burst followed
+by 150 ms of silence, rendered with Afterglow set to 0.05 s (left) and 0.30 s (right).
+At 0.05 s the 150 ms of silence since the burst already exceeds the persistence window,
+so the burst has fully aged out -- an empty circle. At 0.30 s the full 170 ms of burst
+plus silence still fits inside the window, so the burst remains clearly visible.
+`pluginval --strictness-level 10` stays clean with the new parameter.
 
 ## Screenshot (Standalone, current layout)
 

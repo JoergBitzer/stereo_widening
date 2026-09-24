@@ -37,7 +37,10 @@ void GoniometerComponent::refresh()
     for (size_t i = 0; i < drainX.size(); ++i)
         history.emplace_back(drainX[i], drainY[i]);
 
-    while ((int) history.size() > maxHistoryPoints)
+    // points arrive one per audio sample, so afterglowTime_s converts directly to a
+    // point count; recomputed every tick since sample rate or afterglowTime_s can change
+    const size_t maxHistoryPoints = (size_t) juce::jmax(1.0, afterglowTime_s * state.getSampleRate());
+    while (history.size() > maxHistoryPoints)
         history.pop_front();
 }
 
