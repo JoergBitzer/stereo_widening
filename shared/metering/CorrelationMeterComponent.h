@@ -7,21 +7,19 @@
  */
 
 #pragma once
-#include <juce_gui_basics/juce_gui_basics.h>
-
+#include "MeterComponentBase.h"
 #include "StereoMeterState.h"
 
-class CorrelationMeterComponent : public juce::Component, private juce::Timer
+class CorrelationMeterComponent : public MeterComponentBase
 {
 public:
     explicit CorrelationMeterComponent(StereoMeterState& stateToDisplay);
-    ~CorrelationMeterComponent() override;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
 
 private:
-    void timerCallback() override;
+    void refresh() override; // smooths displayedValue towards state.getCorrelation()
 
     StereoMeterState& state;
     float displayedValue = 0.0f; // smoothed for a less jittery needle

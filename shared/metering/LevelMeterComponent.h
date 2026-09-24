@@ -7,15 +7,13 @@
  */
 
 #pragma once
-#include <juce_gui_basics/juce_gui_basics.h>
-
+#include "MeterComponentBase.h"
 #include "StereoMeterState.h"
 
-class LevelMeterComponent : public juce::Component, private juce::Timer
+class LevelMeterComponent : public MeterComponentBase
 {
 public:
     explicit LevelMeterComponent(StereoMeterState& stateToDisplay);
-    ~LevelMeterComponent() override;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -23,7 +21,9 @@ public:
     void setDbRange(float minDb, float maxDb) { rangeMinDb = minDb; rangeMaxDb = maxDb; }
 
 private:
-    void timerCallback() override;
+    // refresh() is not overridden: paint() reads state's atomics directly, so there is
+    // nothing to precompute per tick (unlike the goniometer's FIFO drain or the
+    // correlation meter's display smoothing)
     void drawBar(juce::Graphics& g, juce::Rectangle<float> bounds, const juce::String& name,
                  float rmsDb, float peakDb) const;
     float dbToFraction(float db) const noexcept;

@@ -12,16 +12,15 @@
  */
 
 #pragma once
-#include <juce_gui_basics/juce_gui_basics.h>
 #include <deque>
 
+#include "MeterComponentBase.h"
 #include "StereoMeterState.h"
 
-class GoniometerComponent : public juce::Component, private juce::Timer
+class GoniometerComponent : public MeterComponentBase
 {
 public:
     explicit GoniometerComponent(StereoMeterState& stateToDisplay, juce::String labelText = {});
-    ~GoniometerComponent() override;
 
     void paint(juce::Graphics& g) override;
     void resized() override;
@@ -30,7 +29,7 @@ public:
     void setHistoryLength(int numPoints) { maxHistoryPoints = juce::jmax(1, numPoints); }
 
 private:
-    void timerCallback() override;
+    void refresh() override; // drains the FIFO into history
     juce::Point<float> toScreen(float s, float m) const;
 
     StereoMeterState& state;
