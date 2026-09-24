@@ -4,7 +4,8 @@ JUCE audio plugins that analyse and change the stereo image of audio signals.
 The project is a teaching example for students and young engineers, and at the same
 time a tool for mixing and mastering.
 
-- **StereoAnalyzer**: goniometer, correlation meter, L/R/M/S levels, spectra (in progress)
+- **StereoAnalyzer**: goniometer, correlation meter, L/R/M/S levels (spectra planned).
+  See [docs/algorithms/phase2_stereo_analyzer.md](docs/algorithms/phase2_stereo_analyzer.md).
 - **StereoWidener**: several switchable stereo widening algorithms, in two profiles:
   Mastering (mono-safe) and Creative (planned)
 
@@ -35,6 +36,24 @@ AudioDev/
 ├── Libs/
 └── stereo_widening/   # this repository
 ```
+
+Build (from `AudioDev/`, the shared top-level build directory):
+
+```console
+cd build
+cmake ..
+cmake --build . --target StereoAnalyzer_VST3 -j8
+cmake --build . --target StereoAnalyzer_Standalone -j8
+```
+
+Load `StereoAnalyzer.vst3` (under
+`build/stereo_widening/StereoAnalyzer/StereoAnalyzer_artefacts/Debug/VST3/`) in a DAW.
+`tools/meter_crosscheck/` is a headless console tool that validates the metering math
+against `python/stereo_eval` without needing a GUI/display; `pluginval` is used for
+automated host-compatibility testing. See
+[docs/algorithms/phase2_stereo_analyzer.md](docs/algorithms/phase2_stereo_analyzer.md)
+for both, and for a heap-corruption bug found (and fixed) in `SynchronBlockProcessor`'s
+direct-through mode along the way.
 
 Python environment, test signals and evaluation (run from the project folder):
 

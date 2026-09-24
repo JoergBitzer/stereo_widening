@@ -119,20 +119,29 @@ stereo_widening/
    independent noise gives ρ = 0, polarity-inverted noise gives ρ = −1).
 4. Python reference of **2.1 (M/S + bass mono + side shelf)**, evaluated with the report.
 
-### Phase 2 – StereoAnalyzer plugin (roadmap suggestion 1)
+### Phase 2 – StereoAnalyzer plugin (roadmap suggestion 1) — done except the spectrum
 A separate plugin, created from AdvancedAudioTemplate. It passes the audio through unchanged.
-1. Template copy, rename to `StereoAnalyzer`, build, and load it in Reaper.
-2. Metering components in `shared/metering/`:
+Details, findings and the cross-check numbers: `docs/algorithms/phase2_stereo_analyzer.md`.
+1. ✅ Template copy, rename to `StereoAnalyzer`, VST3/Standalone build verified, GUI
+   confirmed running (screenshot in the docs page). Along the way, found and fixed a
+   real heap-corruption bug in the (per-plugin copied) `SynchronBlockProcessor`'s
+   direct-through mode — worth backporting to AdvancedAudioTemplate, see the docs page.
+   `pluginval --strictness-level 10` now passes cleanly. GUI verification in an actual
+   DAW (Reaper) is still open — this session only had the sandbox's Standalone.
+2. ✅ Metering components in `shared/metering/` (`StereoMeterState`, `MeterFifo`,
+   `GoniometerComponent`, `CorrelationMeterComponent`, `LevelMeterComponent`):
    - lock-free FIFO from the audio thread to the GUI, and a timer-based repaint
-   - **Goniometer / vectorscope** (M vs. S, with persistence or decay)
-   - **Correlation meter** (−1 … +1, with an integration time), optionally per band
-   - **L/R/M/S level meters** (peak and RMS), balance, S/M ratio ("width estimate")
-   - **Spectrum** of `L+R` and `L−R` (mono sum and side)
-3. **Cross-check against Python:** play the Phase-1 test signals through the analyzer.
-   The displayed ρ and levels must match `stereo_eval` (within the integration-time
-   error).
-4. The analyzer is a useful tool on its own (a possible first release and teaching
-   example: "how to see stereo").
+   - **Goniometer / vectorscope** (M vs. S, with persistence/fade)
+   - **Correlation meter** (−1 … +1, selectable integration time: 100/300/1000 ms)
+   - **L/R/M/S level meters** (peak and RMS), S/M ratio ("width estimate"); balance
+     display deferred to Phase 4 (utilities)
+   - **Spectrum** of `L+R` and `L−R`: not yet implemented (optional in the original
+     plan; candidate for a later pass using `TGMStaticLib/FFT.h`)
+3. ✅ **Cross-check against Python:** `tools/meter_crosscheck` (headless console tool,
+   no GUI/display needed) + `python/crosscheck_meter.py`. All four stationary test
+   signals (mono, ρ=0.5, uncorrelated, anti-phase noise) match `stereo_eval` within
+   tolerance; correlation is exactly +1 / −1 / ≈0 as expected.
+4. The analyzer is usable as a standalone tool once GUI verification is done in a DAW.
 
 ### Phase 3 – StereoWidener, first algorithm
 1. Copy StereoAnalyzer to `StereoWidener`. Meters now show **input and output**.
