@@ -15,6 +15,11 @@ listbox for algorithm selection below that."
 
 ![StereoWidener GUI: input meter, dual-colour goniometer, output meter, width knob, algorithm selector](img/phase3_widener_gui.png)
 
+(Both screenshots on this page predate the
+[Phase 5 GUI compaction](phase5_gui_compaction.md), which restacked the aux knobs and
+moved Utilities below the output meter -- the meter row itself, described below, is
+unaffected.)
+
 - **Input level meter (left) / Output level meter (right)**: two separate
   `LevelMeterComponent` instances, each bound to its own `StereoMeterState`
   (`StereoWidenerAudio::m_meterStateIn` / `m_meterStateOut`) -- the widener measures the

@@ -358,9 +358,9 @@ private:
     juce::Label m_monoSafeBadge;
 
     // Utilities (Phase 4 step 2), applied regardless of the selected algorithm -- see
-    // UtilityProcessor.h
-    juce::Label m_utilitiesTitle;
-
+    // UtilityProcessor.h. Stacked in their own column below the output meter (Phase 5
+    // GUI compaction: every utility acts on the final output signal), not a full-width
+    // row below the algorithm selector any more -- see StereoWidenerGUI::resized().
     juce::Label m_rotationLabel;
     juce::Slider m_rotationKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> m_rotationAttachment;
@@ -368,6 +368,11 @@ private:
     juce::Label m_balanceLabel;
     juce::Slider m_balanceKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> m_balanceAttachment;
+
+    // Caption above the toggle buttons -- previously the buttons' own text ("Swap",
+    // "Inv L", "Inv R") was their only description; this names the group, matching the
+    // pattern every other control here has (a label above it).
+    juce::Label m_toggleCaption;
 
     juce::TextButton m_swapLRButton { "Swap" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> m_swapLRAttachment;
@@ -377,6 +382,11 @@ private:
 
     juce::TextButton m_invertRButton { "Inv R" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> m_invertRAttachment;
+
+    // Caption above the Monitor selector, same reasoning as m_toggleCaption -- the
+    // combo box only showed its current choice ("Normal"/"Mono Check (L+R)"/"Solo Side
+    // (S)"), with nothing naming what the control as a whole is.
+    juce::Label m_monitorLabel;
 
     juce::ComboBox m_monitorModeBox;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> m_monitorModeAttachment;

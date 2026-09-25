@@ -364,11 +364,10 @@ StereoWidenerGUI::StereoWidenerGUI(StereoWidenerAudioProcessor& p, juce::AudioPr
     updateAuxKnobsForActiveAlgorithm(); // onChange above only fires on a later *change*, not this initial state
 
     // Utilities (Phase 4 step 2), applied regardless of the selected algorithm -- see
-    // UtilityProcessor.h
-    m_utilitiesTitle.setText("Utilities", juce::dontSendNotification);
-    m_utilitiesTitle.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(m_utilitiesTitle);
-
+    // UtilityProcessor.h. Stacked below the output meter (Phase 5 GUI compaction), not
+    // labelled as a group any more -- their position already says "this acts on the
+    // output"; the two captions below instead name the specific sub-groups that lacked
+    // any text of their own (the toggle buttons, the Monitor selector).
     m_rotationLabel.setText("Rotation", juce::dontSendNotification);
     m_rotationLabel.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(m_rotationLabel);
@@ -385,6 +384,10 @@ StereoWidenerGUI::StereoWidenerGUI(StereoWidenerAudioProcessor& p, juce::AudioPr
     m_balanceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         m_apvts, g_paramBalance.ID, m_balanceKnob);
 
+    m_toggleCaption.setText("Flip", juce::dontSendNotification);
+    m_toggleCaption.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(m_toggleCaption);
+
     m_swapLRButton.setClickingTogglesState(true);
     addAndMakeVisible(m_swapLRButton);
     m_swapLRAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
@@ -399,6 +402,10 @@ StereoWidenerGUI::StereoWidenerGUI(StereoWidenerAudioProcessor& p, juce::AudioPr
     addAndMakeVisible(m_invertRButton);
     m_invertRAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
         m_apvts, g_paramInvertR.ID, m_invertRButton);
+
+    m_monitorLabel.setText("Monitor", juce::dontSendNotification);
+    m_monitorLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(m_monitorLabel);
 
     for (int i = 0; i < g_monitorModeNames.size(); ++i)
         m_monitorModeBox.addItem(g_monitorModeNames[i], i + 1);
@@ -552,102 +559,117 @@ void StereoWidenerGUI::resized()
     m_levelMeterOut.setBounds(meterRow.removeFromRight(levelWidth).reduced(juce::roundToInt(g_levelMeterPadding * scale)));
     m_goniometer.setBounds(meterRow.reduced(juce::roundToInt(g_goniometerPadding * scale)));
 
-    // middle row: the big Width knob, flanked by the two smaller aux knobs (their
-    // meaning/enabled-state depends on the active algorithm, see
-    // updateAuxKnobsForActiveAlgorithm())
-    auto knobRow = r.removeFromTop(juce::roundToInt(g_widthKnobRowHeight * scale));
-    r.removeFromTop(rowGap);
-
+    // Below the meter row: three columns, left/right-edge-aligned with the input/output
+    // meters above them (Phase 5 GUI compaction -- see PluginSettings.h for the
+    // rationale). Left: the two aux knobs stacked vertically (moved here from flanking
+    // Width, freeing the right side for Utilities). Middle: Width, the algorithm
+    // selector and the mono-safe badge. Right: Utilities, since every utility acts on
+    // the final output signal. All three are computed to their own natural height, then
+    // top-anchored and vertically centred within the tallest one's height.
     const int knobSize = juce::roundToInt(g_widthKnobSize * scale);
     const int labelHeight = juce::roundToInt(g_widthKnobLabelHeight * scale);
     const int textBoxHeight = labelHeight;
     const int auxKnobSize = juce::roundToInt(g_auxKnobSize * scale);
     const int auxLabelHeight = juce::roundToInt(g_auxKnobLabelHeight * scale);
-    const int auxGap = juce::roundToInt(g_auxKnobGap * scale);
-
-    const int totalKnobsWidth = auxKnobSize + auxGap + knobSize + auxGap + auxKnobSize;
-    auto knobsCentred = knobRow.withSizeKeepingCentre(totalKnobsWidth, knobRow.getHeight());
-
-    auto auxLeftArea = knobsCentred.removeFromLeft(auxKnobSize);
-    knobsCentred.removeFromLeft(auxGap);
-    auto widthArea = knobsCentred.removeFromLeft(knobSize);
-    knobsCentred.removeFromLeft(auxGap);
-    auto auxRightArea = knobsCentred; // remaining width is exactly auxKnobSize
-
-    m_widthKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobSize, textBoxHeight);
-    auto widthStack = widthArea.withSizeKeepingCentre(knobSize, labelHeight + knobSize + textBoxHeight);
-    m_widthLabel.setBounds(widthStack.removeFromTop(labelHeight));
-    m_widthKnob.setBounds(widthStack);
-
-    m_auxLeftKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, auxKnobSize, auxLabelHeight);
-    auto auxLeftStack = auxLeftArea.withSizeKeepingCentre(auxKnobSize, auxLabelHeight + auxKnobSize + auxLabelHeight);
-    m_auxLeftLabel.setBounds(auxLeftStack.removeFromTop(auxLabelHeight));
-    m_auxLeftKnob.setBounds(auxLeftStack);
-
-    m_auxRightKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, auxKnobSize, auxLabelHeight);
-    auto auxRightStack = auxRightArea.withSizeKeepingCentre(auxKnobSize, auxLabelHeight + auxKnobSize + auxLabelHeight);
-    m_auxRightLabel.setBounds(auxRightStack.removeFromTop(auxLabelHeight));
-    m_auxRightKnob.setBounds(auxRightStack);
-
-    // algorithm row: the "?" help button, then the algorithm selector, centred as a group
-    auto algoRow = r.removeFromTop(juce::roundToInt(g_algorithmRowHeight * scale));
-    r.removeFromTop(rowGap);
+    const int auxVGap = juce::roundToInt(g_auxKnobVGap * scale);
     const int helpSize = juce::roundToInt(g_helpButtonSize * scale);
     const int helpGap = juce::roundToInt(g_helpButtonGap * scale);
+    const int algoRowHeight = juce::roundToInt(g_algorithmRowHeight * scale);
+    const int badgeHeight = juce::roundToInt(g_monoSafeBadgeHeight * scale);
+    const int utilColumnWidth = juce::roundToInt(g_utilColumnWidth * scale);
+    const int utilKnobSize = juce::roundToInt(g_utilKnobSize * scale);
+    const int utilLabelHeight = juce::roundToInt(g_utilKnobLabelHeight * scale);
+    const int utilKnobGap = juce::roundToInt(g_utilKnobGap * scale);
+    const int utilCaptionHeight = juce::roundToInt(g_utilCaptionHeight * scale);
+    const int utilToggleRowHeight = juce::roundToInt(g_utilToggleRowHeight * scale);
+    const int utilToggleWidth = juce::roundToInt(g_utilToggleWidth * scale);
+    const int utilToggleGap = juce::roundToInt(g_utilToggleGap * scale);
+    const int utilMonitorBoxHeight = juce::roundToInt(g_utilMonitorBoxHeight * scale);
+
+    const int auxUnitHeight = auxLabelHeight + auxKnobSize + auxLabelHeight; // label + (knob+textbox)
+    const int leftColumnHeight = 2 * auxUnitHeight + auxVGap;
+
+    const int middleColumnHeight = (labelHeight + knobSize + textBoxHeight) + rowGap + algoRowHeight + rowGap + badgeHeight;
+
+    const int rightColumnHeight = (utilLabelHeight + utilKnobSize + utilLabelHeight) + rowGap
+                                 + utilCaptionHeight + rowGap + utilToggleRowHeight + rowGap
+                                 + utilCaptionHeight + rowGap + utilMonitorBoxHeight;
+
+    auto controlsRow = r.removeFromTop(juce::jmax(leftColumnHeight, middleColumnHeight, rightColumnHeight));
+
+    auto leftColumn = controlsRow.removeFromLeft(auxKnobSize);
+    auto rightColumn = controlsRow.removeFromRight(utilColumnWidth);
+    auto middleColumn = controlsRow; // remaining width
+
+    // Left column: the two aux knobs stacked (their meaning depends on the active
+    // algorithm, see updateAuxKnobsForActiveAlgorithm()).
+    auto leftStack = leftColumn.withSizeKeepingCentre(auxKnobSize, leftColumnHeight);
+    m_auxLeftKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, auxKnobSize, auxLabelHeight);
+    m_auxLeftLabel.setBounds(leftStack.removeFromTop(auxLabelHeight));
+    m_auxLeftKnob.setBounds(leftStack.removeFromTop(auxKnobSize + auxLabelHeight));
+    leftStack.removeFromTop(auxVGap);
+    m_auxRightKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, auxKnobSize, auxLabelHeight);
+    m_auxRightLabel.setBounds(leftStack.removeFromTop(auxLabelHeight));
+    m_auxRightKnob.setBounds(leftStack.removeFromTop(auxKnobSize + auxLabelHeight));
+
+    // Middle column: Width, then the "?" help button + algorithm selector, then the
+    // mono-safe badge, each individually centred within the column's own width.
+    auto middleStack = middleColumn.withSizeKeepingCentre(middleColumn.getWidth(), middleColumnHeight);
+
+    m_widthKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobSize, textBoxHeight);
+    auto widthArea = middleStack.removeFromTop(labelHeight + knobSize + textBoxHeight)
+                                 .withSizeKeepingCentre(knobSize, labelHeight + knobSize + textBoxHeight);
+    m_widthLabel.setBounds(widthArea.removeFromTop(labelHeight));
+    m_widthKnob.setBounds(widthArea);
+    middleStack.removeFromTop(rowGap);
+
+    auto algoRow = middleStack.removeFromTop(algoRowHeight);
     const int boxWidth = juce::jmin(juce::roundToInt(g_algorithmBoxWidth * scale),
                                      algoRow.getWidth() - helpSize - helpGap);
     auto algoGroup = algoRow.withSizeKeepingCentre(helpSize + helpGap + boxWidth, algoRow.getHeight());
     m_helpButton.setBounds(algoGroup.removeFromLeft(helpSize).withSizeKeepingCentre(helpSize, helpSize));
     algoGroup.removeFromLeft(helpGap);
     m_algorithmBox.setBounds(algoGroup);
+    middleStack.removeFromTop(rowGap);
 
     // "Not mono-safe" badge (Phase 5 step 4): always reserved (empty text when the
-    // active algorithm is mono-safe), directly below the algorithm row.
-    m_monoSafeBadge.setBounds(r.removeFromTop(juce::roundToInt(g_monoSafeBadgeHeight * scale)));
-    r.removeFromTop(rowGap);
+    // active algorithm is mono-safe).
+    m_monoSafeBadge.setBounds(middleStack.removeFromTop(badgeHeight));
 
-    // Utilities section (Phase 4 step 2): a title, Rotation/Balance knobs, then a row
-    // of toggle buttons and the Monitor selector -- applied regardless of the selected
-    // algorithm, see UtilityProcessor.h.
-    m_utilitiesTitle.setBounds(r.removeFromTop(juce::roundToInt(g_utilitiesTitleHeight * scale)));
-    r.removeFromTop(rowGap);
+    // Right column: Utilities (Phase 4 step 2, moved here in Phase 5's GUI compaction
+    // since every utility acts on the final output signal, see UtilityProcessor.h) --
+    // Rotation/Balance knobs, a caption, the toggle buttons, another caption, then the
+    // Monitor selector, sharing g_utilColumnWidth throughout.
+    auto rightStack = rightColumn.withSizeKeepingCentre(utilColumnWidth, rightColumnHeight);
 
-    auto utilKnobRow = r.removeFromTop(juce::roundToInt(g_utilitiesKnobSize * scale)
-                                        + 2 * juce::roundToInt(g_utilitiesKnobLabelHeight * scale));
-    r.removeFromTop(rowGap);
-
-    const int utilKnobSize = juce::roundToInt(g_utilitiesKnobSize * scale);
-    const int utilLabelHeight = juce::roundToInt(g_utilitiesKnobLabelHeight * scale);
-    const int utilKnobGap = juce::roundToInt(g_utilitiesKnobGap * scale);
-    const int totalUtilKnobsWidth = utilKnobSize + utilKnobGap + utilKnobSize;
-    auto utilKnobsCentred = utilKnobRow.withSizeKeepingCentre(totalUtilKnobsWidth, utilKnobRow.getHeight());
+    auto utilKnobRow = rightStack.removeFromTop(utilLabelHeight + utilKnobSize + utilLabelHeight);
+    auto utilKnobsCentred = utilKnobRow.withSizeKeepingCentre(2 * utilKnobSize + utilKnobGap, utilKnobRow.getHeight());
     auto rotationArea = utilKnobsCentred.removeFromLeft(utilKnobSize);
     utilKnobsCentred.removeFromLeft(utilKnobGap);
     auto balanceArea = utilKnobsCentred;
 
     m_rotationKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
-    auto rotationStack = rotationArea.withSizeKeepingCentre(utilKnobSize, utilLabelHeight + utilKnobSize + utilLabelHeight);
-    m_rotationLabel.setBounds(rotationStack.removeFromTop(utilLabelHeight));
-    m_rotationKnob.setBounds(rotationStack);
+    m_rotationLabel.setBounds(rotationArea.removeFromTop(utilLabelHeight));
+    m_rotationKnob.setBounds(rotationArea);
 
     m_balanceKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
-    auto balanceStack = balanceArea.withSizeKeepingCentre(utilKnobSize, utilLabelHeight + utilKnobSize + utilLabelHeight);
-    m_balanceLabel.setBounds(balanceStack.removeFromTop(utilLabelHeight));
-    m_balanceKnob.setBounds(balanceStack);
+    m_balanceLabel.setBounds(balanceArea.removeFromTop(utilLabelHeight));
+    m_balanceKnob.setBounds(balanceArea);
+    rightStack.removeFromTop(rowGap);
 
-    auto toggleRow = r.removeFromTop(juce::roundToInt(g_utilitiesToggleRowHeight * scale));
-    const int toggleWidth = juce::roundToInt(g_utilitiesToggleWidth * scale);
-    const int toggleGap = juce::roundToInt(g_utilitiesToggleGap * scale);
-    const int toggleMonitorGap = juce::roundToInt(g_utilitiesToggleMonitorGap * scale);
-    const int monitorWidth = juce::jmin(juce::roundToInt(g_monitorBoxWidth * scale), toggleRow.getWidth());
-    const int totalToggleGroupWidth = 3 * toggleWidth + 2 * toggleGap + toggleMonitorGap + monitorWidth;
-    auto toggleGroup = toggleRow.withSizeKeepingCentre(totalToggleGroupWidth, toggleRow.getHeight());
+    m_toggleCaption.setBounds(rightStack.removeFromTop(utilCaptionHeight));
+    rightStack.removeFromTop(rowGap);
 
-    m_swapLRButton.setBounds(toggleGroup.removeFromLeft(toggleWidth));
-    toggleGroup.removeFromLeft(toggleGap);
-    m_invertLButton.setBounds(toggleGroup.removeFromLeft(toggleWidth));
-    toggleGroup.removeFromLeft(toggleGap);
-    m_invertRButton.setBounds(toggleGroup.removeFromLeft(toggleWidth));
-    toggleGroup.removeFromLeft(toggleMonitorGap);
-    m_monitorModeBox.setBounds(toggleGroup);
+    auto toggleRow = rightStack.removeFromTop(utilToggleRowHeight);
+    auto toggleGroup = toggleRow.withSizeKeepingCentre(3 * utilToggleWidth + 2 * utilToggleGap, toggleRow.getHeight());
+    m_swapLRButton.setBounds(toggleGroup.removeFromLeft(utilToggleWidth));
+    toggleGroup.removeFromLeft(utilToggleGap);
+    m_invertLButton.setBounds(toggleGroup.removeFromLeft(utilToggleWidth));
+    toggleGroup.removeFromLeft(utilToggleGap);
+    m_invertRButton.setBounds(toggleGroup.removeFromLeft(utilToggleWidth));
+    rightStack.removeFromTop(rowGap);
+
+    m_monitorLabel.setBounds(rightStack.removeFromTop(utilCaptionHeight));
+    rightStack.removeFromTop(rowGap);
+    m_monitorModeBox.setBounds(rightStack.removeFromTop(utilMonitorBoxHeight));
 }

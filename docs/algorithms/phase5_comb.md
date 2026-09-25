@@ -97,6 +97,10 @@ ran, which would have fed `MSWidthFiltered`'s Bass Cutoff/High Shelf values into
 
 ![StereoWidenerGUI with the Complementary Comb algorithm selected: aux knobs rebound to Delay (10.0 ms) and Gain (50 %), replacing Bass Cutoff/High Shelf](img/phase5_comb_gui.png)
 
+(Screenshot predates the [Phase 5 GUI compaction](phase5_gui_compaction.md), which
+moved the aux knobs and Utilities to a different layout -- the rebinding behaviour
+shown here is unaffected and still current.)
+
 ## Verification
 
 **Python reference** (`python/algorithms/comb.py`, `python/evaluate_comb.py`): mirrors

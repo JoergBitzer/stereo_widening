@@ -12,7 +12,9 @@ global settings file, and
 [../docs/algorithms/phase5_comb.md](../docs/algorithms/phase5_comb.md) for the third
 algorithm (comb pseudo-stereo) and the aux-knob rebinding mechanism it introduced, and
 [../docs/algorithms/phase5_allpass.md](../docs/algorithms/phase5_allpass.md) for the
-fourth algorithm (allpass decorrelation) and the "not mono-safe" badge it introduced.
+fourth algorithm (allpass decorrelation) and the "not mono-safe" badge it introduced,
+and [../docs/algorithms/phase5_gui_compaction.md](../docs/algorithms/phase5_gui_compaction.md)
+for the current three-column GUI layout.
 
 ## Build
 
@@ -83,15 +85,21 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
   preset (see `tools/PresetHandler.h`) rather than relying on the plugin to remember
   its last state.
 
-  Note: the two knobs flanking Width are shared widgets -- which parameter they
-  actually control, their range, and their unit all change with the selected
-  algorithm (rebound automatically on switch); they are not per-algorithm knobs.
-- **Utilities** (below the algorithm selector; applied regardless of which algorithm is
-  selected, see [phase4_settings.md](../docs/algorithms/phase4_settings.md)):
+  Note: the two knobs are stacked to the left of Width (not flanking it any more,
+  since [phase5_gui_compaction.md](../docs/algorithms/phase5_gui_compaction.md)) and
+  are shared widgets -- which parameter they actually control, their range, and their
+  unit all change with the selected algorithm (rebound automatically on switch); they
+  are not per-algorithm knobs.
+- **Utilities** (stacked below the Output level meter, since every one of them acts on
+  the final output signal regardless of which algorithm is selected -- see
+  [phase4_settings.md](../docs/algorithms/phase4_settings.md) for what each one does
+  and [phase5_gui_compaction.md](../docs/algorithms/phase5_gui_compaction.md) for the
+  layout):
   - **Rotation**: -45..+45 degrees, the stereo image's rotation in the L/R plane.
   - **Balance**: -100..+100 %. Positive attenuates L (image moves right), negative
     attenuates R (image moves left).
-  - **Swap / Inv L / Inv R**: swap the two channels, or invert either channel's polarity.
+  - **Flip** (caption above the three toggle buttons): **Swap / Inv L / Inv R** --
+    swap the two channels, or invert either channel's polarity.
   - **Monitor**: Normal / Mono Check (listen to L+R) / Solo Side (listen to S) --
     auditioning modes that override the final output; always switch back to Normal
     before bouncing/exporting.

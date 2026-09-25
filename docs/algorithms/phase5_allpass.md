@@ -65,6 +65,11 @@ algorithm, so switching algorithms never shifts the Utilities section below it -
 
 ![StereoWidenerGUI with Allpass Decorrelation selected: Amount/Spread aux knobs, and the new orange "not mono-safe" badge below the algorithm selector](img/phase5_allpass_gui.png)
 
+(Screenshot predates the [Phase 5 GUI compaction](phase5_gui_compaction.md), which
+moved the aux knobs and Utilities to a different layout -- the rebinding and
+mono-safe-badge behaviour shown here is unaffected and still current; see that page
+for an up to date screenshot with this algorithm selected.)
+
 ## Parameter minimisation: 2 + Width
 
 Two user-facing parameters, same "2 + Width" convention as every algorithm so far:

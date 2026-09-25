@@ -8,19 +8,20 @@ const bool g_forcePowerOf2(false); // should be true for FFT Processing
 // global GUI setting for StereoWidener
 const int g_minGuiSize_x(480);
 const int g_maxGuiSize_x(1200);
-// 456 for StereoWidenerGUI's original content (meterRow 260 + rowGap 8 + knobRow 150 +
-// rowGap 8 + algorithmRow 30, see the layout constants below) + 31 for the preset
-// control reserved above it (g_minPresetHandlerHeight = 30, plus the 1px gap
+// meterRow (260) + rowGap (8) + the taller of the three control columns below it
+// (currently the middle one: Width label+knob+textbox 146, + rowGap 8 + algorithm row
+// 30, + rowGap 8 + mono-safe badge 18 = 210, see the layout constants below) + 31 for
+// the preset control reserved above it (g_minPresetHandlerHeight = 30, plus the 1px gap
 // PluginEditor.cpp's resized() adds) now that WITH_PRESETHANDLERGUI is enabled
 // (StereoWidener/CMakeLists.txt) -- without this, the preset bar simply ate into
 // StereoWidenerGUI's own height instead of the window growing to fit both, pushing the
-// algorithm selector below the visible window -- plus another ~156 for the Utilities
-// row added below the algorithm selector in Phase 4 step 2 (rowGap 8 + title 18 +
-// rowGap 8 + utilities knob row ~84 + rowGap 8 + utilities toggle row 28, see the
-// g_utilities* constants below), plus another ~26 for the "not mono-safe" badge row
-// added below the algorithm selector in Phase 5 (rowGap 8 + badge 18, see
-// g_monoSafeBadgeHeight below), with a small margin.
-const int g_minGuiSize_y(685);
+// algorithm selector below the visible window -- with a small margin. Substantially
+// shorter than before the Phase 5 GUI compaction (was 685): Utilities used to be its
+// own set of full-width rows below the algorithm selector; it is now a third column
+// alongside Width and the aux knobs, stacked below the output meter instead (every
+// utility acts on the final output signal), so it adds no height of its own as long as
+// it fits within the middle column's height -- see g_util* below.
+const int g_minGuiSize_y(520);
 const float g_guiratio = float(g_minGuiSize_y)/g_minGuiSize_x;
 
 // ---------- presethandler ----------
@@ -51,13 +52,22 @@ const juce::Colour g_goniometerOutColour(juce::Colours::deepskyblue); // output 
 
 const int g_rowGap(8);                    // vertical gap between the three stacked rows
 
+// Below the meter row sit three columns, left-edge-aligned with the input meter and
+// right-edge-aligned with the output meter respectively (StereoWidenerGUI::resized()):
+// left = the two aux knobs stacked vertically, middle = Width + the algorithm selector
+// + the mono-safe badge, right = Utilities. All three are top-anchored and vertically
+// centred within the tallest column's own height (currently the middle one).
+
 const int g_widthKnobSize(110);           // diameter of the big Width rotary knob
-const int g_widthKnobRowHeight(150);      // reserved height for knob + its label/textbox
 const int g_widthKnobLabelHeight(18);
 
-const int g_auxKnobSize(64);              // diameter of the two smaller flanking knobs
-const int g_auxKnobLabelHeight(16);       // (their meaning depends on the active algorithm,
-const int g_auxKnobGap(16);               // see StereoAlgorithm::getAuxLeftInfo()/getAuxRightInfo())
+// Aux knobs (left column): stacked vertically now (Phase 5 GUI compaction moved the
+// second one here from the right of Width, to make room for Utilities below the output
+// meter) -- their meaning depends on the active algorithm, see StereoAlgorithm::
+// getAuxLeftInfo()/getAuxRightInfo().
+const int g_auxKnobSize(64);
+const int g_auxKnobLabelHeight(16);
+const int g_auxKnobVGap(10);              // vertical gap between the two stacked aux knobs
 
 const int g_algorithmRowHeight(30);
 const int g_algorithmBoxWidth(260);
@@ -68,18 +78,22 @@ const int g_algorithmHelpPanelWidth(340);
 // "Not mono-safe" badge (Phase 5 step 4), directly below the algorithm selector row --
 // visible only when the active algorithm's isMonoSafe() is false (first needed by
 // algorithm 2.5, AllpassDecorrelation). Always reserved in the layout (empty text when
-// not shown) so switching algorithms never shifts the Utilities section below it.
+// not shown) so switching algorithms never shifts anything below it.
 const int g_monoSafeBadgeHeight(18);
 
-// Utilities row (Phase 4 step 2: planing.md 2.13 + 2.2), below the algorithm selector.
-// See UtilityProcessor.h.
-const int g_utilitiesTitleHeight(18);
-const int g_utilitiesKnobSize(56);        // Rotation/Balance: smaller than the aux knobs (64),
-const int g_utilitiesKnobLabelHeight(14); // since this row also needs space for the toggles/Monitor box
-const int g_utilitiesKnobGap(16);
-
-const int g_utilitiesToggleRowHeight(28);
-const int g_utilitiesToggleWidth(64);     // Swap / Inv L / Inv R buttons
-const int g_utilitiesToggleGap(6);
-const int g_utilitiesToggleMonitorGap(12); // gap between the toggle buttons and the Monitor box
-const int g_monitorBoxWidth(150);
+// Utilities (Phase 4 step 2: planing.md 2.13 + 2.2; moved into its own column below the
+// output meter in Phase 5's GUI compaction, since every utility acts on the final
+// output signal -- see UtilityProcessor.h). Rotation/Balance knobs on top, then a
+// caption, the three toggle buttons, another caption, then the Monitor selector --
+// every widget in this column shares g_utilColumnWidth, so the Monitor box and the two
+// toggle/knob rows are all centred within (and the Monitor box exactly fills) the same
+// width.
+const int g_utilColumnWidth(150);
+const int g_utilKnobSize(48);
+const int g_utilKnobLabelHeight(14);
+const int g_utilKnobGap(12);              // horizontal gap between Rotation and Balance knobs
+const int g_utilCaptionHeight(14);        // "Flip" above the toggle buttons, "Monitor" above the combo box
+const int g_utilToggleRowHeight(24);
+const int g_utilToggleWidth(44);          // Swap / Inv L / Inv R buttons
+const int g_utilToggleGap(6);
+const int g_utilMonitorBoxHeight(22);
