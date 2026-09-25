@@ -13,8 +13,11 @@ global settings file, and
 algorithm (comb pseudo-stereo) and the aux-knob rebinding mechanism it introduced, and
 [../docs/algorithms/phase5_allpass.md](../docs/algorithms/phase5_allpass.md) for the
 fourth algorithm (allpass decorrelation) and the "not mono-safe" badge it introduced,
-and [../docs/algorithms/phase5_gui_compaction.md](../docs/algorithms/phase5_gui_compaction.md)
-for the current three-column GUI layout.
+[../docs/algorithms/phase5_gui_compaction.md](../docs/algorithms/phase5_gui_compaction.md)
+for the current three-column GUI layout, and
+[../docs/algorithms/phase5_multiband.md](../docs/algorithms/phase5_multiband.md) for
+the fifth algorithm (multiband width), its allpass phase-compensation, and the
+dynamic-window-resize/multi-param-grid mechanism it introduced.
 
 ## Build
 
@@ -77,6 +80,18 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     in mono (Utilities -> Monitor -> Mono Check) before committing to a setting. See
     [phase5_allpass.md](../docs/algorithms/phase5_allpass.md) for the algorithm and its
     verification.
+  - *Multiband Width*: splits the signal into 4 bands (3 crossovers) and applies an
+    independent M/S width to each of the upper 3 bands; the lowest band's width is
+    always 0 ("bass mono comes built in", not a parameter). The only algorithm here
+    that doesn't fit "2 + Width" (6 parameters), so it gets its own grid of 6 knobs
+    below the usual layout instead of the two flanking knobs, and the plugin window
+    grows while it's selected: **Low-Mid / Mid-High / High-Air** (the 3 crossover
+    frequencies, 40-400/200-4000/1000-18000 Hz, each knob clamped against its
+    neighbours so they can't be dragged past each other) and **Low-Mid / Mid-High /
+    High** (the 3 band widths, 0-200 %, default 100 % -- neutral, same as the shared
+    Width knob). See [phase5_multiband.md](../docs/algorithms/phase5_multiband.md) for
+    the algorithm (including the allpass phase-compensation needed for a flat
+    reconstruction) and its verification.
 
   Every parameter's default -- and so what double-clicking its knob resets it to -- is
   chosen to be as close to neutral/pass-through processing as possible for its

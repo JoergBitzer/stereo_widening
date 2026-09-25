@@ -1,14 +1,16 @@
 /**
  * @file main.cpp
  * @brief Renders a wav file through one of StereoWidener's real algorithm classes
- *        (MSWidthBroadband, MSWidthFiltered, ComplementaryComb or AllpassDecorrelation
- *        -- the exact C++ code the plugin runs, not a re-implementation) and writes
- *        the result to another wav file.
+ *        (MSWidthBroadband, MSWidthFiltered, ComplementaryComb, AllpassDecorrelation or
+ *        MultibandWidth -- the exact C++ code the plugin runs, not a re-implementation)
+ *        and writes the result to another wav file.
  *
- * Usage: WidenerRender <input.wav> <output.wav> <broadband|filtered|comb|allpass>
+ * Usage: WidenerRender <input.wav> <output.wav> <broadband|filtered|comb|allpass|multiband>
  *                       [width_percent=100] [bassCutoffHz=150] [highShelfHz=8000]
  *                       [combDelayMs=10] [combGainPercent=50] [combCrossoverHz=300]
  *                       [allpassAmountPercent=50] [allpassSpreadPercent=50]
+ *                       [mbFreq1=150] [mbFreq2=1500] [mbFreq3=6000]
+ *                       [mbWidth2Percent=100] [mbWidth3Percent=100] [mbWidth4Percent=100]
  *
  * width_percent: 0-200, matching the plugin's Width parameter (0 = mono, 100 = unity,
  * 200 = double the side signal). bassCutoffHz/highShelfHz only matter for "filtered";
@@ -18,7 +20,8 @@
  * matter for "comb" (see ComplementaryComb.h); combCrossoverHz mirrors GlobalSettings'
  * combCrossoverHz default (not a user-facing knob in the plugin itself).
  * allpassAmountPercent/allpassSpreadPercent only matter for "allpass" (see
- * AllpassDecorrelation.h).
+ * AllpassDecorrelation.h). mbFreq1/2/3 and mbWidth2/3/4Percent only matter for
+ * "multiband" (see MultibandWidth.h); band 1's width is always 0, not a parameter.
  *
  * python/evaluate_widener_plugin.py calls this once per (signal, setting) pair, then
  * runs python/stereo_eval's report.evaluate() on the resulting (input, output) file
@@ -39,15 +42,18 @@
 #include "algorithms/MSWidthFiltered.h"
 #include "algorithms/ComplementaryComb.h"
 #include "algorithms/AllpassDecorrelation.h"
+#include "algorithms/MultibandWidth.h"
 
 int main(int argc, char* argv[])
 {
     if (argc < 4)
     {
-        std::cerr << "usage: WidenerRender <input.wav> <output.wav> <broadband|filtered|comb|allpass> "
+        std::cerr << "usage: WidenerRender <input.wav> <output.wav> <broadband|filtered|comb|allpass|multiband> "
                      "[width_percent=100] [bassCutoffHz=150] [highShelfHz=8000] "
                      "[combDelayMs=10] [combGainPercent=50] [combCrossoverHz=300] "
-                     "[allpassAmountPercent=50] [allpassSpreadPercent=50]\n";
+                     "[allpassAmountPercent=50] [allpassSpreadPercent=50] "
+                     "[mbFreq1=150] [mbFreq2=1500] [mbFreq3=6000] "
+                     "[mbWidth2Percent=100] [mbWidth3Percent=100] [mbWidth4Percent=100]\n";
         return 1;
     }
 
@@ -65,6 +71,12 @@ int main(int argc, char* argv[])
     const float combCrossoverHz = argc > 9 ? (float) std::atof(argv[9]) : 300.0f;
     const float allpassAmountPercent = argc > 10 ? (float) std::atof(argv[10]) : 50.0f;
     const float allpassSpreadPercent = argc > 11 ? (float) std::atof(argv[11]) : 50.0f;
+    const float mbFreq1 = argc > 12 ? (float) std::atof(argv[12]) : 150.0f;
+    const float mbFreq2 = argc > 13 ? (float) std::atof(argv[13]) : 1500.0f;
+    const float mbFreq3 = argc > 14 ? (float) std::atof(argv[14]) : 6000.0f;
+    const float mbWidth2Percent = argc > 15 ? (float) std::atof(argv[15]) : 100.0f;
+    const float mbWidth3Percent = argc > 16 ? (float) std::atof(argv[16]) : 100.0f;
+    const float mbWidth4Percent = argc > 17 ? (float) std::atof(argv[17]) : 100.0f;
 
     juce::AudioFormatManager formatManager;
     formatManager.registerBasicFormats();
@@ -107,9 +119,11 @@ int main(int argc, char* argv[])
         algorithm = std::make_unique<ComplementaryComb>();
     else if (algorithmName == "allpass")
         algorithm = std::make_unique<AllpassDecorrelation>();
+    else if (algorithmName == "multiband")
+        algorithm = std::make_unique<MultibandWidth>();
     else
     {
-        std::cerr << "unknown algorithm '" << algorithmName << "', expected broadband, filtered, comb or allpass\n";
+        std::cerr << "unknown algorithm '" << algorithmName << "', expected broadband, filtered, comb, allpass or multiband\n";
         return 1;
     }
 
@@ -131,6 +145,15 @@ int main(int argc, char* argv[])
     {
         params.auxLeft = allpassAmountPercent * 0.01f;
         params.auxRight = allpassSpreadPercent * 0.01f;
+    }
+    else if (algorithmName == "multiband")
+    {
+        params.multi[MultibandWidth::kFreq1] = mbFreq1;
+        params.multi[MultibandWidth::kFreq2] = mbFreq2;
+        params.multi[MultibandWidth::kFreq3] = mbFreq3;
+        params.multi[MultibandWidth::kWidth2] = mbWidth2Percent * 0.01f;
+        params.multi[MultibandWidth::kWidth3] = mbWidth3Percent * 0.01f;
+        params.multi[MultibandWidth::kWidth4] = mbWidth4Percent * 0.01f;
     }
     else
     {
@@ -170,6 +193,10 @@ int main(int argc, char* argv[])
     else if (algorithmName == "allpass")
         std::cout << "wrote " << outputFile.getFullPathName() << " (allpass, width=" << (width * 100.0f)
                    << "%, amount=" << allpassAmountPercent << "%, spread=" << allpassSpreadPercent << "%)\n";
+    else if (algorithmName == "multiband")
+        std::cout << "wrote " << outputFile.getFullPathName() << " (multiband, width=" << (width * 100.0f)
+                   << "%, freqs=" << mbFreq1 << "/" << mbFreq2 << "/" << mbFreq3
+                   << " Hz, widths=" << mbWidth2Percent << "/" << mbWidth3Percent << "/" << mbWidth4Percent << "%)\n";
     else
         std::cout << "wrote " << outputFile.getFullPathName() << " (" << algorithmName
                    << ", width=" << (width * 100.0f) << "%, bassCutoff=" << bassCutoffHz

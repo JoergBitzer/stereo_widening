@@ -97,3 +97,17 @@ const int g_utilToggleRowHeight(24);
 const int g_utilToggleWidth(44);          // Swap / Inv L / Inv R buttons
 const int g_utilToggleGap(6);
 const int g_utilMonitorBoxHeight(22);
+
+// Multiband width's dedicated parameter grid (Phase 5 algorithm 2.7): a full-width row
+// below the usual three columns, shown -- and given space, growing the whole window,
+// see StereoWidenerGUI::getRequiredContentHeight()/PluginEditor.cpp -- only when the
+// active algorithm's getNumMultiParams() > 0 (currently just Multiband Width; its 6
+// parameters don't fit the usual two-aux-knob pattern, see StereoAlgorithm.h's
+// StereoAlgorithmParams::multi). Laid out g_multiGridCols-wide, as many rows as needed
+// (Multiband Width's 6 params need exactly 2 rows of 3: crossovers, then widths).
+const int g_multiGridCols(3);
+const int g_multiKnobSize(48);
+const int g_multiKnobTextBoxWidth(60);    // wider than the knob itself: fits "6000 Hz" without truncating
+const int g_multiKnobLabelHeight(14);
+const int g_multiKnobColGap(20);          // horizontal gap between knobs in the same row
+const int g_multiKnobRowGap(8);           // vertical gap between rows

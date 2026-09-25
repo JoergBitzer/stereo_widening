@@ -11,19 +11,35 @@
  */
 
 #pragma once
+#include <array>
 #include <juce_audio_basics/juce_audio_basics.h>
+
+// Cap for StereoAlgorithmParams::multi / StereoAlgorithm::getNumMultiParams() below --
+// see the comment there for why this exists alongside auxLeft/auxRight. 6 is exactly
+// what Phase 5's multiband width (algorithm 2.7) needs (3 crossover frequencies + 3
+// per-band widths); raise it if a future algorithm needs more.
+static constexpr int kMaxMultiParams = 6;
 
 /** Everything an algorithm's process() needs. width is common to every algorithm; the
  *  two aux values are the StereoWidenerGUI's two flanking knobs (left/right of Width) --
  *  what each one actually means (if anything) is entirely up to the active algorithm,
  *  see getAuxLeftInfo()/getAuxRightInfo() below. An algorithm that doesn't use one or
  *  both aux values just ignores them; their knobs are also disabled in the GUI for it
- *  (AuxKnobInfo::enabled = false), so the user never sees a value that does nothing. */
+ *  (AuxKnobInfo::enabled = false), so the user never sees a value that does nothing.
+ *
+ *  `multi` is a separate, larger set for algorithms that need more than two
+ *  independent values (currently only multiband width, algorithm 2.7) -- rather than
+ *  generalise auxLeft/auxRight themselves (which would force every existing algorithm
+ *  and all of StereoWidenerGUI's knob-rebinding code to change for a case only one
+ *  algorithm needs), an algorithm just opts in via getNumMultiParams() > 0 and reads
+ *  params.multi[0..getNumMultiParams()-1]; every existing algorithm is unaffected and
+ *  needs no changes at all (the interface's default implementation returns 0). */
 struct StereoAlgorithmParams
 {
     float width = 1.0f;    // 0 = mono, 1 = unity/unchanged, 2 = double the side signal
     float auxLeft = 0.0f;
     float auxRight = 0.0f;
+    std::array<float, kMaxMultiParams> multi {};
 };
 
 /** Describes how the active algorithm wants one of the two aux knobs used, so
@@ -65,6 +81,14 @@ public:
     /** How this algorithm wants StereoWidenerGUI's left/right aux knobs used. */
     virtual AuxKnobInfo getAuxLeftInfo() const noexcept = 0;
     virtual AuxKnobInfo getAuxRightInfo() const noexcept = 0;
+
+    /** How many of params.multi[] this algorithm uses (0..kMaxMultiParams), and their
+     *  labels -- see StereoAlgorithmParams::multi above. StereoWidenerGUI shows a
+     *  dedicated grid of knobs (growing the window if needed) only when this is > 0;
+     *  0 for every algorithm except multiband width, so the default implementation
+     *  here means no other algorithm needs to override either method. */
+    virtual int getNumMultiParams() const noexcept { return 0; }
+    virtual AuxKnobInfo getMultiParamInfo(int index) const noexcept { juce::ignoreUnused(index); return {}; }
 
     /** Mastering profile (plan2.md section 2) only offers mono-safe algorithms. */
     virtual bool isMonoSafe() const noexcept = 0;

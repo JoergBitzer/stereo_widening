@@ -20,6 +20,15 @@ public:
     void resized() override;
 
 private:
+    // Resizes the window to fit whichever algorithm is now active (StereoWidenerGUI::
+    // getRequiredContentHeight()) -- wired to m_editor.onActiveAlgorithmChanged in the
+    // constructor, and also called once manually right after, since the GUI's own
+    // initial call (from its constructor) happens before that wiring exists yet. Most
+    // algorithms need the same, compact size; Multiband Width (Phase 5 algorithm 2.7)
+    // needs a taller window for its 6-parameter grid, so the window actually changes
+    // shape on selecting/leaving it -- see docs/algorithms (phase5 multiband write-up).
+    void updateWindowSizeForActiveAlgorithm();
+
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     StereoWidenerAudioProcessor& m_processorRef;

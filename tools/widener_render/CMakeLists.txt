@@ -20,7 +20,8 @@ target_sources(WidenerRender
         ../../StereoWidener/algorithms/MSWidthBroadband.cpp
         ../../StereoWidener/algorithms/MSWidthFiltered.cpp
         ../../StereoWidener/algorithms/ComplementaryComb.cpp
-        ../../StereoWidener/algorithms/AllpassDecorrelation.cpp)
+        ../../StereoWidener/algorithms/AllpassDecorrelation.cpp
+        ../../StereoWidener/algorithms/MultibandWidth.cpp)
 
 target_compile_definitions(WidenerRender
     PRIVATE

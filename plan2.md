@@ -281,9 +281,36 @@ the algorithm's spec and its own "con"; velvet noise would need a different
 (convolution-based) engine and is left for a future revisit if the cascade approach
 turns out insufficient in practice. Next: 2.7 multiband.
 
-#### 2.7 Multiband width -- not started
-planing.md 2.7: Linkwitz-Riley crossover (3-4 bands) with a per-band M/S width; bass
-mono comes built in. All four steps not started.
+#### 2.7 Multiband width -- done (v0.1.7)
+1. ✅ Python reference: `python/algorithms/multiband_width.py`,
+   `python/evaluate_multiband.py`. Found and fixed a real reconstruction bug before
+   any C++ was written: a naive LR4 crossover tree does not sum flat (~0.5-0.6 dB
+   spurious mono-sum colouration at every setting); fixed with allpass
+   phase-compensation (down to 0.01-0.04 dB) -- see the doc page for the derivation.
+2. ✅ C++ class: `StereoWidener/algorithms/MultibandWidth.{h,cpp}`; cross-checked
+   against the real plugin DSP via `tools/widener_render` +
+   `python/evaluate_widener_plugin.py`, and directly via the new
+   `python/crosscheck_multiband.py` (PASS, diffs 0.000 to printed precision -- no
+   delay-line interpolation involved, same as allpass's own cross-check).
+3. ✅ Doc page: [phase5_multiband.md](docs/algorithms/phase5_multiband.md).
+4. N/A -- mono-safe by construction (M untouched), no badge/hint needed.
+
+The one algorithm so far that doesn't fit "2 + Width" (needs 6 parameters: 3 crossover
+frequencies + 3 band widths, band 1 always forced mono). Discussed the design with the
+user before implementing (per their explicit request) and agreed: a generic knob grid
+rather than a dedicated band-split-editor widget for v1, and a plugin window that
+resizes per algorithm rather than always reserving space for the largest case. Required
+a new, additive parameter mechanism (`StereoAlgorithmParams::multi`,
+`StereoAlgorithm::getNumMultiParams()`/`getMultiParamInfo()`, all default-implemented
+so the four existing algorithms needed zero changes) alongside the existing
+`auxLeft`/`auxRight` pair, and new GUI plumbing for the window resize
+(`StereoWidenerGUI::getRequiredContentHeight()`/`onActiveAlgorithmChanged`,
+`PluginEditor.cpp`'s `updateWindowSizeForActiveAlgorithm()` -- which also fixed a
+latent preset-bar-height bug that only mattered once the aspect ratio could change).
+Two GUI bugs found and fixed during offline verification: crossover knobs
+collapsing to their range minimum on startup (a knob-clamping guard firing during
+initial binding, before all three knobs had their real values) and a decimal-place
+display bug (see the doc page). Next: 2.3 Haas.
 
 #### 2.3 Haas / precedence-effect delay -- not started
 planing.md 2.3: a short inter-channel delay (creative, not mono-safe like 2.5). All
