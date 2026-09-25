@@ -252,7 +252,12 @@ algorithm getting its own dedicated knob pair). A follow-up in the same doc page
 removed the "last used state" mechanism from `GlobalSettings` (it made a knob's
 double-click reset go to whatever was last dialled in instead of a neutral value) --
 every parameter default is now the neutral/pass-through value for its algorithm
-(v0.1.4).
+(v0.1.4). A second follow-up fixed audible "zipper" noise on Delay changes
+(`juce::dsp::DelayLine::setDelay()` was stepping the read position instantly); fixed by
+ramping it with `juce::SmoothedValue<float>` instead -- considered and rejected reusing
+a more complex hand-written time-variant delay-line class (designed for a different,
+N-channel feedback-delay use case, and unsafe with a single mono channel) in favour of
+this much smaller fix reusing only already-verified JUCE building blocks (v0.1.8).
 
 #### 2.5 Allpass decorrelation -- done (v0.1.5)
 1. ✅ Python reference: `python/algorithms/allpass_decorrelation.py`,

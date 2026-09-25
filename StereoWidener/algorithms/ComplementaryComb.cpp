@@ -1,14 +1,4 @@
 #include "ComplementaryComb.h"
-#include <cmath>
-
-namespace
-{
-    // same epsilon-comparison pattern as MSWidthFiltered.cpp's hasChanged()
-    bool hasChanged(float value, float lastValue) noexcept
-    {
-        return std::abs(value - lastValue) > 1.0e-6f;
-    }
-}
 
 void ComplementaryComb::prepare(double newSampleRate, int maxBlockSize)
 {
@@ -21,13 +11,15 @@ void ComplementaryComb::prepare(double newSampleRate, int maxBlockSize)
     crossoverFilter.prepare(juce::dsp::ProcessSpec { sampleRate, (juce::uint32) maxBlockSize, 1 });
     updateCrossoverFilter();
 
-    lastDelayMs = -1.0f; // force the delay to be (re)applied on the next process()
+    smoothedDelaySamples.reset(sampleRate, (double) kDelaySmoothingSeconds);
+    delayInitialized = false; // force a snap (not a glide-in from 0) on the next process()
 }
 
 void ComplementaryComb::reset()
 {
     delayLine.reset();
     crossoverFilter.reset();
+    delayInitialized = false; // same reasoning as in prepare(): snap cleanly, don't glide in
 }
 
 void ComplementaryComb::setCrossoverHz(float hz) noexcept
@@ -43,10 +35,15 @@ void ComplementaryComb::updateCrossoverFilter() noexcept
 
 void ComplementaryComb::process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept
 {
-    if (hasChanged(params.auxLeft, lastDelayMs))
+    const float targetDelaySamples = params.auxLeft * 0.001f * (float) sampleRate;
+    if (!delayInitialized)
     {
-        delayLine.setDelay(params.auxLeft * 0.001f * (float) sampleRate);
-        lastDelayMs = params.auxLeft;
+        smoothedDelaySamples.setCurrentAndTargetValue(targetDelaySamples); // first block: snap, no glide-in from 0
+        delayInitialized = true;
+    }
+    else
+    {
+        smoothedDelaySamples.setTargetValue(targetDelaySamples);
     }
 
     auto* left = buffer.getWritePointer(0);
@@ -56,6 +53,13 @@ void ComplementaryComb::process(juce::AudioBuffer<float>& buffer, const StereoAl
 
     for (int i = 0; i < numSamples; ++i)
     {
+        // Re-applied every sample (not just when the target changes): this is what
+        // actually glides the read position smoothly instead of stepping it -- see the
+        // file header/smoothedDelaySamples' own comment. Once settled,
+        // getNextValue() just keeps returning the target, so this costs nothing extra
+        // in the steady state beyond the (cheap) smoothed-value update itself.
+        delayLine.setDelay(smoothedDelaySamples.getNextValue());
+
         const float m = 0.5f * (left[i] + right[i]);
         const float s = 0.5f * (left[i] - right[i]);
 

@@ -35,6 +35,17 @@
  * *pseudo*-stereo technique, as opposed to a *width* technique that can only reshape
  * width that already exists.
  *
+ * The Delay knob's value is smoothed (smoothedDelaySamples, see the file's own
+ * comment), not applied to delayLine directly: an unsmoothed juce::dsp::DelayLine::
+ * setDelay() steps the read position discontinuously, causing an audible "zipper"
+ * click on every change -- most noticeable while dragging the knob. Considered and
+ * rejected: a dedicated time-variant delay-line class with built-in ramping (found to
+ * be designed for a different use case here -- N-channel feedback/crosstalk delays --
+ * and not safely usable with a single mono channel, see git history/PR discussion);
+ * simply ramping juce::SmoothedValue<float> and feeding it to the existing,
+ * already-verified DelayLine every sample achieves the same fix with no new class and
+ * no external dependency.
+ *
  * Reference: M. R. Schroeder, "An Artificial Stereophonic Effect Obtained from a
  * Single Audio Signal", J. Audio Eng. Soc., 1958.
  *
@@ -69,14 +80,26 @@ public:
     // a bit past the Delay knob's own max (g_paramCombDelay.maxValue = 20 ms,
     // StereoWidener.h), so the delay line never needs to grow after prepare()
     static constexpr float kMaxDelayMs = 25.0f;
+    // How long a Delay-knob change takes to glide in, rather than stepping instantly
+    // (see smoothedDelaySamples below) -- matches the project's other short UI-driven
+    // ramps, e.g. StereoWidenerAudio::kCrossfadeSeconds.
+    static constexpr float kDelaySmoothingSeconds = 0.02f;
 
 private:
     void updateCrossoverFilter() noexcept;
 
     double sampleRate = 48000.0;
     float crossoverHz = 300.0f;
-    float lastDelayMs = -1.0f;
 
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine { 4096 };
     juce::dsp::IIR::Filter<float> crossoverFilter;
+
+    // Ramps delayLine's read position smoothly to a new Delay-knob value instead of
+    // stepping it instantly, which caused an audible "zipper" click (the read pointer
+    // jumping discontinuously to a different position in the circular buffer every
+    // time the parameter changed -- most noticeable while dragging the knob). false
+    // until the first process() call, which snaps (no ramp) to that block's delay
+    // instead of gliding in from 0 -- see process().
+    juce::SmoothedValue<float> smoothedDelaySamples;
+    bool delayInitialized = false;
 };

@@ -223,6 +223,68 @@ unchanged from before). `docs/algorithms/phase4_settings.md` carries a correctio
 pointing back here rather than being rewritten, since its "last used state" section is
 now a historical record of a design later found to have this problem.
 
+## Fixing "zipper" noise on Delay changes
+
+Second follow-up, reported after using the plugin: changing the Delay knob produced an
+audible "zipper" click. Cause: `ComplementaryComb::process()` called
+`juce::dsp::DelayLine::setDelay()` once per block whenever the parameter changed --
+this steps the delay line's read position *discontinuously* to a different point in the
+circular buffer, and since two nearby points in a delayed periodic/quasi-periodic
+signal are generally at different phases, jumping between them produces an audible
+click (worse while dragging the knob continuously, hence "zipper").
+
+The user pointed at their own `TimeVariantDelayLine` class (a different project,
+`AudioDev/BasicDelay/`) as a possible fix and asked whether to reuse it or write
+something simpler. Decided **not** to reuse it, for several concrete reasons found on
+inspection, not just a style preference:
+- It is designed for N-channel delays with a feedback/crosstalk matrix between
+  channels; `ComplementaryComb` needs exactly one mono delay line (for M). Using it
+  with 1 channel is actually **unsafe**: `processSamples()` unconditionally reads
+  `m_crosstalkGain[1]`/`m_feedbackOld[1]` when `chn == 0`, an out-of-bounds access if
+  `m_NrOfChns == 1`.
+- It depends on `AudioDev/BasicDelay/`'s own `FirstOrderDesignRoutines.h` -- outside the
+  `stereo_widening` git repo entirely, so using it would make this repo not buildable
+  from a fresh clone without either vendoring those files in or adding a path
+  dependency on a separate, separately-versioned sibling project.
+- Its feedback/crosstalk/lowpass/highpass are all irrelevant to this algorithm (the
+  crossover filtering already has its own dedicated, already-verified
+  `crossoverFilter`) -- dead weight to carry and to have to reason about as "definitely
+  inert here".
+- Its `processSamples()` takes a whole `AudioBuffer`, while `ComplementaryComb::
+  process()` interleaves the delay with per-sample M/S math -- would need restructuring
+  either way.
+
+The actual technique that class demonstrates -- ramp the delay *time* smoothly toward
+its target instead of stepping it -- doesn't need any of that: `juce::SmoothedValue<float>`
+(already used elsewhere in this project, e.g. `StereoWidenerAudio::m_crossfadeProgress`
+for the algorithm-switch crossfade) applied to the delay-in-samples value, fed to the
+existing, already-verified `juce::dsp::DelayLine` every sample
+(`delayLine.setDelay(smoothedDelaySamples.getNextValue())`), achieves the same fix in
+about 10 lines, no new class, no external dependency. A `kDelaySmoothingSeconds = 0.02f`
+ramp (20 ms, matching the project's other short UI-driven ramps) glides the read
+position smoothly across a Delay change instead of jumping.
+
+**Provably no regression for every existing static-setting test**: the smoothing only
+engages on a live parameter *change* after the algorithm has already processed at least
+one block (`delayInitialized`); the very first block after `prepare()`/`reset()` snaps
+directly to that block's target value with `setCurrentAndTargetValue()` (no glide-in
+from 0). Since every existing test (`evaluate_comb.py`, `tools/widener_render` /
+`evaluate_widener_plugin.py`, `crosscheck_comb.py`) renders one fixed setting per file
+with no mid-render automation, none of them ever exercise the "already initialized,
+value changes" branch at all -- confirmed by re-running `evaluate_widener_plugin.py`
+after the fix and diffing against the pre-fix numbers: bit-for-bit identical on every
+comb row.
+
+**Verifying the fix itself**: a throwaway console tool (`tools/comb_zipper_check`,
+removed afterwards per the project's convention) drove `ComplementaryComb` with a
+sustained 300 Hz tone and an abrupt Delay change mid-stream (5 ms -> 18 ms, close to
+the knob's full range, deliberately a worst case), then measured the largest
+sample-to-sample jump in the output near the transition. Result: 0.023, essentially the
+same as the input tone's own natural sample-to-sample delta (0.021) -- no discontinuity
+spike, confirming the glide is smooth. `pluginval --strictness-level 10`: SUCCESS.
+
+StereoWidener 0.1.7 -> 0.1.8.
+
 ## Files
 
 - `StereoWidener/algorithms/ComplementaryComb.h`/`.cpp` (new): the algorithm class.
