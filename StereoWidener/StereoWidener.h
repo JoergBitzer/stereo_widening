@@ -17,6 +17,7 @@
 #include "algorithms/ComplementaryComb.h"
 #include "algorithms/AllpassDecorrelation.h"
 #include "algorithms/MultibandWidth.h"
+#include "algorithms/EarlyReflections.h"
 #include "../shared/metering/StereoMeterState.h"
 #include "../shared/metering/GoniometerComponent.h"
 #include "../shared/metering/LevelMeterComponent.h"
@@ -237,6 +238,38 @@ const struct
 	const int numDecimalPlaces = 0;
 }g_paramMultibandWidth4;
 
+// EarlyReflections' aux knobs (Phase 5, algorithm 2.12). See EarlyReflections.h for the
+// formula; Room Size's range (a spread window in ms internally, see
+// EarlyReflections::kRoomMinSpreadMs/kRoomMaxSpreadMs) is exposed here as a plain
+// 0-100 % knob, same convention as g_paramCombGain/g_paramAllpassSpread.
+const struct
+{
+	const std::string ID = "earlyReflAmount";
+	const std::string name = "Amount";
+	const std::string unitName = "%";
+	const float minValue = 0.0f;
+	const float maxValue = 100.0f;
+	// 0 % is neutral (exact bypass, algebraically -- see EarlyReflections.h) until the
+	// user dials this in, same reasoning as g_paramAllpassAmount's default above.
+	const float defaultValue = minValue;
+	const float skew = 1.0f;
+	const int numDecimalPlaces = 0;
+}g_paramEarlyReflAmount;
+
+const struct
+{
+	const std::string ID = "earlyReflRoomSize";
+	const std::string name = "Room Size";
+	const std::string unitName = "%";
+	const float minValue = 0.0f;
+	const float maxValue = 100.0f;
+	// No "neutral" value of its own -- inert whenever Amount = 0, same reasoning as
+	// g_paramCombDelay's default above.
+	const float defaultValue = 50.0f;
+	const float skew = 1.0f;
+	const int numDecimalPlaces = 0;
+}g_paramEarlyReflRoomSize;
+
 constexpr const char* g_paramAlgorithmID = "algorithm";
 constexpr const char* g_paramAlgorithmName = "Algorithm";
 
@@ -249,7 +282,8 @@ const juce::StringArray g_algorithmNames {
     "M/S Width (Filtered / Bass Mono)",
     "Complementary Comb (Pseudo-Stereo)",
     "Allpass Decorrelation",
-    "Multiband Width"
+    "Multiband Width",
+    "Early Reflections (Room Widening)"
 };
 
 // ---- Utilities (Phase 4 step 2: planing.md 2.13 + 2.2) -------------------------
@@ -355,6 +389,8 @@ private:
     juce::AudioParameterFloat* m_multibandWidth2Param = nullptr;
     juce::AudioParameterFloat* m_multibandWidth3Param = nullptr;
     juce::AudioParameterFloat* m_multibandWidth4Param = nullptr;
+    juce::AudioParameterFloat* m_earlyReflAmountParam = nullptr;
+    juce::AudioParameterFloat* m_earlyReflRoomSizeParam = nullptr;
     juce::AudioParameterChoice* m_algorithmParam = nullptr;
 
     // Builds this block's params for algorithmIndex, sourced from whichever aux

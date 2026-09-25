@@ -21,7 +21,8 @@ target_sources(WidenerRender
         ../../StereoWidener/algorithms/MSWidthFiltered.cpp
         ../../StereoWidener/algorithms/ComplementaryComb.cpp
         ../../StereoWidener/algorithms/AllpassDecorrelation.cpp
-        ../../StereoWidener/algorithms/MultibandWidth.cpp)
+        ../../StereoWidener/algorithms/MultibandWidth.cpp
+        ../../StereoWidener/algorithms/EarlyReflections.cpp)
 
 target_compile_definitions(WidenerRender
     PRIVATE

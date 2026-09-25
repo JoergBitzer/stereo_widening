@@ -221,9 +221,11 @@ Details and verification: `docs/algorithms/phase4_settings.md`.
    algorithm reports 0).
 
 ### Phase 5 – Algorithms 2–5 (v1)
-Order: **2.4 comb → 2.5 allpass/velvet → 2.7 multiband → 2.3 Haas** (changed from the
-original comb → multiband → allpass/velvet → Haas order: allpass/velvet moved ahead of
-multiband). The mono-safe modes come first.
+Order: **2.4 comb → 2.5 allpass/velvet → 2.7 multiband → 2.12 early reflections → 2.3
+Haas** (changed twice from the original comb → multiband → allpass/velvet → Haas
+order: allpass/velvet moved ahead of multiband, and 2.12 early-reflection/room
+widening inserted ahead of 2.3 Haas per explicit request -- 2.3 is deferred, not
+dropped). The mono-safe modes come first.
 
 Every algorithm goes through the same four steps; each subsection below tracks them:
 1. Python reference in `python/algorithms/`, evaluation report, and choice of default
@@ -315,11 +317,48 @@ latent preset-bar-height bug that only mattered once the aspect ratio could chan
 Two GUI bugs found and fixed during offline verification: crossover knobs
 collapsing to their range minimum on startup (a knob-clamping guard firing during
 initial binding, before all three knobs had their real values) and a decimal-place
-display bug (see the doc page). Next: 2.3 Haas.
+display bug (see the doc page). Next: 2.12 early reflections (2.3 Haas deferred, see
+below).
 
-#### 2.3 Haas / precedence-effect delay -- not started
-planing.md 2.3: a short inter-channel delay (creative, not mono-safe like 2.5). All
-four steps not started.
+#### 2.12 Early reflections / room widening -- done (v0.1.9)
+1. ✅ Python reference: `python/algorithms/early_reflections.py`,
+   `python/evaluate_early_reflections.py`. Asserts `amount = 0` is an exact bypass;
+   confirmed the mono sum is genuinely non-flat once `amount > 0` and genuine width
+   from dual-mono input, same as allpass decorrelation.
+2. ✅ C++ class: `StereoWidener/algorithms/EarlyReflections.{h,cpp}`; cross-checked
+   against the real plugin DSP via `tools/widener_render` +
+   `python/evaluate_widener_plugin.py`, and directly via the new
+   `python/crosscheck_early_reflections.py` (PASS, diffs 0.000 to printed precision --
+   the tightest cross-check so far). Found and fixed **two** real bugs, both in
+   `juce::dsp::DelayLine::popSample()`'s `updateReadPointer` flag (this algorithm reads
+   one shared delay line ten times per pushed sample, unlike comb's one-pop-per-push):
+   first, the cross-check caught leaving it at its default `true` on every call, which
+   let the read cursor free-run ahead of the write cursor and corrupt every tap's
+   delay. The first fix (`false` on every call) overcorrected -- it froze the read
+   cursor entirely, so every tap read one fixed buffer slot refreshed only once per
+   buffer revolution, audible as periodic crackle at Amount > 0 and Width > 0 (reported
+   live by the user; invisible to the cross-check's aggregate statistics, since the
+   stale samples read back were still real, correlated audio). Correct fix:
+   `updateReadPointer=true` on only the temporally last of the ten `popSample()` calls
+   per sample, `false` on the rest -- see the doc page for the full account.
+3. ✅ Doc page: [phase5_early_reflections.md](docs/algorithms/phase5_early_reflections.md).
+4. N/A -- badge/hint mechanism already generic since 2.5, no new GUI code needed;
+   confirmed via a new throwaway `WidenerGuiSnapshot` offline-render tool that it shows
+   correctly for this algorithm.
+
+Two user-facing parameters (Amount, Room Size) plus the shared Width knob, decided by
+weighing the user's own three-knob suggestion (`nr_of_reflections`, `RoomSize`,
+`pre-delay`) against the "2 + Width"/neutral-default conventions: Amount (0 % neutral
+bypass, not originally suggested but required to preserve the project's
+every-algorithm-has-an-exact-bypass invariant), Room Size (50 % default, no neutral
+value of its own), with pre-delay pushed to a `GlobalSettings` default (mirroring
+comb's `crossoverHz`) and reflection count fixed at a compiled-in constant (mirroring
+allpass's fixed cascade-stage count). Next: 2.3 Haas.
+
+#### 2.3 Haas / precedence-effect delay -- deferred
+planing.md 2.3: a short inter-channel delay (creative, not mono-safe like 2.5). Skipped
+ahead of 2.12 (early reflections) per explicit request; all four steps still not
+started.
 
 ### Phase 6 – v1 release
 1. GUI: profile switch, mode selector (filtered by profile), macro width, parameter panel

@@ -92,6 +92,20 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     Width knob). See [phase5_multiband.md](../docs/algorithms/phase5_multiband.md) for
     the algorithm (including the allpass phase-compensation needed for a flat
     reconstruction) and its verification.
+  - *Early Reflections (Room Widening)*: a handful of short, quiet, delayed copies of
+    the mid signal are added to each channel, using a DIFFERENT set of delay times for
+    L than for R -- mimics the early reflections a real room adds before its late
+    reverb tail arrives (apparent source width), and also creates real width from
+    dual-mono input, like Complementary Comb and Allpass Decorrelation. The left knob
+    sets **Amount** (0-100 %, defaults to 0 % -- an exact bypass), the right knob sets
+    **Room Size** (0-100 %, how spread out the reflections are: small room = tight
+    cluster, large room = spread further out). The pre-delay before the first
+    reflection (default 5 ms) and the number of reflections (5) are not parameters;
+    the former is read from the global settings file, the latter is fixed. **Not
+    mono-safe**, same reasoning and warning badge as Allpass Decorrelation. See
+    [phase5_early_reflections.md](../docs/algorithms/phase5_early_reflections.md) for
+    the algorithm (including a `juce::dsp::DelayLine` read-cursor bug found and fixed
+    during cross-checking) and its verification.
 
   Every parameter's default -- and so what double-clicking its knob resets it to -- is
   chosen to be as close to neutral/pass-through processing as possible for its

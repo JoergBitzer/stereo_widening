@@ -1,16 +1,17 @@
 /**
  * @file main.cpp
  * @brief Renders a wav file through one of StereoWidener's real algorithm classes
- *        (MSWidthBroadband, MSWidthFiltered, ComplementaryComb, AllpassDecorrelation or
- *        MultibandWidth -- the exact C++ code the plugin runs, not a re-implementation)
- *        and writes the result to another wav file.
+ *        (MSWidthBroadband, MSWidthFiltered, ComplementaryComb, AllpassDecorrelation,
+ *        MultibandWidth or EarlyReflections -- the exact C++ code the plugin runs, not
+ *        a re-implementation) and writes the result to another wav file.
  *
- * Usage: WidenerRender <input.wav> <output.wav> <broadband|filtered|comb|allpass|multiband>
+ * Usage: WidenerRender <input.wav> <output.wav> <broadband|filtered|comb|allpass|multiband|earlyrefl>
  *                       [width_percent=100] [bassCutoffHz=150] [highShelfHz=8000]
  *                       [combDelayMs=10] [combGainPercent=50] [combCrossoverHz=300]
  *                       [allpassAmountPercent=50] [allpassSpreadPercent=50]
  *                       [mbFreq1=150] [mbFreq2=1500] [mbFreq3=6000]
  *                       [mbWidth2Percent=100] [mbWidth3Percent=100] [mbWidth4Percent=100]
+ *                       [erAmountPercent=50] [erRoomSizePercent=50] [erPreDelayMs=5]
  *
  * width_percent: 0-200, matching the plugin's Width parameter (0 = mono, 100 = unity,
  * 200 = double the side signal). bassCutoffHz/highShelfHz only matter for "filtered";
@@ -22,6 +23,9 @@
  * allpassAmountPercent/allpassSpreadPercent only matter for "allpass" (see
  * AllpassDecorrelation.h). mbFreq1/2/3 and mbWidth2/3/4Percent only matter for
  * "multiband" (see MultibandWidth.h); band 1's width is always 0, not a parameter.
+ * erAmountPercent/erRoomSizePercent/erPreDelayMs only matter for "earlyrefl" (see
+ * EarlyReflections.h); erPreDelayMs mirrors GlobalSettings' own default (not a
+ * user-facing knob in the plugin itself).
  *
  * python/evaluate_widener_plugin.py calls this once per (signal, setting) pair, then
  * runs python/stereo_eval's report.evaluate() on the resulting (input, output) file
@@ -43,17 +47,19 @@
 #include "algorithms/ComplementaryComb.h"
 #include "algorithms/AllpassDecorrelation.h"
 #include "algorithms/MultibandWidth.h"
+#include "algorithms/EarlyReflections.h"
 
 int main(int argc, char* argv[])
 {
     if (argc < 4)
     {
-        std::cerr << "usage: WidenerRender <input.wav> <output.wav> <broadband|filtered|comb|allpass|multiband> "
+        std::cerr << "usage: WidenerRender <input.wav> <output.wav> <broadband|filtered|comb|allpass|multiband|earlyrefl> "
                      "[width_percent=100] [bassCutoffHz=150] [highShelfHz=8000] "
                      "[combDelayMs=10] [combGainPercent=50] [combCrossoverHz=300] "
                      "[allpassAmountPercent=50] [allpassSpreadPercent=50] "
                      "[mbFreq1=150] [mbFreq2=1500] [mbFreq3=6000] "
-                     "[mbWidth2Percent=100] [mbWidth3Percent=100] [mbWidth4Percent=100]\n";
+                     "[mbWidth2Percent=100] [mbWidth3Percent=100] [mbWidth4Percent=100] "
+                     "[erAmountPercent=50] [erRoomSizePercent=50] [erPreDelayMs=5]\n";
         return 1;
     }
 
@@ -77,6 +83,9 @@ int main(int argc, char* argv[])
     const float mbWidth2Percent = argc > 15 ? (float) std::atof(argv[15]) : 100.0f;
     const float mbWidth3Percent = argc > 16 ? (float) std::atof(argv[16]) : 100.0f;
     const float mbWidth4Percent = argc > 17 ? (float) std::atof(argv[17]) : 100.0f;
+    const float erAmountPercent = argc > 18 ? (float) std::atof(argv[18]) : 50.0f;
+    const float erRoomSizePercent = argc > 19 ? (float) std::atof(argv[19]) : 50.0f;
+    const float erPreDelayMs = argc > 20 ? (float) std::atof(argv[20]) : 5.0f;
 
     juce::AudioFormatManager formatManager;
     formatManager.registerBasicFormats();
@@ -121,14 +130,18 @@ int main(int argc, char* argv[])
         algorithm = std::make_unique<AllpassDecorrelation>();
     else if (algorithmName == "multiband")
         algorithm = std::make_unique<MultibandWidth>();
+    else if (algorithmName == "earlyrefl")
+        algorithm = std::make_unique<EarlyReflections>();
     else
     {
-        std::cerr << "unknown algorithm '" << algorithmName << "', expected broadband, filtered, comb, allpass or multiband\n";
+        std::cerr << "unknown algorithm '" << algorithmName << "', expected broadband, filtered, comb, allpass, multiband or earlyrefl\n";
         return 1;
     }
 
     if (auto* comb = dynamic_cast<ComplementaryComb*>(algorithm.get()))
         comb->setCrossoverHz(combCrossoverHz);
+    if (auto* earlyRefl = dynamic_cast<EarlyReflections*>(algorithm.get()))
+        earlyRefl->setPreDelayMs(erPreDelayMs);
 
     constexpr int blockSize = 512;
     algorithm->prepare(reader->sampleRate, blockSize);
@@ -154,6 +167,11 @@ int main(int argc, char* argv[])
         params.multi[MultibandWidth::kWidth2] = mbWidth2Percent * 0.01f;
         params.multi[MultibandWidth::kWidth3] = mbWidth3Percent * 0.01f;
         params.multi[MultibandWidth::kWidth4] = mbWidth4Percent * 0.01f;
+    }
+    else if (algorithmName == "earlyrefl")
+    {
+        params.auxLeft = erAmountPercent * 0.01f;
+        params.auxRight = erRoomSizePercent * 0.01f;
     }
     else
     {
@@ -197,6 +215,10 @@ int main(int argc, char* argv[])
         std::cout << "wrote " << outputFile.getFullPathName() << " (multiband, width=" << (width * 100.0f)
                    << "%, freqs=" << mbFreq1 << "/" << mbFreq2 << "/" << mbFreq3
                    << " Hz, widths=" << mbWidth2Percent << "/" << mbWidth3Percent << "/" << mbWidth4Percent << "%)\n";
+    else if (algorithmName == "earlyrefl")
+        std::cout << "wrote " << outputFile.getFullPathName() << " (earlyrefl, width=" << (width * 100.0f)
+                   << "%, amount=" << erAmountPercent << "%, roomSize=" << erRoomSizePercent
+                   << "%, preDelay=" << erPreDelayMs << " ms)\n";
     else
         std::cout << "wrote " << outputFile.getFullPathName() << " (" << algorithmName
                    << ", width=" << (width * 100.0f) << "%, bassCutoff=" << bassCutoffHz

@@ -12,6 +12,7 @@ StereoWidenerAudio::StereoWidenerAudio(StereoWidenerAudioProcessor* processor)
     m_algorithms.push_back(std::make_unique<ComplementaryComb>());
     m_algorithms.push_back(std::make_unique<AllpassDecorrelation>());
     m_algorithms.push_back(std::make_unique<MultibandWidth>());
+    m_algorithms.push_back(std::make_unique<EarlyReflections>());
 
     // user-configurable defaults (plan2.md Phase 4, "Global settings file"), previously
     // fixed compiled-in constants -- see GlobalSettings.h
@@ -19,6 +20,8 @@ StereoWidenerAudio::StereoWidenerAudio(StereoWidenerAudioProcessor* processor)
         filtered->setHighShelfGainDb(m_globalSettings.getHighShelfGainDb());
     if (auto* comb = dynamic_cast<ComplementaryComb*>(m_algorithms[2].get()))
         comb->setCrossoverHz(m_globalSettings.getCombCrossoverHz());
+    if (auto* earlyRefl = dynamic_cast<EarlyReflections*>(m_algorithms[5].get()))
+        earlyRefl->setPreDelayMs(m_globalSettings.getEarlyReflectionsPreDelayMs());
 }
 
 StereoAlgorithmParams StereoWidenerAudio::paramsFor(int algorithmIndex, float width) const noexcept
@@ -50,6 +53,10 @@ StereoAlgorithmParams StereoWidenerAudio::paramsFor(int algorithmIndex, float wi
             p.multi[MultibandWidth::kWidth2] = (m_multibandWidth2Param != nullptr ? m_multibandWidth2Param->get() : g_paramMultibandWidth2.defaultValue) * 0.01f;
             p.multi[MultibandWidth::kWidth3] = (m_multibandWidth3Param != nullptr ? m_multibandWidth3Param->get() : g_paramMultibandWidth3.defaultValue) * 0.01f;
             p.multi[MultibandWidth::kWidth4] = (m_multibandWidth4Param != nullptr ? m_multibandWidth4Param->get() : g_paramMultibandWidth4.defaultValue) * 0.01f;
+            break;
+        case 5: // EarlyReflections: Amount (0-100 % -> 0-1), Room Size (0-100 % -> 0-1)
+            p.auxLeft = (m_earlyReflAmountParam != nullptr ? m_earlyReflAmountParam->get() : g_paramEarlyReflAmount.defaultValue) * 0.01f;
+            p.auxRight = (m_earlyReflRoomSizeParam != nullptr ? m_earlyReflRoomSizeParam->get() : g_paramEarlyReflRoomSize.defaultValue) * 0.01f;
             break;
         default: // MSWidthBroadband and any future algorithm with no aux params
             break;
@@ -326,6 +333,8 @@ void StereoWidenerAudio::addParameter(std::vector<std::unique_ptr<juce::RangedAu
     paramVector.push_back(makeFloatParameter(g_paramMultibandWidth2, g_paramMultibandWidth2.defaultValue));
     paramVector.push_back(makeFloatParameter(g_paramMultibandWidth3, g_paramMultibandWidth3.defaultValue));
     paramVector.push_back(makeFloatParameter(g_paramMultibandWidth4, g_paramMultibandWidth4.defaultValue));
+    paramVector.push_back(makeFloatParameter(g_paramEarlyReflAmount, g_paramEarlyReflAmount.defaultValue));
+    paramVector.push_back(makeFloatParameter(g_paramEarlyReflRoomSize, g_paramEarlyReflRoomSize.defaultValue));
 
     paramVector.push_back(std::make_unique<juce::AudioParameterChoice>(g_paramAlgorithmID, g_paramAlgorithmName,
         g_algorithmNames, 0));
@@ -355,6 +364,8 @@ void StereoWidenerAudio::prepareParameter(std::unique_ptr<juce::AudioProcessorVa
     m_multibandWidth2Param = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramMultibandWidth2.ID));
     m_multibandWidth3Param = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramMultibandWidth3.ID));
     m_multibandWidth4Param = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramMultibandWidth4.ID));
+    m_earlyReflAmountParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramEarlyReflAmount.ID));
+    m_earlyReflRoomSizeParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramEarlyReflRoomSize.ID));
     m_algorithmParam = dynamic_cast<juce::AudioParameterChoice*>(vts->getParameter(g_paramAlgorithmID));
 
     m_rotationParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramRotation.ID));
@@ -509,6 +520,7 @@ namespace
             case 1: return g_paramBassCutoff.ID;
             case 2: return g_paramCombDelay.ID;
             case 3: return g_paramAllpassAmount.ID;
+            case 5: return g_paramEarlyReflAmount.ID;
             default: return {};
         }
     }
@@ -520,6 +532,7 @@ namespace
             case 1: return g_paramHighShelfFreq.ID;
             case 2: return g_paramCombGain.ID;
             case 3: return g_paramAllpassSpread.ID;
+            case 5: return g_paramEarlyReflRoomSize.ID;
             default: return {};
         }
     }
@@ -597,7 +610,9 @@ void StereoWidenerGUI::bindAuxKnob(juce::Slider& knob, std::unique_ptr<SliderAtt
     }
     else if (paramId == juce::String(g_paramCombGain.ID)
              || paramId == juce::String(g_paramAllpassAmount.ID)
-             || paramId == juce::String(g_paramAllpassSpread.ID))
+             || paramId == juce::String(g_paramAllpassSpread.ID)
+             || paramId == juce::String(g_paramEarlyReflAmount.ID)
+             || paramId == juce::String(g_paramEarlyReflRoomSize.ID))
     {
         knob.setTextValueSuffix(" %");
     }

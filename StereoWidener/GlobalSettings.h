@@ -55,6 +55,11 @@ public:
      *  to 2 + Width" request, phase5 docs). Default 300.0 Hz. */
     float getCombCrossoverHz() const noexcept { return combCrossoverHz; }
 
+    /** Pre-delay (ms) before EarlyReflections' first reflection tap -- planing.md
+     *  2.12's own suggested reflection window starts around 5 ms, not a user-facing
+     *  knob (same "2 + Width" reasoning as combCrossoverHz above). Default 5.0 ms. */
+    float getEarlyReflectionsPreDelayMs() const noexcept { return earlyReflectionsPreDelayMs; }
+
     /** Default GUI scale factor for a brand new instance (StereoWidenerAudioProcessor's
      *  m_pluginScaleFactor before any project state is restored). Default 1.0. */
     float getGuiScaleFactor() const noexcept { return guiScaleFactor; }
@@ -86,4 +91,5 @@ private:
     float meterPeakHoldTimeS = 1.5f;
     float meterPeakDecayDbPerS = 20.0f;
     float combCrossoverHz = 300.0f; // matches planing.md 2.4's own suggested value
+    float earlyReflectionsPreDelayMs = 5.0f;
 };
