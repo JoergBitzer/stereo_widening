@@ -221,11 +221,12 @@ Details and verification: `docs/algorithms/phase4_settings.md`.
    algorithm reports 0).
 
 ### Phase 5 – Algorithms 2–5 (v1)
-Order: **2.4 comb → 2.5 allpass/velvet → 2.7 multiband → 2.12 early reflections → 2.3
-Haas** (changed twice from the original comb → multiband → allpass/velvet → Haas
-order: allpass/velvet moved ahead of multiband, and 2.12 early-reflection/room
-widening inserted ahead of 2.3 Haas per explicit request -- 2.3 is deferred, not
-dropped). The mono-safe modes come first.
+Order: **2.4 comb → 2.5 allpass/velvet → 2.7 multiband → 2.12 early reflections →
+2.11 multi chorus** (changed repeatedly from the original comb → multiband →
+allpass/velvet → Haas order: allpass/velvet moved ahead of multiband, 2.12
+early-reflection/room widening inserted ahead of 2.3 Haas, and 2.3 Haas moved out of
+v1 entirely -- see "Phase 7 -- v2 and later" below -- in favour of 2.11 micro-pitch/
+chorus doubler, per explicit request). The mono-safe modes come first.
 
 Every algorithm goes through the same four steps; each subsection below tracks them:
 1. Python reference in `python/algorithms/`, evaluation report, and choice of default
@@ -353,12 +354,18 @@ bypass, not originally suggested but required to preserve the project's
 every-algorithm-has-an-exact-bypass invariant), Room Size (50 % default, no neutral
 value of its own), with pre-delay pushed to a `GlobalSettings` default (mirroring
 comb's `crossoverHz`) and reflection count fixed at a compiled-in constant (mirroring
-allpass's fixed cascade-stage count). Next: 2.3 Haas.
+allpass's fixed cascade-stage count). Next: 2.11 multi chorus (2.3 Haas moved to
+Phase 7, see below).
 
-#### 2.3 Haas / precedence-effect delay -- deferred
-planing.md 2.3: a short inter-channel delay (creative, not mono-safe like 2.5). Skipped
-ahead of 2.12 (early reflections) per explicit request; all four steps still not
-started.
+#### 2.11 Micro-pitch / multi chorus doubler -- not started
+planing.md 2.11: L and R get slightly different short, modulated delays (5-30 ms,
+LFO) or fixed detune (±5-15 cent, delay-line pitch shifting) -- the classic
+"Dimension D"/micro-shift chorus effect. Added to the v1 plan per explicit request
+(originally a Phase 7/v2 candidate, moved up). Works on mono input like comb/allpass/
+early reflections; planing.md's own con is that it changes the sound (it's an effect,
+not a neutral width tool) and the mono sum shows comb/flanging artefacts -- expect
+this to need the "not mono-safe" badge, same as allpass/early reflections. All four
+steps not started.
 
 ### Phase 6 – v1 release
 1. GUI: profile switch, mode selector (filtered by profile), macro width, parameter panel
@@ -369,14 +376,35 @@ started.
 5. README, user documentation, versioning.
 
 ### Phase 7 – v2 and later
-1. **Crosstalk cancellation (2.10)**, the loudspeaker focus. Parameters: speaker angle,
+Every algorithm from planing.md not implemented (or not yet decided) for v1 lives
+here -- the single place to look for "what's left, and why it isn't in v1 yet".
+
+1. **2.3 Haas / precedence-effect delay** -- moved out of v1 per explicit request (was
+   briefly planned for Phase 5, then deferred, then moved here for good). planing.md
+   2.3: a short inter-channel delay (creative, not mono-safe like 2.5); "better
+   variant: delay only the side part, or only a band-limited part". All four Phase 5
+   steps not started.
+2. **2.8 STFT panning expansion / source re-panning ("the most intelligent
+   approach")**, reusing the OutOfPhase WOLA structure and `TGMStaticLib/FFT` for a
+   real C++ implementation. A Python-only feasibility prototype has been evaluated
+   (per explicit request, before committing to a C++ redesign) --
+   [source_repanning_prototype.md](docs/algorithms/source_repanning_prototype.md).
+   Verdict so far: the base technique (no primary-ambient decomposition) measurably
+   *narrows* the image on realistic multi-source mixes instead of widening it, and
+   even its own "no remap requested" baseline isn't a clean bypass -- the
+   primary-ambient decomposition extension planing.md separately describes looks
+   like a required redesign, not an optional add-on, before this is worth a C++
+   implementation. Needs a listening decision, not just a numeric one, before this
+   item moves further.
+3. **Crosstalk cancellation (2.10)**, the loudspeaker focus. Parameters: speaker angle,
    listener distance, regularisation (limit the bass boost of S). Evaluate with the IACC
    of the loudspeaker model.
-2. STFT panning expansion / primary–ambient decomposition (2.8), reusing the OutOfPhase
-   WOLA structure and `TGMStaticLib/FFT`.
-3. PCA rotation (2.9), micro-pitch (2.11), spectral interleaving (2.6).
-4. Later: **headphone version** (crossfeed, and optionally binaural), with a clear GUI note
+4. PCA rotation (2.9), spectral interleaving (2.6).
+5. Later: **headphone version** (crossfeed, and optionally binaural), with a clear GUI note
    saying which modes are meant for loudspeakers and which for headphones.
+
+(2.11 micro-pitch/multi chorus doubler moved OUT of this list and into Phase 5/v1,
+see above.)
 
 ---
 
