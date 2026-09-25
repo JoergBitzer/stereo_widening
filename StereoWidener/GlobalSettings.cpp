@@ -38,6 +38,8 @@ void GlobalSettings::load()
             combCrossoverHz = (float) (double) obj->getProperty("combCrossoverHz");
         if (obj->hasProperty("earlyReflectionsPreDelayMs"))
             earlyReflectionsPreDelayMs = (float) (double) obj->getProperty("earlyReflectionsPreDelayMs");
+        if (obj->hasProperty("chorusRateHz"))
+            chorusRateHz = (float) (double) obj->getProperty("chorusRateHz");
     }
     // a missing/unparseable/incomplete file just keeps whichever defaults above were
     // not overwritten -- a broken settings file must never stop the plugin from loading
@@ -59,6 +61,7 @@ void GlobalSettings::write(const juce::File& file) const
     obj->setProperty("meterPeakDecayDbPerS", (double) meterPeakDecayDbPerS);
     obj->setProperty("combCrossoverHz", (double) combCrossoverHz);
     obj->setProperty("earlyReflectionsPreDelayMs", (double) earlyReflectionsPreDelayMs);
+    obj->setProperty("chorusRateHz", (double) chorusRateHz);
     const juce::var root(obj);
 
     file.getParentDirectory().createDirectory();

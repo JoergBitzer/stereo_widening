@@ -1,0 +1,108 @@
+#include "ChorusDoubler.h"
+
+void ChorusDoubler::prepare(double newSampleRate, int maxBlockSize)
+{
+    sampleRate = newSampleRate;
+
+    const int maxDelaySamples = juce::roundToInt(kMaxDelayMs * 0.001f * (float) sampleRate) + 1;
+    delayLineL.setMaximumDelayInSamples(maxDelaySamples);
+    delayLineR.setMaximumDelayInSamples(maxDelaySamples);
+    delayLineL.prepare(juce::dsp::ProcessSpec { sampleRate, (juce::uint32) maxBlockSize, 1 });
+    delayLineR.prepare(juce::dsp::ProcessSpec { sampleRate, (juce::uint32) maxBlockSize, 1 });
+
+    smoothedDepth.reset(sampleRate, (double) kDepthSmoothingSeconds);
+    depthInitialized = false; // force a snap (not a glide-in from 0) on the next process()
+    phase = 0.0f;
+}
+
+void ChorusDoubler::reset()
+{
+    delayLineL.reset();
+    delayLineR.reset();
+    depthInitialized = false; // same reasoning as in prepare(): snap cleanly, don't glide in
+    phase = 0.0f;
+}
+
+void ChorusDoubler::process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept
+{
+    const float targetDepth = params.auxRight; // 0..1, see StereoWidenerAudio::paramsFor()
+    if (!depthInitialized)
+    {
+        smoothedDepth.setCurrentAndTargetValue(targetDepth);
+        depthInitialized = true;
+    }
+    else
+    {
+        smoothedDepth.setTargetValue(targetDepth);
+    }
+
+    auto* left = buffer.getWritePointer(0);
+    auto* right = buffer.getWritePointer(1);
+    const int numSamples = buffer.getNumSamples();
+    const float amount = params.auxLeft; // 0..1, see StereoWidenerAudio::paramsFor()
+    const float gain = params.width * amount;
+
+    const float samplesPerMs = 0.001f * (float) sampleRate;
+    const float baseSamples = kBaseDelayMs * samplesPerMs;
+    const float stereoOffsetSamples = kStereoOffsetMs * samplesPerMs;
+    const float phaseIncrement = juce::MathConstants<float>::twoPi * rateHz / (float) sampleRate;
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        // Re-applied every sample: this is what actually glides the LFO excursion
+        // smoothly instead of stepping it -- see the file header. Once settled,
+        // getNextValue() just keeps returning the target.
+        const float depth = smoothedDepth.getNextValue();
+        const float excursionSamples = depth * kMaxDepthMs * samplesPerMs;
+
+        // kStereoOffsetMs is NOT scaled by depth -- see the file header for why L and
+        // R must stay genuinely different even at depth = 0.
+        const float delayLSamples = baseSamples + excursionSamples * std::sin(phase);
+        const float delayRSamples = baseSamples + stereoOffsetSamples
+                                     + excursionSamples * std::sin(phase + kStereoPhaseOffsetRadians);
+
+        const float m = 0.5f * (left[i] + right[i]);
+
+        // One push + one pop per sample per delay line (default updateReadPointer =
+        // true) -- the safe, standard usage; see the file header for why this
+        // algorithm deliberately does NOT reuse EarlyReflections' shared-delay-line,
+        // multiple-taps-per-push trick.
+        delayLineL.setDelay(delayLSamples);
+        delayLineL.pushSample(0, m);
+        const float yL = delayLineL.popSample(0) - m;
+
+        delayLineR.setDelay(delayRSamples);
+        delayLineR.pushSample(0, m);
+        const float yR = delayLineR.popSample(0) - m;
+
+        left[i] = left[i] + gain * yL;
+        right[i] = right[i] + gain * yR;
+
+        phase += phaseIncrement;
+        if (phase >= juce::MathConstants<float>::twoPi)
+            phase -= juce::MathConstants<float>::twoPi; // wrap -- sin() is exactly periodic at 2*pi, so this is seamless
+    }
+}
+
+juce::String ChorusDoubler::getDescription() const
+{
+    return "Micro-pitch / chorus doubler (\"Dimension D\" style).\n\n"
+           "The mid signal is fed through two independently LFO-modulated delay "
+           "lines, one per channel, held a quarter-cycle apart -- the classic "
+           "modulated-delay chorus/\"Dimension D\" effect, also creating real width "
+           "from mono input like Complementary Comb, Allpass Decorrelation and Early "
+           "Reflections.\n\n"
+           "Depth controls how much the delay time swings around its centre; Amount "
+           "controls how much of the effect is blended in. The LFO rate is a global "
+           "setting, kept deliberately slow so the effect stays lush rather than "
+           "turning into an obvious vibrato/warble.\n\n"
+           "Unlike Complementary Comb, this technique is NOT mono-compatible, and "
+           "more so than Allpass Decorrelation or Early Reflections: because the "
+           "delay difference between L and R is itself constantly sweeping, the mono "
+           "sum (L+R) shows a moving, \"flanging\" comb-filter pattern once Amount is "
+           "above 0 -- a real trade-off of this technique, not a bug. Check your mix "
+           "in mono (Utilities -> Monitor -> Mono Check) before committing to a "
+           "setting.\n\n"
+           "Source: R. Dattorro, \"Effect Design Part 2: Delay Line Modulation and "
+           "Chorus\", J. Audio Eng. Soc., 1997.";
+}

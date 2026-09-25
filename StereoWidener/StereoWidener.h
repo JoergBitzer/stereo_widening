@@ -18,6 +18,7 @@
 #include "algorithms/AllpassDecorrelation.h"
 #include "algorithms/MultibandWidth.h"
 #include "algorithms/EarlyReflections.h"
+#include "algorithms/ChorusDoubler.h"
 #include "../shared/metering/StereoMeterState.h"
 #include "../shared/metering/GoniometerComponent.h"
 #include "../shared/metering/LevelMeterComponent.h"
@@ -270,6 +271,38 @@ const struct
 	const int numDecimalPlaces = 0;
 }g_paramEarlyReflRoomSize;
 
+// ChorusDoubler's aux knobs (Phase 5, algorithm 2.11). See ChorusDoubler.h for the
+// formula; Depth's range (an LFO excursion in ms internally, see
+// ChorusDoubler::kMaxDepthMs) is exposed here as a plain 0-100 % knob, same
+// convention as g_paramCombGain/g_paramAllpassSpread/g_paramEarlyReflRoomSize.
+const struct
+{
+	const std::string ID = "chorusAmount";
+	const std::string name = "Amount";
+	const std::string unitName = "%";
+	const float minValue = 0.0f;
+	const float maxValue = 100.0f;
+	// 0 % is neutral (exact bypass, algebraically -- see ChorusDoubler.h) until the
+	// user dials this in, same reasoning as g_paramEarlyReflAmount's default above.
+	const float defaultValue = minValue;
+	const float skew = 1.0f;
+	const int numDecimalPlaces = 0;
+}g_paramChorusAmount;
+
+const struct
+{
+	const std::string ID = "chorusDepth";
+	const std::string name = "Depth";
+	const std::string unitName = "%";
+	const float minValue = 0.0f;
+	const float maxValue = 100.0f;
+	// No "neutral" value of its own -- inert whenever Amount = 0, same reasoning as
+	// g_paramEarlyReflRoomSize's default above.
+	const float defaultValue = 50.0f;
+	const float skew = 1.0f;
+	const int numDecimalPlaces = 0;
+}g_paramChorusDepth;
+
 constexpr const char* g_paramAlgorithmID = "algorithm";
 constexpr const char* g_paramAlgorithmName = "Algorithm";
 
@@ -283,7 +316,8 @@ const juce::StringArray g_algorithmNames {
     "Complementary Comb (Pseudo-Stereo)",
     "Allpass Decorrelation",
     "Multiband Width",
-    "Early Reflections (Room Widening)"
+    "Early Reflections (Room Widening)",
+    "Chorus Doubler (Dimension D)"
 };
 
 // ---- Utilities (Phase 4 step 2: planing.md 2.13 + 2.2) -------------------------
@@ -391,6 +425,8 @@ private:
     juce::AudioParameterFloat* m_multibandWidth4Param = nullptr;
     juce::AudioParameterFloat* m_earlyReflAmountParam = nullptr;
     juce::AudioParameterFloat* m_earlyReflRoomSizeParam = nullptr;
+    juce::AudioParameterFloat* m_chorusAmountParam = nullptr;
+    juce::AudioParameterFloat* m_chorusDepthParam = nullptr;
     juce::AudioParameterChoice* m_algorithmParam = nullptr;
 
     // Builds this block's params for algorithmIndex, sourced from whichever aux

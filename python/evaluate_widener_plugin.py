@@ -66,25 +66,31 @@ SIGNALS = [
 # erAmountPercent/erRoomSizePercent/erPreDelayMs only matter for "earlyrefl" (see
 # algorithms/EarlyReflections.h), mirroring python/evaluate_early_reflections.py's own
 # settings; erPreDelayMs mirrors GlobalSettings' own default (not a user-facing knob).
+# chorusAmountPercent/chorusDepthPercent/chorusRateHz only matter for "chorus" (see
+# algorithms/ChorusDoubler.h), mirroring python/evaluate_chorus_doubler.py's own
+# settings; chorusRateHz mirrors GlobalSettings' own default (not a user-facing knob).
 SETTINGS = [
-    ("broadband_w000", "broadband", 0, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5),
-    ("broadband_w150", "broadband", 150, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5),
-    ("broadband_w200", "broadband", 200, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5),
-    ("filtered_w150_bass120_shelf8k", "filtered", 150, 120, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5),
-    ("filtered_w150_off", "filtered", 150, 20, 20000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5),
-    ("comb_d10_g050", "comb", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5),
-    ("comb_d05_g030", "comb", 100, 150, 8000, 5, 30, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5),
-    ("comb_d20_g070", "comb", 100, 150, 8000, 20, 70, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5),
-    ("allpass_a050_s10", "allpass", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5),   # amount=0.5, spread=1.0 oct
-    ("allpass_a025_s05", "allpass", 100, 150, 8000, 10, 50, 300, 25, 25, 150, 1500, 6000, 100, 100, 100, 50, 50, 5),   # amount=0.25, spread=0.5 oct
-    ("allpass_a100_s20", "allpass", 100, 150, 8000, 10, 50, 300, 100, 100, 150, 1500, 6000, 100, 100, 100, 50, 50, 5), # amount=1.0, spread=2.0 oct
-    ("multiband_default", "multiband", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5),
-    ("multiband_narrow_high", "multiband", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 0, 50, 50, 5),
-    ("multiband_wide_mid", "multiband", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 200, 100, 50, 50, 5),
-    ("multiband_all_narrow", "multiband", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 0, 0, 0, 50, 50, 5),
-    ("earlyrefl_a050_r050", "earlyrefl", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5),
-    ("earlyrefl_a025_r025", "earlyrefl", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 25, 25, 5),
-    ("earlyrefl_a100_r100", "earlyrefl", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 100, 100, 5),
+    ("broadband_w000", "broadband", 0, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3),
+    ("broadband_w150", "broadband", 150, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3),
+    ("broadband_w200", "broadband", 200, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3),
+    ("filtered_w150_bass120_shelf8k", "filtered", 150, 120, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3),
+    ("filtered_w150_off", "filtered", 150, 20, 20000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3),
+    ("comb_d10_g050", "comb", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3),
+    ("comb_d05_g030", "comb", 100, 150, 8000, 5, 30, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3),
+    ("comb_d20_g070", "comb", 100, 150, 8000, 20, 70, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3),
+    ("allpass_a050_s10", "allpass", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3),   # amount=0.5, spread=1.0 oct
+    ("allpass_a025_s05", "allpass", 100, 150, 8000, 10, 50, 300, 25, 25, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3),   # amount=0.25, spread=0.5 oct
+    ("allpass_a100_s20", "allpass", 100, 150, 8000, 10, 50, 300, 100, 100, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3), # amount=1.0, spread=2.0 oct
+    ("multiband_default", "multiband", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3),
+    ("multiband_narrow_high", "multiband", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 0, 50, 50, 5, 50, 50, 0.3),
+    ("multiband_wide_mid", "multiband", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 200, 100, 50, 50, 5, 50, 50, 0.3),
+    ("multiband_all_narrow", "multiband", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 0, 0, 0, 50, 50, 5, 50, 50, 0.3),
+    ("earlyrefl_a050_r050", "earlyrefl", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3),
+    ("earlyrefl_a025_r025", "earlyrefl", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 25, 25, 5, 50, 50, 0.3),
+    ("earlyrefl_a100_r100", "earlyrefl", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 100, 100, 5, 50, 50, 0.3),
+    ("chorus_a050_d050", "chorus", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 50, 50, 0.3),
+    ("chorus_a025_d025", "chorus", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 25, 25, 0.3),
+    ("chorus_a100_d100", "chorus", 100, 150, 8000, 10, 50, 300, 50, 50, 150, 1500, 6000, 100, 100, 100, 50, 50, 5, 100, 100, 0.3),
 ]
 
 PLOT_SETTING = "filtered_w150_bass120_shelf8k"
@@ -92,6 +98,7 @@ COMB_PLOT_SETTING = "comb_d10_g050"
 ALLPASS_PLOT_SETTING = "allpass_a050_s10"
 MULTIBAND_PLOT_SETTING = "multiband_default"
 EARLY_REFLECTIONS_PLOT_SETTING = "earlyrefl_a050_r050"
+CHORUS_PLOT_SETTING = "chorus_a050_d050"
 OFF_CHECK_SETTINGS = ("broadband_w150", "filtered_w150_off")
 
 
@@ -99,14 +106,16 @@ def render(binary, input_path, output_path, algorithm, width, bass_cutoff, high_
            comb_delay_ms, comb_gain_percent, comb_crossover_hz,
            allpass_amount_percent, allpass_spread_percent,
            mb_freq1, mb_freq2, mb_freq3, mb_width2_percent, mb_width3_percent, mb_width4_percent,
-           er_amount_percent, er_room_size_percent, er_pre_delay_ms):
+           er_amount_percent, er_room_size_percent, er_pre_delay_ms,
+           chorus_amount_percent, chorus_depth_percent, chorus_rate_hz):
     subprocess.run([binary, input_path, output_path, algorithm,
                      str(width), str(bass_cutoff), str(high_shelf),
                      str(comb_delay_ms), str(comb_gain_percent), str(comb_crossover_hz),
                      str(allpass_amount_percent), str(allpass_spread_percent),
                      str(mb_freq1), str(mb_freq2), str(mb_freq3),
                      str(mb_width2_percent), str(mb_width3_percent), str(mb_width4_percent),
-                     str(er_amount_percent), str(er_room_size_percent), str(er_pre_delay_ms)],
+                     str(er_amount_percent), str(er_room_size_percent), str(er_pre_delay_ms),
+                     str(chorus_amount_percent), str(chorus_depth_percent), str(chorus_rate_hz)],
                     capture_output=True, text=True, check=True)
 
 
@@ -138,12 +147,14 @@ def main():
         outputs = {}
         for (label, algorithm, width, bass_cutoff, high_shelf, comb_delay, comb_gain, comb_xover,
              allpass_amount, allpass_spread, mb_freq1, mb_freq2, mb_freq3,
-             mb_width2, mb_width3, mb_width4, er_amount, er_room_size, er_pre_delay) in SETTINGS:
+             mb_width2, mb_width3, mb_width4, er_amount, er_room_size, er_pre_delay,
+             chorus_amount, chorus_depth, chorus_rate) in SETTINGS:
             out_path = os.path.join(AUDIO_OUT_DIR, f"{name}_{label}.wav")
             render(binary, in_path, out_path, algorithm, width, bass_cutoff, high_shelf,
                    comb_delay, comb_gain, comb_xover, allpass_amount, allpass_spread,
                    mb_freq1, mb_freq2, mb_freq3, mb_width2, mb_width3, mb_width4,
-                   er_amount, er_room_size, er_pre_delay)
+                   er_amount, er_room_size, er_pre_delay,
+                   chorus_amount, chorus_depth, chorus_rate)
             y, _ = audio_io.read_stereo(out_path, expected_fs=fs)
             outputs[label] = y
 
@@ -155,7 +166,7 @@ def main():
             rows.append(row)
 
             if label in (PLOT_SETTING, COMB_PLOT_SETTING, ALLPASS_PLOT_SETTING, MULTIBAND_PLOT_SETTING,
-                         EARLY_REFLECTIONS_PLOT_SETTING):
+                         EARLY_REFLECTIONS_PLOT_SETTING, CHORUS_PLOT_SETTING):
                 report.plot_evaluation(ev, x, y, os.path.join(RESULT_DIR, f"{name}_{label}.png"),
                                         title=f"StereoWidener plugin: {name}, {label}")
 

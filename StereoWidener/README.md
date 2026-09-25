@@ -106,6 +106,19 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     [phase5_early_reflections.md](../docs/algorithms/phase5_early_reflections.md) for
     the algorithm (including a `juce::dsp::DelayLine` read-cursor bug found and fixed
     during cross-checking) and its verification.
+  - *Chorus Doubler (Dimension D)*: the mid signal is fed through two independently
+    LFO-modulated delay lines, one per channel, held a quarter-cycle apart -- the
+    classic modulated-delay chorus/"Dimension D" effect, also creating real width
+    from mono input like Complementary Comb, Allpass Decorrelation and Early
+    Reflections. The left knob sets **Amount** (0-100 %, defaults to 0 % -- an exact
+    bypass), the right knob sets **Depth** (0-100 %, how much the delay time swings
+    around its centre). The LFO rate is not a parameter; it is read from the global
+    settings file, kept deliberately slow so the effect stays lush rather than turning
+    into an obvious vibrato/warble. **Not mono-safe** -- more so than Allpass
+    Decorrelation or Early Reflections, since the delay difference between L and R is
+    itself constantly sweeping ("flanging"), not fixed. See
+    [phase5_chorus.md](../docs/algorithms/phase5_chorus.md) for the algorithm and its
+    verification.
 
   Every parameter's default -- and so what double-clicking its knob resets it to -- is
   chosen to be as close to neutral/pass-through processing as possible for its

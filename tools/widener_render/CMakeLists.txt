@@ -22,7 +22,8 @@ target_sources(WidenerRender
         ../../StereoWidener/algorithms/ComplementaryComb.cpp
         ../../StereoWidener/algorithms/AllpassDecorrelation.cpp
         ../../StereoWidener/algorithms/MultibandWidth.cpp
-        ../../StereoWidener/algorithms/EarlyReflections.cpp)
+        ../../StereoWidener/algorithms/EarlyReflections.cpp
+        ../../StereoWidener/algorithms/ChorusDoubler.cpp)
 
 target_compile_definitions(WidenerRender
     PRIVATE

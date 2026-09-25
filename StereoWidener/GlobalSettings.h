@@ -60,6 +60,11 @@ public:
      *  knob (same "2 + Width" reasoning as combCrossoverHz above). Default 5.0 ms. */
     float getEarlyReflectionsPreDelayMs() const noexcept { return earlyReflectionsPreDelayMs; }
 
+    /** LFO rate (Hz) for ChorusDoubler's modulated delay lines -- not a user-facing
+     *  knob, deliberately kept slow/"Dimension D"-like by design (a fast rate turns
+     *  this into an obvious vibrato/warble, see ChorusDoubler.h). Default 0.3 Hz. */
+    float getChorusRateHz() const noexcept { return chorusRateHz; }
+
     /** Default GUI scale factor for a brand new instance (StereoWidenerAudioProcessor's
      *  m_pluginScaleFactor before any project state is restored). Default 1.0. */
     float getGuiScaleFactor() const noexcept { return guiScaleFactor; }
@@ -92,4 +97,5 @@ private:
     float meterPeakDecayDbPerS = 20.0f;
     float combCrossoverHz = 300.0f; // matches planing.md 2.4's own suggested value
     float earlyReflectionsPreDelayMs = 5.0f;
+    float chorusRateHz = 0.3f;
 };

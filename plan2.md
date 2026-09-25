@@ -357,15 +357,40 @@ comb's `crossoverHz`) and reflection count fixed at a compiled-in constant (mirr
 allpass's fixed cascade-stage count). Next: 2.11 multi chorus (2.3 Haas moved to
 Phase 7, see below).
 
-#### 2.11 Micro-pitch / multi chorus doubler -- not started
-planing.md 2.11: L and R get slightly different short, modulated delays (5-30 ms,
-LFO) or fixed detune (±5-15 cent, delay-line pitch shifting) -- the classic
-"Dimension D"/micro-shift chorus effect. Added to the v1 plan per explicit request
-(originally a Phase 7/v2 candidate, moved up). Works on mono input like comb/allpass/
-early reflections; planing.md's own con is that it changes the sound (it's an effect,
-not a neutral width tool) and the mono sum shows comb/flanging artefacts -- expect
-this to need the "not mono-safe" badge, same as allpass/early reflections. All four
-steps not started.
+#### 2.11 Micro-pitch / chorus doubler ("Dimension D") -- done (v0.1.10)
+1. ✅ Python reference: `python/algorithms/chorus_doubler.py`,
+   `python/evaluate_chorus_doubler.py`. Asserts `amount = 0` is an exact bypass;
+   confirmed mono colouration is genuinely non-zero (and larger than allpass/early
+   reflections at comparable settings, planing.md's "-" vs. their "o") and genuine,
+   strong width from dual-mono input (`speech_dry_answers` correlation reaching
+   negative values at the strongest setting). Found and fixed a real design flaw
+   before any C++ was written: an early version scaled the L/R stereo phase offset by
+   Depth, so `Depth = 0` collapsed L and R to the identical delayed signal -- a single
+   comb filter baked into both channels, showing up as the *worst* (not best) setting
+   for mono coloration/level. Fixed with a fixed, Depth-independent L/R offset.
+2. ✅ C++ class: `StereoWidener/algorithms/ChorusDoubler.{h,cpp}`; cross-checked
+   against the real plugin DSP via `tools/widener_render` +
+   `python/evaluate_widener_plugin.py`, and directly via the new
+   `python/crosscheck_chorus_doubler.py` (PASS, tolerances as tight as allpass's/
+   multiband's own cross-checks). Deliberately used two separate `juce::dsp::DelayLine`
+   instances (one per channel, standard one-push/one-pop-per-sample usage) rather than
+   early reflections' shared-single-delay-line multi-tap trick, informed directly by
+   that algorithm's own two-bug history (see phase5_early_reflections.md) -- trading a
+   few KB of memory for eliminating that entire class of bug up front.
+3. ✅ Doc page: [phase5_chorus.md](docs/algorithms/phase5_chorus.md).
+4. N/A -- badge/hint mechanism already generic since 2.5, no new GUI code needed;
+   confirmed via a throwaway `WidenerGuiSnapshot` offline-render tool that it shows
+   correctly for this algorithm.
+
+Two user-facing parameters (Amount, Depth) plus the shared Width knob. Rate (LFO
+speed) is a `GlobalSettings` default, not a knob -- deliberately kept slow/"Dimension
+D"-like by design, since a fast rate turns this into an obvious vibrato/warble, a
+worse-sounding regime a live knob could let a user dial into. Discussed before
+implementation (per the user's own question): are chorus/Dimension-D/micro-pitch-shift
+different enough to need separate classes? Agreed answer: chorus and Dimension-D share
+one engine (LFO-modulated delay line, different rate/depth/phase settings); true
+pitch-shift needs a structurally different sawtooth/ramp LFO with a crossfading delay
+line, and was explicitly descoped by the user ("skip pitch-shift").
 
 ### Phase 6 – v1 release
 1. GUI: profile switch, mode selector (filtered by profile), macro width, parameter panel
