@@ -6,9 +6,11 @@ components (`shared/metering/`) so both plugins show the same goniometer/level-m
 look and any fix helps both.
 
 See [../docs/algorithms/phase3_stereo_widener.md](../docs/algorithms/phase3_stereo_widener.md)
-for the architecture, the algorithm-switch crossfade, and the two algorithms, and
+for the architecture, the algorithm-switch crossfade, and the first two algorithms,
 [../docs/algorithms/phase4_settings.md](../docs/algorithms/phase4_settings.md) for the
-global settings file.
+global settings file, and
+[../docs/algorithms/phase5_comb.md](../docs/algorithms/phase5_comb.md) for the third
+algorithm (comb pseudo-stereo) and the aux-knob rebinding mechanism it introduced.
 
 ## Build
 
@@ -44,10 +46,33 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
   - *M/S Width (Filtered / Bass Mono)*: the same control, but the side signal is
     high-pass filtered first, so bass content is forced mono and only the highs get
     widened, then high-shelved to restore some "air". The left knob sets the **Bass
-    Cutoff** (40-500 Hz, turn below 40 Hz for "Off" -- bypasses the high-pass entirely),
-    the right knob sets the **High Shelf** frequency (1000-16000 Hz, turn above 16 kHz
-    for "Off" -- bypasses the shelf entirely). The shelf's gain (default 3 dB) is not a
-    parameter; it's read from the global settings file, see below.
+    Cutoff** (40-500 Hz, turn below 40 Hz for "Off" -- bypasses the high-pass entirely,
+    and is the default: double-clicking the knob resets to Off, not to some fixed
+    cutoff), the right knob sets the **High Shelf** frequency (1000-16000 Hz, turn above
+    16 kHz for "Off" -- bypasses the shelf entirely, and is likewise the default). The
+    shelf's gain (default 3 dB) is not a parameter; it's read from the global settings
+    file, see below.
+  - *Complementary Comb (Pseudo-Stereo)*: a delayed, gained copy of the mid signal is
+    added to the side signal (Lauridsen/Schroeder pseudo-stereo) -- unlike the two M/S
+    algorithms above, this one creates real width even from dual-mono input. The left
+    knob sets **Delay** (5-20 ms), the right knob sets **Gain** (0-100 %, defaults to
+    0 % -- no effect until dialled in, same "neutral by default" reasoning as Bass
+    Cutoff/High Shelf above). The crossover frequency above which the delayed signal is
+    added (default 300 Hz, keeping bass content out of the effect) is not a parameter;
+    it's read from the global settings file, see below. See
+    [phase5_comb.md](../docs/algorithms/phase5_comb.md) for the algorithm and its
+    verification.
+
+  Every parameter's default -- and so what double-clicking its knob resets it to -- is
+  chosen to be as close to neutral/pass-through processing as possible for its
+  algorithm (Width 100 %, Rotation/Balance 0, Bass Cutoff/High Shelf/Comb Gain Off/0 %,
+  etc.). To start a session from your own preferred settings instead, save an `init`
+  preset (see `tools/PresetHandler.h`) rather than relying on the plugin to remember
+  its last state.
+
+  Note: the two knobs flanking Width are shared widgets -- which parameter they
+  actually control, their range, and their unit all change with the selected
+  algorithm (rebound automatically on switch); they are not per-algorithm knobs.
 - **Utilities** (below the algorithm selector; applied regardless of which algorithm is
   selected, see [phase4_settings.md](../docs/algorithms/phase4_settings.md)):
   - **Rotation**: -45..+45 degrees, the stereo image's rotation in the L/R plane.
@@ -60,9 +85,10 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
 
 ## Global settings file
 
-See [../docs/algorithms/phase4_settings.md](../docs/algorithms/phase4_settings.md).
+See [../docs/algorithms/phase4_settings.md](../docs/algorithms/phase4_settings.md) (and
+its correction note about `lastUsedState`, removed later -- see below).
 `~/.config/StereoWidener/settings.json` (created automatically on first run) stores
-user-wide defaults that aren't part of a DAW project's own saved state -- a project's
+user-wide preferences that aren't part of a DAW project's own saved state -- a project's
 saved parameter values and GUI size always take priority over these once they exist:
 
 ```json
@@ -72,11 +98,13 @@ saved parameter values and GUI size always take priority over these once they ex
   "meterIntegrationTimeS": 0.3,
   "meterPeakHoldTimeS": 1.5,
   "meterPeakDecayDbPerS": 20.0,
-  "lastUsedState": { "width": 100.0, "algorithm": 0, "...": "..." }
+  "combCrossoverHz": 300.0
 }
 ```
 
 Edit and save while the plugin/DAW is closed; it's read once when a plugin instance is
-created, not watched live. `lastUsedState` is written automatically (whenever a plugin
-instance closes) and used to seed a brand new instance's starting values -- editing it
-by hand works too, but it will be overwritten the next time an instance closes.
+created, not watched live. Note this file does **not** store parameter values or their
+defaults (it did briefly, as `lastUsedState`; removed, see
+[phase4_settings.md](../docs/algorithms/phase4_settings.md)) -- every parameter's
+default is a fixed, compiled-in, neutral value, and restoring your own preferred
+settings across sessions is what an `init` preset is for instead.

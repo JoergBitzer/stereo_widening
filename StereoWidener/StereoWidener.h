@@ -13,6 +13,7 @@
 #include "algorithms/StereoAlgorithm.h"
 #include "algorithms/MSWidthBroadband.h"
 #include "algorithms/MSWidthFiltered.h"
+#include "algorithms/ComplementaryComb.h"
 #include "../shared/metering/StereoMeterState.h"
 #include "../shared/metering/GoniometerComponent.h"
 #include "../shared/metering/LevelMeterComponent.h"
@@ -52,7 +53,10 @@ const struct
 	const std::string unitName = "Hz";
 	const float minValue = 30.0f;  // 30-40 Hz: "Off" zone, see the comment above
 	const float maxValue = 500.0f;
-	const float defaultValue = 150.0f;
+	// Off by default (neutral/pass-through: MSWidthFiltered reduces to plain width,
+	// same as MSWidthBroadband, until the user dials this in) -- also the value a
+	// double-click on the knob resets to, see GlobalSettings.h.
+	const float defaultValue = minValue;
 	const float skew = 1.0f;
 	const int numDecimalPlaces = 0;
 }g_paramBassCutoff;
@@ -75,19 +79,58 @@ const struct
 	const std::string unitName = "Hz";
 	const float minValue = 1000.0f;
 	const float maxValue = 16500.0f; // 16000-16500 Hz: "Off" zone, see the comment above
-	const float defaultValue = 8000.0f;
+	// Off by default, same reasoning as g_paramBassCutoff's defaultValue above.
+	const float defaultValue = maxValue;
 	const float skew = 1.0f; // unused, see the comment above
 	const int numDecimalPlaces = 0;
 }g_paramHighShelfFreq;
+
+// ComplementaryComb's aux knobs (Phase 5, algorithm 2.4). Range from planing.md 2.4:
+// "D ~= 5-20 ms and g ~= 0.3-0.7"; Gain's range is widened to the full 0-100 % (g's
+// "usable" spec range sits comfortably in the middle) so the user isn't limited to a
+// narrower band than the Width knob's own 0-200 %.
+const struct
+{
+	const std::string ID = "combDelay";
+	const std::string name = "Delay";
+	const std::string unitName = "ms";
+	const float minValue = 5.0f;
+	const float maxValue = 20.0f;
+	// No "neutral" value of its own (see g_paramCombGain below -- Gain = 0 % already
+	// makes the whole algorithm neutral regardless of Delay), so this just starts at a
+	// representative mid-range value for when the user raises Gain.
+	const float defaultValue = 10.0f;
+	const float skew = 1.0f;
+	const int numDecimalPlaces = 1;
+}g_paramCombDelay;
+
+const struct
+{
+	const std::string ID = "combGain";
+	const std::string name = "Gain";
+	const std::string unitName = "%";
+	const float minValue = 0.0f;
+	const float maxValue = 100.0f;
+	// 0 % is neutral (no delayed contribution added to S -- same output as
+	// MSWidthBroadband at the same Width) until the user dials this in, same reasoning
+	// as g_paramBassCutoff/g_paramHighShelfFreq's Off defaults above.
+	const float defaultValue = minValue;
+	const float skew = 1.0f;
+	const int numDecimalPlaces = 0;
+}g_paramCombGain;
 
 constexpr const char* g_paramAlgorithmID = "algorithm";
 constexpr const char* g_paramAlgorithmName = "Algorithm";
 
 // Must stay in the same order as the algorithm instances StereoWidenerAudio's
-// constructor creates in algorithms/ -- see the comment there. Two algorithms so far,
-// specifically so switching between them (a crossfade, see processSynchronBlock) has
-// something audibly different to exercise: 2.1 M/S width, broadband vs. bass-mono.
-const juce::StringArray g_algorithmNames { "M/S Width (Broadband)", "M/S Width (Filtered / Bass Mono)" };
+// constructor creates in algorithms/ -- see the comment there, and
+// StereoWidenerGUI::auxLeftParamIdFor()/auxRightParamIdFor() (StereoWidener.cpp), which
+// must also stay in sync with this order.
+const juce::StringArray g_algorithmNames {
+    "M/S Width (Broadband)",
+    "M/S Width (Filtered / Bass Mono)",
+    "Complementary Comb (Pseudo-Stereo)"
+};
 
 // ---- Utilities (Phase 4 step 2: planing.md 2.13 + 2.2) -------------------------
 // Applied by UtilityProcessor after the selected width algorithm, regardless of which
@@ -165,7 +208,7 @@ public:
     const StereoAlgorithm& getAlgorithm(int index) const noexcept { return *m_algorithms[(size_t) index]; }
 
     // StereoWidenerAudioProcessor reads/writes this from its own constructor/destructor
-    // (GUI scale factor default, "last used state" persistence) -- GlobalSettings must
+    // (GUI scale factor default and persistence) -- GlobalSettings must
     // stay owned here rather than by the processor, since the processor's constructor
     // builds this whole object (m_algo) via its member-initializer-list before its own
     // constructor *body* runs, so only members already constructed by then (i.e. ones
@@ -182,7 +225,16 @@ private:
     juce::AudioParameterFloat* m_widthParam = nullptr;
     juce::AudioParameterFloat* m_bassCutoffParam = nullptr;
     juce::AudioParameterFloat* m_highShelfFreqParam = nullptr;
+    juce::AudioParameterFloat* m_combDelayParam = nullptr;
+    juce::AudioParameterFloat* m_combGainParam = nullptr;
     juce::AudioParameterChoice* m_algorithmParam = nullptr;
+
+    // Builds this block's params for algorithmIndex, sourced from whichever aux
+    // parameters *that* algorithm actually uses (each algorithm may have its own --
+    // see the g_paramBassCutoff/g_paramCombDelay comments). Needed because a crossfade
+    // runs two DIFFERENT algorithms in the same block, each needing its own aux values,
+    // not one shared pair -- see processSynchronBlock().
+    StereoAlgorithmParams paramsFor(int algorithmIndex, float width) const noexcept;
 
     juce::AudioParameterFloat* m_rotationParam = nullptr;
     juce::AudioParameterFloat* m_balanceParam = nullptr;
@@ -221,13 +273,23 @@ public:
 	void resized() override;
 private:
     void showAlgorithmHelp();
-    // Relabels/enables the two aux knobs for whichever algorithm is now selected (see
-    // StereoAlgorithm::getAuxLeftInfo()/getAuxRightInfo()); called once at construction
-    // for the initial selection, and from m_algorithmBox.onChange after that (which
-    // fires for both user clicks and host-automation-driven changes -- see
+    // Relabels and rebinds the two aux knobs for whichever algorithm is now selected
+    // (see StereoAlgorithm::getAuxLeftInfo()/getAuxRightInfo() for the label/enabled
+    // state, and bindAuxKnob() for the rebinding -- each algorithm may have its own aux
+    // parameters, e.g. MSWidthFiltered's Bass Cutoff/High Shelf vs. ComplementaryComb's
+    // Delay/Gain, so the knob *positions* are shared but which parameter each one
+    // actually controls changes with the algorithm). Called once at construction for
+    // the initial selection, and from m_algorithmBox.onChange after that (which fires
+    // for both user clicks and host-automation-driven changes -- see
     // ComboBoxParameterAttachment::setValue() in JUCE, it notifies external listeners
     // even though it suppresses the attachment's own re-entrant one).
     void updateAuxKnobsForActiveAlgorithm();
+
+    // Rebinds knob to the parameter named paramId (destroying/recreating attachment),
+    // configuring whatever display formatting that specific parameter needs; paramId
+    // empty means "no parameter for this algorithm" -- detach and disable the knob.
+    using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
+    void bindAuxKnob(juce::Slider& knob, std::unique_ptr<SliderAttachment>& attachment, const juce::String& paramId);
 
 	StereoWidenerAudioProcessor& m_processor;
     juce::AudioProcessorValueTreeState& m_apvts;

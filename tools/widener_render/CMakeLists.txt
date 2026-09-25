@@ -18,7 +18,8 @@ target_sources(WidenerRender
     PRIVATE
         main.cpp
         ../../StereoWidener/algorithms/MSWidthBroadband.cpp
-        ../../StereoWidener/algorithms/MSWidthFiltered.cpp)
+        ../../StereoWidener/algorithms/MSWidthFiltered.cpp
+        ../../StereoWidener/algorithms/ComplementaryComb.cpp)
 
 target_compile_definitions(WidenerRender
     PRIVATE

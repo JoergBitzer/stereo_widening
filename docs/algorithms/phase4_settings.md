@@ -159,6 +159,21 @@ swap, monitor mode) with no crashes.
 
 ## Step 1 continued: last-used state, GUI size, meter options
 
+> **Correction (Phase 5 follow-up, see
+> [phase5_comb.md](phase5_comb.md#removing-last-used-state-neutral-defaults-instead)):
+> the "last used state" mechanism described in this section was removed.** It seeded
+> each parameter's construction-time default (and therefore also its GUI knob's
+> double-click-reset value, which JUCE wires to the parameter's default automatically)
+> from whatever was last saved, so double-clicking a knob reset it to whatever was last
+> dialled in rather than to a neutral/pass-through value -- an undesired side effect not
+> caught at the time. `GlobalSettings::getLastUsedParam()`/`saveLastUsedState()` and the
+> `lastUsedState` JSON field no longer exist; every parameter's default is now a fixed,
+> compiled-in, neutral value (Width 100 %, Bass Cutoff/High Shelf/Comb Gain Off/0 %,
+> etc.), and restoring a previous session's settings is now the `init` preset's job
+> (`PresetHandler`), not `GlobalSettings`'. The rest of this section is kept as a
+> historical record of the original (superseded) design; the GUI-size/meter-option
+> parts described below are unaffected and still work as described.
+
 User feedback while starting step 2: "I am not sure if the settings file should include
 profile. The last used state for new instances is a good idea. Here it is important
 that the settings inside the project will be used if exist. The same goes for GUI size

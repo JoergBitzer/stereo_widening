@@ -1,6 +1,5 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include <map>
 
 //==============================================================================
 StereoWidenerAudioProcessor::StereoWidenerAudioProcessor()
@@ -36,21 +35,11 @@ StereoWidenerAudioProcessor::StereoWidenerAudioProcessor()
 
 StereoWidenerAudioProcessor::~StereoWidenerAudioProcessor()
 {
-    // "Last used state" (plan2.md Phase 4 step 1): persisted here so the next brand new
-    // instance (one with no saved DAW-project state yet) starts from these values
-    // instead of the compiled-in defaults -- see GlobalSettings.h and
-    // StereoWidener.cpp's addParameter().
-    const juce::StringArray allParamIds {
-        g_paramWidth.ID, g_paramBassCutoff.ID, g_paramHighShelfFreq.ID, g_paramAlgorithmID,
-        g_paramRotation.ID, g_paramBalance.ID, g_paramInvertL.ID, g_paramInvertR.ID,
-        g_paramSwapLR.ID, g_paramMonitorModeID
-    };
-    std::map<juce::String, double> lastUsed;
-    for (const auto& id : allParamIds)
-        if (auto* value = m_parameterVTS->getRawParameterValue(id))
-            lastUsed[id] = (double) value->load();
-
-    m_algo.getGlobalSettings().saveLastUsedState(lastUsed, m_pluginScaleFactor);
+    // Persist only the GUI scale factor (a UI convenience, not a processing default) --
+    // see GlobalSettings.h for why parameter values themselves are no longer persisted
+    // here; the init.xml preset is the supported way to restore a previous session's
+    // settings.
+    m_algo.getGlobalSettings().saveGuiScaleFactor(m_pluginScaleFactor);
 }
 
 //==============================================================================

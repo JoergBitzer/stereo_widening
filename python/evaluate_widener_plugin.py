@@ -48,25 +48,34 @@ SIGNALS = [
     "samples/mix_loop_let_it_be.wav",
 ]
 
-# (label, algorithm, width_percent, bassCutoffHz, highShelfHz) -- the last two only
-# matter for "filtered" (see algorithms/MSWidthFiltered.h); "..._off" uses values in
-# both knobs' Off zones (below 40 Hz / above 16000 Hz), which must reduce to plain
-# broadband width -- the sanity check described in the module docstring.
+# (label, algorithm, width_percent, bassCutoffHz, highShelfHz, combDelayMs,
+# combGainPercent, combCrossoverHz) -- bassCutoffHz/highShelfHz only matter for
+# "filtered" (see algorithms/MSWidthFiltered.h); "..._off" uses values in both knobs'
+# Off zones (below 40 Hz / above 16000 Hz), which must reduce to plain broadband width --
+# the sanity check described in the module docstring. combDelayMs/combGainPercent/
+# combCrossoverHz only matter for "comb" (see algorithms/ComplementaryComb.h); 300 Hz
+# matches GlobalSettings' own default (not a user-facing knob in the plugin itself).
 SETTINGS = [
-    ("broadband_w000", "broadband", 0, 150, 8000),
-    ("broadband_w150", "broadband", 150, 150, 8000),
-    ("broadband_w200", "broadband", 200, 150, 8000),
-    ("filtered_w150_bass120_shelf8k", "filtered", 150, 120, 8000),
-    ("filtered_w150_off", "filtered", 150, 20, 20000),
+    ("broadband_w000", "broadband", 0, 150, 8000, 10, 50, 300),
+    ("broadband_w150", "broadband", 150, 150, 8000, 10, 50, 300),
+    ("broadband_w200", "broadband", 200, 150, 8000, 10, 50, 300),
+    ("filtered_w150_bass120_shelf8k", "filtered", 150, 120, 8000, 10, 50, 300),
+    ("filtered_w150_off", "filtered", 150, 20, 20000, 10, 50, 300),
+    ("comb_d10_g050", "comb", 100, 150, 8000, 10, 50, 300),
+    ("comb_d05_g030", "comb", 100, 150, 8000, 5, 30, 300),
+    ("comb_d20_g070", "comb", 100, 150, 8000, 20, 70, 300),
 ]
 
 PLOT_SETTING = "filtered_w150_bass120_shelf8k"
+COMB_PLOT_SETTING = "comb_d10_g050"
 OFF_CHECK_SETTINGS = ("broadband_w150", "filtered_w150_off")
 
 
-def render(binary, input_path, output_path, algorithm, width, bass_cutoff, high_shelf):
+def render(binary, input_path, output_path, algorithm, width, bass_cutoff, high_shelf,
+           comb_delay_ms, comb_gain_percent, comb_crossover_hz):
     subprocess.run([binary, input_path, output_path, algorithm,
-                     str(width), str(bass_cutoff), str(high_shelf)],
+                     str(width), str(bass_cutoff), str(high_shelf),
+                     str(comb_delay_ms), str(comb_gain_percent), str(comb_crossover_hz)],
                     capture_output=True, text=True, check=True)
 
 
@@ -96,9 +105,10 @@ def main():
         name = os.path.splitext(os.path.basename(in_path))[0]
 
         outputs = {}
-        for label, algorithm, width, bass_cutoff, high_shelf in SETTINGS:
+        for label, algorithm, width, bass_cutoff, high_shelf, comb_delay, comb_gain, comb_xover in SETTINGS:
             out_path = os.path.join(AUDIO_OUT_DIR, f"{name}_{label}.wav")
-            render(binary, in_path, out_path, algorithm, width, bass_cutoff, high_shelf)
+            render(binary, in_path, out_path, algorithm, width, bass_cutoff, high_shelf,
+                   comb_delay, comb_gain, comb_xover)
             y, _ = audio_io.read_stereo(out_path, expected_fs=fs)
             outputs[label] = y
 
@@ -109,7 +119,7 @@ def main():
             print(row)
             rows.append(row)
 
-            if label == PLOT_SETTING:
+            if label == PLOT_SETTING or label == COMB_PLOT_SETTING:
                 report.plot_evaluation(ev, x, y, os.path.join(RESULT_DIR, f"{name}_{label}.png"),
                                         title=f"StereoWidener plugin: {name}, {label}")
 

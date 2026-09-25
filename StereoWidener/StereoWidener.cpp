@@ -9,11 +9,38 @@ StereoWidenerAudio::StereoWidenerAudio(StereoWidenerAudioProcessor* processor)
     // must stay in the same order as g_algorithmNames (StereoWidener.h)
     m_algorithms.push_back(std::make_unique<MSWidthBroadband>());
     m_algorithms.push_back(std::make_unique<MSWidthFiltered>());
+    m_algorithms.push_back(std::make_unique<ComplementaryComb>());
 
-    // user-configurable default (plan2.md Phase 4, "Global ini file"), previously a
-    // fixed compiled-in constant -- see GlobalSettings.h
+    // user-configurable defaults (plan2.md Phase 4, "Global settings file"), previously
+    // fixed compiled-in constants -- see GlobalSettings.h
     if (auto* filtered = dynamic_cast<MSWidthFiltered*>(m_algorithms[1].get()))
         filtered->setHighShelfGainDb(m_globalSettings.getHighShelfGainDb());
+    if (auto* comb = dynamic_cast<ComplementaryComb*>(m_algorithms[2].get()))
+        comb->setCrossoverHz(m_globalSettings.getCombCrossoverHz());
+}
+
+StereoAlgorithmParams StereoWidenerAudio::paramsFor(int algorithmIndex, float width) const noexcept
+{
+    StereoAlgorithmParams p;
+    p.width = width;
+
+    // Which parameters feed auxLeft/auxRight is per-algorithm -- the one place that
+    // needs to know about every algorithm's own aux parameters, matching
+    // StereoWidenerGUI::auxLeftParamIdFor()/auxRightParamIdFor() (same index order).
+    switch (algorithmIndex)
+    {
+        case 1: // MSWidthFiltered: Bass Cutoff (Hz), High Shelf (Hz)
+            p.auxLeft = m_bassCutoffParam != nullptr ? m_bassCutoffParam->get() : g_paramBassCutoff.defaultValue;
+            p.auxRight = m_highShelfFreqParam != nullptr ? m_highShelfFreqParam->get() : g_paramHighShelfFreq.defaultValue;
+            break;
+        case 2: // ComplementaryComb: Delay (ms), Gain (0-100 % -> 0-1)
+            p.auxLeft = m_combDelayParam != nullptr ? m_combDelayParam->get() : g_paramCombDelay.defaultValue;
+            p.auxRight = (m_combGainParam != nullptr ? m_combGainParam->get() : g_paramCombGain.defaultValue) * 0.01f;
+            break;
+        default: // MSWidthBroadband and any future algorithm with no aux params
+            break;
+    }
+    return p;
 }
 
 void StereoWidenerAudio::prepareToPlay(double sampleRate, int max_samplesPerBlock, int max_channels)
@@ -60,10 +87,7 @@ int StereoWidenerAudio::processSynchronBlock(juce::AudioBuffer<float> & buffer, 
         return 0;
     }
 
-    StereoAlgorithmParams params;
-    params.width = m_widthParam != nullptr ? m_widthParam->get() * 0.01f : 1.0f; // 0-200 % -> 0-2
-    params.auxLeft = m_bassCutoffParam != nullptr ? m_bassCutoffParam->get() : g_paramBassCutoff.defaultValue;
-    params.auxRight = m_highShelfFreqParam != nullptr ? m_highShelfFreqParam->get() : g_paramHighShelfFreq.defaultValue;
+    const float width = m_widthParam != nullptr ? m_widthParam->get() * 0.01f : 1.0f; // 0-200 % -> 0-2
     const int selectedIndex = m_algorithmParam != nullptr ? m_algorithmParam->getIndex() : m_activeIndex;
 
     if (selectedIndex != m_activeIndex && !m_crossfading)
@@ -82,8 +106,8 @@ int StereoWidenerAudio::processSynchronBlock(juce::AudioBuffer<float> & buffer, 
         m_crossfadeScratch.setSize(numChannels, numSamples, false, false, true);
         m_crossfadeScratch.makeCopyOf(buffer, true);
 
-        m_algorithms[(size_t) m_activeIndex]->process(buffer, params);
-        m_algorithms[(size_t) m_targetIndex]->process(m_crossfadeScratch, params);
+        m_algorithms[(size_t) m_activeIndex]->process(buffer, paramsFor(m_activeIndex, width));
+        m_algorithms[(size_t) m_targetIndex]->process(m_crossfadeScratch, paramsFor(m_targetIndex, width));
 
         for (int i = 0; i < numSamples; ++i)
         {
@@ -108,7 +132,7 @@ int StereoWidenerAudio::processSynchronBlock(juce::AudioBuffer<float> & buffer, 
     }
     else
     {
-        m_algorithms[(size_t) m_activeIndex]->process(buffer, params);
+        m_algorithms[(size_t) m_activeIndex]->process(buffer, paramsFor(m_activeIndex, width));
     }
 
     // Utilities (Phase 4 step 2, planing.md 2.13 + 2.2): applied once, after whichever
@@ -133,10 +157,10 @@ namespace
     // slider step (interval) is set to 10^-numDecimalPlaces, e.g. 1 for
     // numDecimalPlaces = 0, so both the knob and any host's generic parameter view show
     // a clean "150 Hz" instead of "150.000000 Hz" (see StereoAnalyzer.cpp, same pattern).
-    // defaultValue is passed explicitly (rather than always using p.defaultValue) so the
-    // caller can seed it from GlobalSettings' "last used" state (Phase 4 step 2) --
-    // clamped defensively, in case a hand-edited settings file has a stale/out-of-range
-    // value from before a range changed.
+    // defaultValue is passed explicitly (rather than always using p.defaultValue
+    // implicitly) so callers are forced to say plainly which default they mean --
+    // currently always p.defaultValue itself, see addParameter(). Still clamped
+    // defensively against the parameter's own range.
     template <typename ParamDef>
     std::unique_ptr<juce::AudioParameterFloat> makeFloatParameter(const ParamDef& p, float defaultValue)
     {
@@ -221,41 +245,36 @@ namespace
 
 void StereoWidenerAudio::addParameter(std::vector<std::unique_ptr<juce::RangedAudioParameter>> &paramVector)
 {
-    // "Last used state" (plan2.md Phase 4 step 1): a brand new instance starts from
-    // whatever was last saved to the global settings file (StereoWidenerAudioProcessor's
-    // destructor), or the compiled-in default if there is none yet (e.g. the very first
-    // run). A DAW project's own saved state, restored afterwards via
-    // setStateInformation(), always overrides this -- it unconditionally replaces the
-    // whole parameter tree, which runs strictly after this constructor-time code.
-    const auto lastUsed = [this](const std::string& id, double fallback)
-    {
-        return m_globalSettings.getLastUsedParam(id, fallback);
-    };
-
-    paramVector.push_back(makeFloatParameter(g_paramWidth, (float) lastUsed(g_paramWidth.ID, g_paramWidth.defaultValue)));
+    // Every parameter's default is its own compiled-in g_param*.defaultValue, chosen to
+    // be as close to neutral (unchanged/pass-through) processing as possible for its
+    // algorithm -- this is also the value a double-click on the GUI knob resets to
+    // (JUCE's SliderParameterAttachment wires that up automatically from the
+    // parameter's own default). A brand new instance therefore always starts neutral;
+    // a DAW project's own saved state, restored afterwards via setStateInformation(),
+    // still overrides this as usual. Previously these defaults were seeded from a
+    // "last used state" recorded in the global settings file (removed: it made
+    // double-click reset to whatever was last dialled in rather than neutral, and the
+    // init.xml preset already covers "restore my last settings" better -- see
+    // GlobalSettings.h).
+    paramVector.push_back(makeFloatParameter(g_paramWidth, g_paramWidth.defaultValue));
     paramVector.push_back(makeFrequencyParameterWithOff(g_paramBassCutoff, MSWidthFiltered::kBassCutoffOffThreshold, true,
-        (float) lastUsed(g_paramBassCutoff.ID, g_paramBassCutoff.defaultValue)));
+        g_paramBassCutoff.defaultValue));
     paramVector.push_back(makeLogFrequencyParameterWithOff(g_paramHighShelfFreq, MSWidthFiltered::kHighShelfOffThreshold,
-        (float) lastUsed(g_paramHighShelfFreq.ID, g_paramHighShelfFreq.defaultValue)));
+        g_paramHighShelfFreq.defaultValue));
+    paramVector.push_back(makeFloatParameter(g_paramCombDelay, g_paramCombDelay.defaultValue));
+    paramVector.push_back(makeFloatParameter(g_paramCombGain, g_paramCombGain.defaultValue));
 
-    const int lastAlgorithmIndex = juce::jlimit(0, g_algorithmNames.size() - 1,
-        (int) lastUsed(g_paramAlgorithmID, 0.0));
     paramVector.push_back(std::make_unique<juce::AudioParameterChoice>(g_paramAlgorithmID, g_paramAlgorithmName,
-        g_algorithmNames, lastAlgorithmIndex));
+        g_algorithmNames, 0));
 
     // Utilities (Phase 4 step 2)
-    paramVector.push_back(makeFloatParameter(g_paramRotation, (float) lastUsed(g_paramRotation.ID, g_paramRotation.defaultValue)));
-    paramVector.push_back(makeFloatParameter(g_paramBalance, (float) lastUsed(g_paramBalance.ID, g_paramBalance.defaultValue)));
-    paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramInvertL.ID, g_paramInvertL.name,
-        lastUsed(g_paramInvertL.ID, 0.0) > 0.5));
-    paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramInvertR.ID, g_paramInvertR.name,
-        lastUsed(g_paramInvertR.ID, 0.0) > 0.5));
-    paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramSwapLR.ID, g_paramSwapLR.name,
-        lastUsed(g_paramSwapLR.ID, 0.0) > 0.5));
-    const int lastMonitorMode = juce::jlimit(0, g_monitorModeNames.size() - 1,
-        (int) lastUsed(g_paramMonitorModeID, 0.0));
+    paramVector.push_back(makeFloatParameter(g_paramRotation, g_paramRotation.defaultValue));
+    paramVector.push_back(makeFloatParameter(g_paramBalance, g_paramBalance.defaultValue));
+    paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramInvertL.ID, g_paramInvertL.name, false));
+    paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramInvertR.ID, g_paramInvertR.name, false));
+    paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramSwapLR.ID, g_paramSwapLR.name, false));
     paramVector.push_back(std::make_unique<juce::AudioParameterChoice>(g_paramMonitorModeID, g_paramMonitorModeName,
-        g_monitorModeNames, lastMonitorMode));
+        g_monitorModeNames, 0));
 }
 
 void StereoWidenerAudio::prepareParameter(std::unique_ptr<juce::AudioProcessorValueTreeState> &vts)
@@ -263,6 +282,8 @@ void StereoWidenerAudio::prepareParameter(std::unique_ptr<juce::AudioProcessorVa
     m_widthParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramWidth.ID));
     m_bassCutoffParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramBassCutoff.ID));
     m_highShelfFreqParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramHighShelfFreq.ID));
+    m_combDelayParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramCombDelay.ID));
+    m_combGainParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramCombGain.ID));
     m_algorithmParam = dynamic_cast<juce::AudioParameterChoice*>(vts->getParameter(g_paramAlgorithmID));
 
     m_rotationParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramRotation.ID));
@@ -305,39 +326,17 @@ StereoWidenerGUI::StereoWidenerGUI(StereoWidenerAudioProcessor& p, juce::AudioPr
     m_widthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         m_apvts, g_paramWidth.ID, m_widthKnob);
 
-    // custom text display (not just a unit suffix) so the "Off" zone at the bottom of
-    // this knob's range (see g_paramBassCutoff, MSWidthFiltered::kBassCutoffOffThreshold)
-    // reads as "Off" instead of e.g. "39 Hz"
+    // Widgets only here -- which parameter each one is bound to (and that parameter's
+    // own display formatting, e.g. MSWidthFiltered's "Off" zones) depends on the active
+    // algorithm and is set up by bindAuxKnob(), called from
+    // updateAuxKnobsForActiveAlgorithm() below.
     m_auxLeftLabel.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(m_auxLeftLabel);
-    m_auxLeftKnob.textFromValueFunction = [](double value) -> juce::String
-    {
-        return value < MSWidthFiltered::kBassCutoffOffThreshold ? "Off"
-             : juce::String(juce::roundToInt(value)) + " Hz";
-    };
-    m_auxLeftKnob.valueFromTextFunction = [](const juce::String& text) -> double
-    {
-        return text.trim().equalsIgnoreCase("off") ? (double) g_paramBassCutoff.minValue : text.getDoubleValue();
-    };
     addAndMakeVisible(m_auxLeftKnob);
-    m_auxLeftAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        m_apvts, g_paramBassCutoff.ID, m_auxLeftKnob);
 
-    // mirrors the left knob: "Off" above MSWidthFiltered::kHighShelfOffThreshold
     m_auxRightLabel.setJustificationType(juce::Justification::centred);
     addAndMakeVisible(m_auxRightLabel);
-    m_auxRightKnob.textFromValueFunction = [](double value) -> juce::String
-    {
-        return value > MSWidthFiltered::kHighShelfOffThreshold ? "Off"
-             : juce::String(juce::roundToInt(value)) + " Hz";
-    };
-    m_auxRightKnob.valueFromTextFunction = [](const juce::String& text) -> double
-    {
-        return text.trim().equalsIgnoreCase("off") ? (double) g_paramHighShelfFreq.maxValue : text.getDoubleValue();
-    };
     addAndMakeVisible(m_auxRightKnob);
-    m_auxRightAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        m_apvts, g_paramHighShelfFreq.ID, m_auxRightKnob);
 
     m_helpButton.onClick = [this] { showAlgorithmHelp(); };
     addAndMakeVisible(m_helpButton);
@@ -395,6 +394,91 @@ StereoWidenerGUI::StereoWidenerGUI(StereoWidenerAudioProcessor& p, juce::AudioPr
         m_apvts, g_paramMonitorModeID, m_monitorModeBox);
 }
 
+namespace
+{
+    // Which APVTS parameter each aux knob should be rebound to for a given algorithm
+    // index -- the GUI-side counterpart of StereoWidenerAudio::paramsFor(), and must
+    // stay in the same index order as g_algorithmNames/the algorithm instances (see the
+    // comment there). Empty string means "this algorithm has no such parameter" --
+    // bindAuxKnob() then detaches and disables the knob.
+    juce::String auxLeftParamIdFor(int algorithmIndex)
+    {
+        switch (algorithmIndex)
+        {
+            case 1: return g_paramBassCutoff.ID;
+            case 2: return g_paramCombDelay.ID;
+            default: return {};
+        }
+    }
+
+    juce::String auxRightParamIdFor(int algorithmIndex)
+    {
+        switch (algorithmIndex)
+        {
+            case 1: return g_paramHighShelfFreq.ID;
+            case 2: return g_paramCombGain.ID;
+            default: return {};
+        }
+    }
+}
+
+void StereoWidenerGUI::bindAuxKnob(juce::Slider& knob, std::unique_ptr<SliderAttachment>& attachment, const juce::String& paramId)
+{
+    attachment.reset(); // must be destroyed before a new one is created on the same slider
+
+    knob.textFromValueFunction = nullptr;
+    knob.valueFromTextFunction = nullptr;
+    knob.setTextValueSuffix({});
+
+    if (paramId.isEmpty())
+    {
+        // No parameter behind this knob for the active algorithm (e.g.
+        // MSWidthBroadband): blank the text box instead of showing the detached
+        // slider's own raw numeric value (e.g. "0.0000000"), which would look broken.
+        knob.textFromValueFunction = [](double) -> juce::String { return {}; };
+        knob.updateText(); // no attachment will run to refresh the cached text box otherwise
+        return;
+    }
+
+    // Custom text display (not just a unit suffix) for the two parameters with an "Off"
+    // zone (see g_paramBassCutoff/g_paramHighShelfFreq); everything else just shows its
+    // own unit suffix.
+    if (paramId == juce::String(g_paramBassCutoff.ID))
+    {
+        knob.textFromValueFunction = [](double value) -> juce::String
+        {
+            return value < MSWidthFiltered::kBassCutoffOffThreshold ? "Off"
+                 : juce::String(juce::roundToInt(value)) + " Hz";
+        };
+        knob.valueFromTextFunction = [](const juce::String& text) -> double
+        {
+            return text.trim().equalsIgnoreCase("off") ? (double) g_paramBassCutoff.minValue : text.getDoubleValue();
+        };
+    }
+    else if (paramId == juce::String(g_paramHighShelfFreq.ID))
+    {
+        knob.textFromValueFunction = [](double value) -> juce::String
+        {
+            return value > MSWidthFiltered::kHighShelfOffThreshold ? "Off"
+                 : juce::String(juce::roundToInt(value)) + " Hz";
+        };
+        knob.valueFromTextFunction = [](const juce::String& text) -> double
+        {
+            return text.trim().equalsIgnoreCase("off") ? (double) g_paramHighShelfFreq.maxValue : text.getDoubleValue();
+        };
+    }
+    else if (paramId == juce::String(g_paramCombDelay.ID))
+    {
+        knob.setTextValueSuffix(" ms");
+    }
+    else if (paramId == juce::String(g_paramCombGain.ID))
+    {
+        knob.setTextValueSuffix(" %");
+    }
+
+    attachment = std::make_unique<SliderAttachment>(m_apvts, paramId, knob);
+}
+
 void StereoWidenerGUI::showAlgorithmHelp()
 {
     const int index = juce::jlimit(0, m_processor.m_algo.getNumAlgorithms() - 1, m_algorithmBox.getSelectedItemIndex());
@@ -411,10 +495,12 @@ void StereoWidenerGUI::updateAuxKnobsForActiveAlgorithm()
     const auto leftInfo = algorithm.getAuxLeftInfo();
     m_auxLeftKnob.setEnabled(leftInfo.enabled);
     m_auxLeftLabel.setText(leftInfo.enabled ? leftInfo.label : juce::String(), juce::dontSendNotification);
+    bindAuxKnob(m_auxLeftKnob, m_auxLeftAttachment, leftInfo.enabled ? auxLeftParamIdFor(index) : juce::String());
 
     const auto rightInfo = algorithm.getAuxRightInfo();
     m_auxRightKnob.setEnabled(rightInfo.enabled);
     m_auxRightLabel.setText(rightInfo.enabled ? rightInfo.label : juce::String(), juce::dontSendNotification);
+    bindAuxKnob(m_auxRightKnob, m_auxRightAttachment, rightInfo.enabled ? auxRightParamIdFor(index) : juce::String());
 }
 
 void StereoWidenerGUI::paint(juce::Graphics &g)

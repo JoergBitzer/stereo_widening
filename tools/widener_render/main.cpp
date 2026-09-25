@@ -1,17 +1,21 @@
 /**
  * @file main.cpp
  * @brief Renders a wav file through one of StereoWidener's real algorithm classes
- *        (MSWidthBroadband or MSWidthFiltered -- the exact C++ code the plugin runs,
- *        not a re-implementation) and writes the result to another wav file.
+ *        (MSWidthBroadband, MSWidthFiltered or ComplementaryComb -- the exact C++ code
+ *        the plugin runs, not a re-implementation) and writes the result to another wav
+ *        file.
  *
- * Usage: WidenerRender <input.wav> <output.wav> <broadband|filtered>
+ * Usage: WidenerRender <input.wav> <output.wav> <broadband|filtered|comb>
  *                       [width_percent=100] [bassCutoffHz=150] [highShelfHz=8000]
+ *                       [combDelayMs=10] [combGainPercent=50] [combCrossoverHz=300]
  *
  * width_percent: 0-200, matching the plugin's Width parameter (0 = mono, 100 = unity,
  * 200 = double the side signal). bassCutoffHz/highShelfHz only matter for "filtered";
  * pass a value in their "Off" zone (e.g. bassCutoffHz below 40, or highShelfHz above
  * 16000) to bypass that stage, same as turning the corresponding knob to Off in the
- * plugin (see MSWidthFiltered.h).
+ * plugin (see MSWidthFiltered.h). combDelayMs/combGainPercent/combCrossoverHz only
+ * matter for "comb" (see ComplementaryComb.h); combCrossoverHz mirrors GlobalSettings'
+ * combCrossoverHz default (not a user-facing knob in the plugin itself).
  *
  * python/evaluate_widener_plugin.py calls this once per (signal, setting) pair, then
  * runs python/stereo_eval's report.evaluate() on the resulting (input, output) file
@@ -30,13 +34,15 @@
 
 #include "algorithms/MSWidthBroadband.h"
 #include "algorithms/MSWidthFiltered.h"
+#include "algorithms/ComplementaryComb.h"
 
 int main(int argc, char* argv[])
 {
     if (argc < 4)
     {
-        std::cerr << "usage: WidenerRender <input.wav> <output.wav> <broadband|filtered> "
-                     "[width_percent=100] [bassCutoffHz=150] [highShelfHz=8000]\n";
+        std::cerr << "usage: WidenerRender <input.wav> <output.wav> <broadband|filtered|comb> "
+                     "[width_percent=100] [bassCutoffHz=150] [highShelfHz=8000] "
+                     "[combDelayMs=10] [combGainPercent=50] [combCrossoverHz=300]\n";
         return 1;
     }
 
@@ -49,6 +55,9 @@ int main(int argc, char* argv[])
     const float width = (argc > 4 ? (float) std::atof(argv[4]) : 100.0f) * 0.01f;
     const float bassCutoffHz = argc > 5 ? (float) std::atof(argv[5]) : 150.0f;
     const float highShelfHz = argc > 6 ? (float) std::atof(argv[6]) : 8000.0f;
+    const float combDelayMs = argc > 7 ? (float) std::atof(argv[7]) : 10.0f;
+    const float combGainPercent = argc > 8 ? (float) std::atof(argv[8]) : 50.0f;
+    const float combCrossoverHz = argc > 9 ? (float) std::atof(argv[9]) : 300.0f;
 
     juce::AudioFormatManager formatManager;
     formatManager.registerBasicFormats();
@@ -87,11 +96,16 @@ int main(int argc, char* argv[])
         algorithm = std::make_unique<MSWidthBroadband>();
     else if (algorithmName == "filtered")
         algorithm = std::make_unique<MSWidthFiltered>();
+    else if (algorithmName == "comb")
+        algorithm = std::make_unique<ComplementaryComb>();
     else
     {
-        std::cerr << "unknown algorithm '" << algorithmName << "', expected broadband or filtered\n";
+        std::cerr << "unknown algorithm '" << algorithmName << "', expected broadband, filtered or comb\n";
         return 1;
     }
+
+    if (auto* comb = dynamic_cast<ComplementaryComb*>(algorithm.get()))
+        comb->setCrossoverHz(combCrossoverHz);
 
     constexpr int blockSize = 512;
     algorithm->prepare(reader->sampleRate, blockSize);
@@ -99,8 +113,16 @@ int main(int argc, char* argv[])
 
     StereoAlgorithmParams params;
     params.width = width;
-    params.auxLeft = bassCutoffHz;
-    params.auxRight = highShelfHz;
+    if (algorithmName == "comb")
+    {
+        params.auxLeft = combDelayMs;
+        params.auxRight = combGainPercent * 0.01f;
+    }
+    else
+    {
+        params.auxLeft = bassCutoffHz;
+        params.auxRight = highShelfHz;
+    }
 
     // block-sized processing, not one giant call, so MSWidthFiltered's per-sample IIR
     // filter state behaves exactly as it would inside the real plugin's
@@ -127,8 +149,13 @@ int main(int argc, char* argv[])
     }
     writer->writeFromAudioSampleBuffer(buffer, 0, numSamples);
 
-    std::cout << "wrote " << outputFile.getFullPathName() << " (" << algorithmName
-               << ", width=" << (width * 100.0f) << "%, bassCutoff=" << bassCutoffHz
-               << " Hz, highShelf=" << highShelfHz << " Hz)\n";
+    if (algorithmName == "comb")
+        std::cout << "wrote " << outputFile.getFullPathName() << " (comb, width=" << (width * 100.0f)
+                   << "%, delay=" << combDelayMs << " ms, gain=" << combGainPercent
+                   << "%, crossover=" << combCrossoverHz << " Hz)\n";
+    else
+        std::cout << "wrote " << outputFile.getFullPathName() << " (" << algorithmName
+                   << ", width=" << (width * 100.0f) << "%, bassCutoff=" << bassCutoffHz
+                   << " Hz, highShelf=" << highShelfHz << " Hz)\n";
     return 0;
 }

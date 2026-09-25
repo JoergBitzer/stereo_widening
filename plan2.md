@@ -194,10 +194,13 @@ Details and verification: `docs/algorithms/phase4_settings.md`.
    `juce::JSON` needs no extra dependency). `StereoWidener/GlobalSettings.h`/`.cpp`
    reads/creates `~/.config/StereoWidener/settings.json`, storing:
    - the side high-shelf's gain (`MSWidthFiltered`, previously a fixed 3 dB constant)
-   - last used state (every parameter value), used as the default for a brand new
-     instance -- a DAW project's own saved state always overrides this once it exists
-     (see the docs page for exactly how/why, no extra "which wins" logic needed)
-   - GUI size (same "project always wins once it exists" behaviour)
+   - ~~last used state (every parameter value), used as the default for a brand new
+     instance~~ -- **removed in the Phase 5 comb follow-up**: it made a GUI knob's
+     double-click reset go to whatever was last dialled in rather than to a neutral
+     value; every parameter default is now a fixed, compiled-in, neutral value instead,
+     and the `init` preset covers "restore my last settings" (see
+     `docs/algorithms/phase5_comb.md`)
+   - GUI size ("project always wins once it exists" behaviour, unaffected by the above)
    - meter options (integration time, peak hold, peak decay) -- defaults only, since
      StereoWidener has no per-project override mechanism for these yet (unlike
      StereoAnalyzer's Settings popup)
@@ -227,6 +230,15 @@ come first. For each algorithm:
 3. A documentation page in `docs/algorithms/` (theory, block diagram, parameters,
    evaluation plots).
 4. For creative modes: the "not mono-safe" badge and a mono-check hint in the GUI.
+
+**2.4 comb: done** (v0.1.3). Two user-facing parameters (Delay, Gain) plus the shared
+Width knob, per explicit request to minimise controls to "2 + Width"; the crossover
+frequency is a `GlobalSettings` default instead of a third knob. Required a new
+dynamic aux-knob-rebinding mechanism in `StereoWidenerGUI` (the two aux knob widgets
+now represent different parameters depending on the active algorithm, rather than
+each algorithm getting its own dedicated knob pair) -- see
+[phase5_comb.md](docs/algorithms/phase5_comb.md) for the full writeup and verification
+results. Next: 2.7 multiband.
 
 ### Phase 6 – v1 release
 1. GUI: profile switch, mode selector (filtered by profile), macro width, parameter panel

@@ -34,30 +34,16 @@ void GlobalSettings::load()
             meterPeakHoldTimeS = (float) (double) obj->getProperty("meterPeakHoldTimeS");
         if (obj->hasProperty("meterPeakDecayDbPerS"))
             meterPeakDecayDbPerS = (float) (double) obj->getProperty("meterPeakDecayDbPerS");
-        if (obj->hasProperty("lastUsedState"))
-            lastUsedState = obj->getProperty("lastUsedState");
+        if (obj->hasProperty("combCrossoverHz"))
+            combCrossoverHz = (float) (double) obj->getProperty("combCrossoverHz");
     }
     // a missing/unparseable/incomplete file just keeps whichever defaults above were
     // not overwritten -- a broken settings file must never stop the plugin from loading
 }
 
-double GlobalSettings::getLastUsedParam(const juce::String& paramId, double fallbackValue) const
-{
-    if (auto* obj = lastUsedState.getDynamicObject())
-        if (obj->hasProperty(paramId))
-            return (double) obj->getProperty(paramId);
-    return fallbackValue;
-}
-
-void GlobalSettings::saveLastUsedState(const std::map<juce::String, double>& paramValues, float newGuiScaleFactor)
+void GlobalSettings::saveGuiScaleFactor(float newGuiScaleFactor)
 {
     guiScaleFactor = newGuiScaleFactor;
-
-    auto* obj = new juce::DynamicObject();
-    for (const auto& [id, value] : paramValues)
-        obj->setProperty(id, value);
-    lastUsedState = juce::var(obj);
-
     write(getSettingsFile());
 }
 
@@ -69,7 +55,7 @@ void GlobalSettings::write(const juce::File& file) const
     obj->setProperty("meterIntegrationTimeS", (double) meterIntegrationTimeS);
     obj->setProperty("meterPeakHoldTimeS", (double) meterPeakHoldTimeS);
     obj->setProperty("meterPeakDecayDbPerS", (double) meterPeakDecayDbPerS);
-    obj->setProperty("lastUsedState", lastUsedState);
+    obj->setProperty("combCrossoverHz", (double) combCrossoverHz);
     const juce::var root(obj);
 
     file.getParentDirectory().createDirectory();
