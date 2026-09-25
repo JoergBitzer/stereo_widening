@@ -221,8 +221,11 @@ Details and verification: `docs/algorithms/phase4_settings.md`.
    algorithm reports 0).
 
 ### Phase 5 – Algorithms 2–5 (v1)
-Order: **2.4 comb → 2.7 multiband → 2.5 allpass/velvet → 2.3 Haas**. The mono-safe modes
-come first. For each algorithm:
+Order: **2.4 comb → 2.5 allpass/velvet → 2.7 multiband → 2.3 Haas** (changed from the
+original comb → multiband → allpass/velvet → Haas order: allpass/velvet moved ahead of
+multiband). The mono-safe modes come first.
+
+Every algorithm goes through the same four steps; each subsection below tracks them:
 1. Python reference in `python/algorithms/`, evaluation report, and choice of default
    parameters and ranges.
 2. C++ class in `StereoWidener/algorithms/`, plus a null test or reference test against
@@ -231,14 +234,60 @@ come first. For each algorithm:
    evaluation plots).
 4. For creative modes: the "not mono-safe" badge and a mono-check hint in the GUI.
 
-**2.4 comb: done** (v0.1.3). Two user-facing parameters (Delay, Gain) plus the shared
-Width knob, per explicit request to minimise controls to "2 + Width"; the crossover
-frequency is a `GlobalSettings` default instead of a third knob. Required a new
-dynamic aux-knob-rebinding mechanism in `StereoWidenerGUI` (the two aux knob widgets
-now represent different parameters depending on the active algorithm, rather than
-each algorithm getting its own dedicated knob pair) -- see
-[phase5_comb.md](docs/algorithms/phase5_comb.md) for the full writeup and verification
-results. Next: 2.7 multiband.
+#### 2.4 Complementary comb -- done (v0.1.3)
+1. ✅ Python reference: `python/algorithms/comb.py`, `python/evaluate_comb.py`.
+2. ✅ C++ class: `StereoWidener/algorithms/ComplementaryComb.{h,cpp}`; cross-checked
+   against the real plugin DSP via `tools/widener_render` +
+   `python/evaluate_widener_plugin.py`, and directly against the Python reference via
+   the new `python/crosscheck_comb.py` (PASS, see the doc page).
+3. ✅ Doc page: [phase5_comb.md](docs/algorithms/phase5_comb.md).
+4. N/A -- mono-safe by construction (`L'+R' = 2M` always), no badge/hint needed.
+
+Two user-facing parameters (Delay, Gain) plus the shared Width knob, per explicit
+request to minimise controls to "2 + Width"; the crossover frequency is a
+`GlobalSettings` default instead of a third knob. Required a new dynamic
+aux-knob-rebinding mechanism in `StereoWidenerGUI` (the two aux knob widgets now
+represent different parameters depending on the active algorithm, rather than each
+algorithm getting its own dedicated knob pair). A follow-up in the same doc page also
+removed the "last used state" mechanism from `GlobalSettings` (it made a knob's
+double-click reset go to whatever was last dialled in instead of a neutral value) --
+every parameter default is now the neutral/pass-through value for its algorithm
+(v0.1.4).
+
+#### 2.5 Allpass decorrelation -- done (v0.1.5)
+1. ✅ Python reference: `python/algorithms/allpass_decorrelation.py`,
+   `python/evaluate_allpass.py`. Asserts `amount = 0` is an exact bypass; confirmed the
+   mono sum is genuinely non-flat once `amount > 0` (unlike comb), and that
+   `spread = 0` still colours the mono sum despite leaving the side signal untouched
+   bit-for-bit (see the doc page's derivation).
+2. ✅ C++ class: `StereoWidener/algorithms/AllpassDecorrelation.{h,cpp}`; cross-checked
+   against the real plugin DSP via `tools/widener_render` +
+   `python/evaluate_widener_plugin.py`, and directly against the Python reference via
+   the new `python/crosscheck_allpass.py` (PASS, diffs ~0.00 -- no delay-line
+   interpolation difference this time, unlike comb's cross-check).
+3. ✅ Doc page: [phase5_allpass.md](docs/algorithms/phase5_allpass.md).
+4. ✅ "Not mono-safe" badge + mono-check hint: `StereoWidenerGUI` now shows an orange
+   warning below the algorithm selector whenever the active algorithm's
+   `isMonoSafe()` is false (first algorithm to trigger it), pointing at the existing
+   Monitor "Mono Check (L+R)" utility. `g_minGuiSize_y` grown 655 -> 685 to fit the new
+   row.
+
+Two parameters (Amount, Spread) plus the shared Width knob, both defaulting to their
+neutral values (Amount 0 % = exact bypass; Spread has no neutral value of its own,
+inert whenever Amount = 0) per the same convention established in 2.4's follow-up.
+Velvet-noise decorrelators (planing.md's other suggested technique under this same
+entry) were not implemented -- the allpass-cascade approach alone already satisfies
+the algorithm's spec and its own "con"; velvet noise would need a different
+(convolution-based) engine and is left for a future revisit if the cascade approach
+turns out insufficient in practice. Next: 2.7 multiband.
+
+#### 2.7 Multiband width -- not started
+planing.md 2.7: Linkwitz-Riley crossover (3-4 bands) with a per-band M/S width; bass
+mono comes built in. All four steps not started.
+
+#### 2.3 Haas / precedence-effect delay -- not started
+planing.md 2.3: a short inter-channel delay (creative, not mono-safe like 2.5). All
+four steps not started.
 
 ### Phase 6 – v1 release
 1. GUI: profile switch, mode selector (filtered by profile), macro width, parameter panel

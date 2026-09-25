@@ -10,6 +10,7 @@ StereoWidenerAudio::StereoWidenerAudio(StereoWidenerAudioProcessor* processor)
     m_algorithms.push_back(std::make_unique<MSWidthBroadband>());
     m_algorithms.push_back(std::make_unique<MSWidthFiltered>());
     m_algorithms.push_back(std::make_unique<ComplementaryComb>());
+    m_algorithms.push_back(std::make_unique<AllpassDecorrelation>());
 
     // user-configurable defaults (plan2.md Phase 4, "Global settings file"), previously
     // fixed compiled-in constants -- see GlobalSettings.h
@@ -36,6 +37,10 @@ StereoAlgorithmParams StereoWidenerAudio::paramsFor(int algorithmIndex, float wi
         case 2: // ComplementaryComb: Delay (ms), Gain (0-100 % -> 0-1)
             p.auxLeft = m_combDelayParam != nullptr ? m_combDelayParam->get() : g_paramCombDelay.defaultValue;
             p.auxRight = (m_combGainParam != nullptr ? m_combGainParam->get() : g_paramCombGain.defaultValue) * 0.01f;
+            break;
+        case 3: // AllpassDecorrelation: Amount (0-100 % -> 0-1), Spread (0-100 % -> 0-1)
+            p.auxLeft = (m_allpassAmountParam != nullptr ? m_allpassAmountParam->get() : g_paramAllpassAmount.defaultValue) * 0.01f;
+            p.auxRight = (m_allpassSpreadParam != nullptr ? m_allpassSpreadParam->get() : g_paramAllpassSpread.defaultValue) * 0.01f;
             break;
         default: // MSWidthBroadband and any future algorithm with no aux params
             break;
@@ -263,6 +268,8 @@ void StereoWidenerAudio::addParameter(std::vector<std::unique_ptr<juce::RangedAu
         g_paramHighShelfFreq.defaultValue));
     paramVector.push_back(makeFloatParameter(g_paramCombDelay, g_paramCombDelay.defaultValue));
     paramVector.push_back(makeFloatParameter(g_paramCombGain, g_paramCombGain.defaultValue));
+    paramVector.push_back(makeFloatParameter(g_paramAllpassAmount, g_paramAllpassAmount.defaultValue));
+    paramVector.push_back(makeFloatParameter(g_paramAllpassSpread, g_paramAllpassSpread.defaultValue));
 
     paramVector.push_back(std::make_unique<juce::AudioParameterChoice>(g_paramAlgorithmID, g_paramAlgorithmName,
         g_algorithmNames, 0));
@@ -284,6 +291,8 @@ void StereoWidenerAudio::prepareParameter(std::unique_ptr<juce::AudioProcessorVa
     m_highShelfFreqParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramHighShelfFreq.ID));
     m_combDelayParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramCombDelay.ID));
     m_combGainParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramCombGain.ID));
+    m_allpassAmountParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramAllpassAmount.ID));
+    m_allpassSpreadParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramAllpassSpread.ID));
     m_algorithmParam = dynamic_cast<juce::AudioParameterChoice*>(vts->getParameter(g_paramAlgorithmID));
 
     m_rotationParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramRotation.ID));
@@ -348,6 +357,10 @@ StereoWidenerGUI::StereoWidenerGUI(StereoWidenerAudioProcessor& p, juce::AudioPr
     m_algorithmAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         m_apvts, g_paramAlgorithmID, m_algorithmBox);
 
+    m_monoSafeBadge.setJustificationType(juce::Justification::centred);
+    m_monoSafeBadge.setColour(juce::Label::textColourId, juce::Colours::orange);
+    addAndMakeVisible(m_monoSafeBadge);
+
     updateAuxKnobsForActiveAlgorithm(); // onChange above only fires on a later *change*, not this initial state
 
     // Utilities (Phase 4 step 2), applied regardless of the selected algorithm -- see
@@ -407,6 +420,7 @@ namespace
         {
             case 1: return g_paramBassCutoff.ID;
             case 2: return g_paramCombDelay.ID;
+            case 3: return g_paramAllpassAmount.ID;
             default: return {};
         }
     }
@@ -417,6 +431,7 @@ namespace
         {
             case 1: return g_paramHighShelfFreq.ID;
             case 2: return g_paramCombGain.ID;
+            case 3: return g_paramAllpassSpread.ID;
             default: return {};
         }
     }
@@ -471,7 +486,9 @@ void StereoWidenerGUI::bindAuxKnob(juce::Slider& knob, std::unique_ptr<SliderAtt
     {
         knob.setTextValueSuffix(" ms");
     }
-    else if (paramId == juce::String(g_paramCombGain.ID))
+    else if (paramId == juce::String(g_paramCombGain.ID)
+             || paramId == juce::String(g_paramAllpassAmount.ID)
+             || paramId == juce::String(g_paramAllpassSpread.ID))
     {
         knob.setTextValueSuffix(" %");
     }
@@ -501,6 +518,13 @@ void StereoWidenerGUI::updateAuxKnobsForActiveAlgorithm()
     m_auxRightKnob.setEnabled(rightInfo.enabled);
     m_auxRightLabel.setText(rightInfo.enabled ? rightInfo.label : juce::String(), juce::dontSendNotification);
     bindAuxKnob(m_auxRightKnob, m_auxRightAttachment, rightInfo.enabled ? auxRightParamIdFor(index) : juce::String());
+
+    // "Not mono-safe" badge (plan2.md Phase 5 step 4): empty (but still laid out, see
+    // resized()) for every mono-safe algorithm, so switching algorithms never shifts
+    // the Utilities section below it.
+    m_monoSafeBadge.setText(algorithm.isMonoSafe() ? juce::String()
+        : juce::String::fromUTF8("\xe2\x9a\xa0 Not mono-safe -- check Utilities \xe2\x86\x92 Monitor \xe2\x86\x92 Mono Check"),
+        juce::dontSendNotification);
 }
 
 void StereoWidenerGUI::paint(juce::Graphics &g)
@@ -576,6 +600,11 @@ void StereoWidenerGUI::resized()
     m_helpButton.setBounds(algoGroup.removeFromLeft(helpSize).withSizeKeepingCentre(helpSize, helpSize));
     algoGroup.removeFromLeft(helpGap);
     m_algorithmBox.setBounds(algoGroup);
+
+    // "Not mono-safe" badge (Phase 5 step 4): always reserved (empty text when the
+    // active algorithm is mono-safe), directly below the algorithm row.
+    m_monoSafeBadge.setBounds(r.removeFromTop(juce::roundToInt(g_monoSafeBadgeHeight * scale)));
+    r.removeFromTop(rowGap);
 
     // Utilities section (Phase 4 step 2): a title, Rotation/Balance knobs, then a row
     // of toggle buttons and the Monitor selector -- applied regardless of the selected

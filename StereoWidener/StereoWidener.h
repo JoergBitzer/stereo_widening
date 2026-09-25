@@ -14,6 +14,7 @@
 #include "algorithms/MSWidthBroadband.h"
 #include "algorithms/MSWidthFiltered.h"
 #include "algorithms/ComplementaryComb.h"
+#include "algorithms/AllpassDecorrelation.h"
 #include "../shared/metering/StereoMeterState.h"
 #include "../shared/metering/GoniometerComponent.h"
 #include "../shared/metering/LevelMeterComponent.h"
@@ -119,6 +120,39 @@ const struct
 	const int numDecimalPlaces = 0;
 }g_paramCombGain;
 
+// AllpassDecorrelation's aux knobs (Phase 5, algorithm 2.5). See AllpassDecorrelation.h
+// for the formula; Spread's range (0-2 octaves internally, see
+// AllpassDecorrelation::kMaxSpreadOctaves) is exposed here as a plain 0-100 % knob, same
+// convention as g_paramCombGain, with the actual octave conversion done in
+// StereoWidenerAudio::paramsFor().
+const struct
+{
+	const std::string ID = "allpassAmount";
+	const std::string name = "Amount";
+	const std::string unitName = "%";
+	const float minValue = 0.0f;
+	const float maxValue = 100.0f;
+	// 0 % is neutral (exact bypass, algebraically -- see AllpassDecorrelation.h) until
+	// the user dials this in, same reasoning as g_paramCombGain's default above.
+	const float defaultValue = minValue;
+	const float skew = 1.0f;
+	const int numDecimalPlaces = 0;
+}g_paramAllpassAmount;
+
+const struct
+{
+	const std::string ID = "allpassSpread";
+	const std::string name = "Spread";
+	const std::string unitName = "%";
+	const float minValue = 0.0f;
+	const float maxValue = 100.0f;
+	// No "neutral" value of its own -- inert whenever Amount = 0, same reasoning as
+	// g_paramCombDelay's default above.
+	const float defaultValue = 50.0f;
+	const float skew = 1.0f;
+	const int numDecimalPlaces = 0;
+}g_paramAllpassSpread;
+
 constexpr const char* g_paramAlgorithmID = "algorithm";
 constexpr const char* g_paramAlgorithmName = "Algorithm";
 
@@ -129,7 +163,8 @@ constexpr const char* g_paramAlgorithmName = "Algorithm";
 const juce::StringArray g_algorithmNames {
     "M/S Width (Broadband)",
     "M/S Width (Filtered / Bass Mono)",
-    "Complementary Comb (Pseudo-Stereo)"
+    "Complementary Comb (Pseudo-Stereo)",
+    "Allpass Decorrelation"
 };
 
 // ---- Utilities (Phase 4 step 2: planing.md 2.13 + 2.2) -------------------------
@@ -227,6 +262,8 @@ private:
     juce::AudioParameterFloat* m_highShelfFreqParam = nullptr;
     juce::AudioParameterFloat* m_combDelayParam = nullptr;
     juce::AudioParameterFloat* m_combGainParam = nullptr;
+    juce::AudioParameterFloat* m_allpassAmountParam = nullptr;
+    juce::AudioParameterFloat* m_allpassSpreadParam = nullptr;
     juce::AudioParameterChoice* m_algorithmParam = nullptr;
 
     // Builds this block's params for algorithmIndex, sourced from whichever aux
@@ -278,11 +315,13 @@ private:
     // state, and bindAuxKnob() for the rebinding -- each algorithm may have its own aux
     // parameters, e.g. MSWidthFiltered's Bass Cutoff/High Shelf vs. ComplementaryComb's
     // Delay/Gain, so the knob *positions* are shared but which parameter each one
-    // actually controls changes with the algorithm). Called once at construction for
-    // the initial selection, and from m_algorithmBox.onChange after that (which fires
-    // for both user clicks and host-automation-driven changes -- see
-    // ComboBoxParameterAttachment::setValue() in JUCE, it notifies external listeners
-    // even though it suppresses the attachment's own re-entrant one).
+    // actually controls changes with the algorithm), and updates the "not mono-safe"
+    // badge (StereoAlgorithm::isMonoSafe(), plan2.md Phase 5 step 4 -- first needed by
+    // AllpassDecorrelation, algorithm 2.5). Called once at construction for the initial
+    // selection, and from m_algorithmBox.onChange after that (which fires for both user
+    // clicks and host-automation-driven changes -- see ComboBoxParameterAttachment::
+    // setValue() in JUCE, it notifies external listeners even though it suppresses the
+    // attachment's own re-entrant one).
     void updateAuxKnobsForActiveAlgorithm();
 
     // Rebinds knob to the parameter named paramId (destroying/recreating attachment),
@@ -313,6 +352,10 @@ private:
     juce::TextButton m_helpButton { "?" };
     juce::ComboBox m_algorithmBox;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> m_algorithmAttachment;
+
+    // "Not mono-safe" badge (plan2.md Phase 5 step 4): visible only when the active
+    // algorithm's isMonoSafe() is false, updated by updateAuxKnobsForActiveAlgorithm().
+    juce::Label m_monoSafeBadge;
 
     // Utilities (Phase 4 step 2), applied regardless of the selected algorithm -- see
     // UtilityProcessor.h

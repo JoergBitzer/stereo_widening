@@ -17,8 +17,10 @@ const int g_maxGuiSize_x(1200);
 // algorithm selector below the visible window -- plus another ~156 for the Utilities
 // row added below the algorithm selector in Phase 4 step 2 (rowGap 8 + title 18 +
 // rowGap 8 + utilities knob row ~84 + rowGap 8 + utilities toggle row 28, see the
-// g_utilities* constants below), with a small margin.
-const int g_minGuiSize_y(655);
+// g_utilities* constants below), plus another ~26 for the "not mono-safe" badge row
+// added below the algorithm selector in Phase 5 (rowGap 8 + badge 18, see
+// g_monoSafeBadgeHeight below), with a small margin.
+const int g_minGuiSize_y(685);
 const float g_guiratio = float(g_minGuiSize_y)/g_minGuiSize_x;
 
 // ---------- presethandler ----------
@@ -62,6 +64,12 @@ const int g_algorithmBoxWidth(260);
 const int g_helpButtonSize(22);           // small square "?" button, left of the algorithm box
 const int g_helpButtonGap(6);
 const int g_algorithmHelpPanelWidth(340);
+
+// "Not mono-safe" badge (Phase 5 step 4), directly below the algorithm selector row --
+// visible only when the active algorithm's isMonoSafe() is false (first needed by
+// algorithm 2.5, AllpassDecorrelation). Always reserved in the layout (empty text when
+// not shown) so switching algorithms never shifts the Utilities section below it.
+const int g_monoSafeBadgeHeight(18);
 
 // Utilities row (Phase 4 step 2: planing.md 2.13 + 2.2), below the algorithm selector.
 // See UtilityProcessor.h.

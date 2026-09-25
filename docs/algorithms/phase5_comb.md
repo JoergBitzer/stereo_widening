@@ -127,6 +127,24 @@ passes.
 
 ![StereoWidener plugin (real C++ DSP), speech_dry_answers (dual-mono) through the comb algorithm: goniometer widens from a vertical mono line to a genuine blob, and per-octave correlation tracks the input closely below the ~300 Hz crossover and drops above it](../../python/results/widener_plugin/speech_dry_answers_comb_d10_g050.png)
 
+**Automated numeric cross-check** (`python/crosscheck_comb.py`, new): rather than
+eyeballing the two summary tables above, this parses both
+`python/results/comb/summary.txt` (Python reference) and
+`python/results/widener_plugin/summary.txt` (C++ plugin) and directly diffs
+`stereo_eval.report`'s metrics for the 3 settings x 7 signals both scripts share (21
+rows), asserting each is within a tolerance loose enough to absorb the one intentional
+implementation difference (the Python reference uses an integer-sample delay with no
+interpolation; the C++ class uses `juce::dsp::DelayLine` with linear interpolation, so
+automation-time delay changes don't click) but tight enough to catch a real
+algorithmic mismatch. Result: **PASS** -- max diffs across all 21 rows: correlation
+0.02, IACC 0.01, dS-M 0.6 dB (tolerance 0.7 dB; the one row close to its tolerance,
+`speech_dry_answers`/`d05_g030`, is the dual-mono signal at its most delay-sensitive
+setting -- S starts near zero there, so dS-M is a highly sensitive ratio), dLUFS
+0.1 dB, mono colouration 0.00 dB exactly on every row. Full table in
+`python/results/comb/crosscheck_vs_cpp.txt`. Run with `python
+python/crosscheck_comb.py` after both `evaluate_comb.py` and
+`evaluate_widener_plugin.py`.
+
 **pluginval --strictness-level 10**: SUCCESS on the rebuilt VST3, both before and after
 the disabled-aux-knob text-box fix above. (Unrelated, pre-existing: a `JUCE Assertion
 failure in juce_NormalisableRange.h:265` fires repeatedly during fuzzing -- confirmed by

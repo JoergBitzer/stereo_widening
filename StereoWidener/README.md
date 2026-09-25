@@ -10,7 +10,9 @@ for the architecture, the algorithm-switch crossfade, and the first two algorith
 [../docs/algorithms/phase4_settings.md](../docs/algorithms/phase4_settings.md) for the
 global settings file, and
 [../docs/algorithms/phase5_comb.md](../docs/algorithms/phase5_comb.md) for the third
-algorithm (comb pseudo-stereo) and the aux-knob rebinding mechanism it introduced.
+algorithm (comb pseudo-stereo) and the aux-knob rebinding mechanism it introduced, and
+[../docs/algorithms/phase5_allpass.md](../docs/algorithms/phase5_allpass.md) for the
+fourth algorithm (allpass decorrelation) and the "not mono-safe" badge it introduced.
 
 ## Build
 
@@ -62,11 +64,22 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     it's read from the global settings file, see below. See
     [phase5_comb.md](../docs/algorithms/phase5_comb.md) for the algorithm and its
     verification.
+  - *Allpass Decorrelation*: the mid signal is filtered through two different allpass
+    cascades and blended into each channel, decorrelating L/R without altering either
+    channel's own magnitude spectrum -- also creates real width from dual-mono input,
+    like Complementary Comb. The left knob sets **Amount** (0-100 %, defaults to 0 % --
+    an exact bypass), the right knob sets **Spread** (0-100 %, how far apart the two
+    cascades' frequencies sit). **Not mono-safe**: unlike every other algorithm here,
+    the mono sum (L+R) is coloured once Amount is above 0 -- StereoWidenerGUI shows a
+    warning below the algorithm selector when this algorithm is active; check your mix
+    in mono (Utilities -> Monitor -> Mono Check) before committing to a setting. See
+    [phase5_allpass.md](../docs/algorithms/phase5_allpass.md) for the algorithm and its
+    verification.
 
   Every parameter's default -- and so what double-clicking its knob resets it to -- is
   chosen to be as close to neutral/pass-through processing as possible for its
-  algorithm (Width 100 %, Rotation/Balance 0, Bass Cutoff/High Shelf/Comb Gain Off/0 %,
-  etc.). To start a session from your own preferred settings instead, save an `init`
+  algorithm (Width 100 %, Rotation/Balance 0, Bass Cutoff/High Shelf/Comb Gain/Allpass
+  Amount Off/0 %, etc.). To start a session from your own preferred settings instead, save an `init`
   preset (see `tools/PresetHandler.h`) rather than relying on the plugin to remember
   its last state.
 

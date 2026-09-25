@@ -1,0 +1,76 @@
+/**
+ * @file AllpassDecorrelation.h
+ * @brief Algorithm 2.5 (planing.md): allpass-cascade decorrelation.
+ *
+ * Two different allpass cascades (kNumStages 2nd-order allpass sections each, built
+ * with juce::dsp::IIR::Coefficients::makeAllPass -- same RBJ cookbook formula as the
+ * Python reference, python/algorithms/allpass_decorrelation.py, which has the full
+ * derivation) are applied to the mid signal M, giving two copies with M's exact
+ * magnitude spectrum but different phase:
+ *
+ *     Y1 = AP1(M), Y2 = AP2(M)
+ *     L' = L + Amount * (Y1 - M)
+ *     R' = R + Amount * (Y2 - M)
+ *     M' = (L' + R') / 2,  S' = Width * (L' - R') / 2
+ *     L'' = M' + S',  R'' = M' - S'
+ *
+ * Amount = 0 is an exact bypass. AP1's cascade frequencies are fixed (kBaseFreqsHz);
+ * AP2's are AP1's shifted up by Spread octaves -- Spread = 0 makes AP1 == AP2 (Y1 = Y2),
+ * which leaves S completely untouched (L'-R' algebraically reduces to L-R) but *does*
+ * still colour M (see the Python reference's module docstring for why -- summing a
+ * signal with a phase-shifted copy of itself is not magnitude-neutral even though each
+ * copy alone has an unchanged magnitude spectrum). Spread > 0 makes AP1 != AP2, adding
+ * genuine inter-channel decorrelation on top of that.
+ *
+ * Unlike algorithm 2.4's comb, this one is NOT mono-safe: because M itself changes
+ * (not just S, see above), L''+R'' generally does *not* equal L+R once Amount > 0 --
+ * planing.md's own stated con for this technique. isMonoSafe() reports false, and
+ * StereoWidenerGUI shows a "not mono-safe" badge + mono-check hint when this algorithm
+ * is selected (see StereoWidener.cpp).
+ *
+ * Two user-facing parameters (Amount, Spread) plus the shared Width knob, per the
+ * project's "2 + Width" control-minimisation convention (see ComplementaryComb.h).
+ * Amount defaults to 0 % (neutral/bypass, matching every other algorithm's neutral-
+ * default convention, see GlobalSettings.h); Spread has no "neutral" value of its own
+ * (inert when Amount = 0, same reasoning as ComplementaryComb's Delay default).
+ *
+ * Reference: general "decorrelation filter" technique, planing.md 2.5; J. S. Kendall,
+ * "The Decorrelation of Audio Signals and Its Impact on Spatial Imagery", Computer
+ * Music Journal, 1995.
+ *
+ * (c) J. Bitzer, Jade HS, MIT license
+ */
+
+#pragma once
+#include <array>
+#include <juce_dsp/juce_dsp.h>
+#include "StereoAlgorithm.h"
+
+class AllpassDecorrelation : public StereoAlgorithm
+{
+public:
+    void prepare(double sampleRate, int maxBlockSize) override;
+    void reset() override;
+    void process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept override;
+
+    const char* getName() const noexcept override { return "Allpass Decorrelation"; }
+    juce::String getDescription() const override;
+    AuxKnobInfo getAuxLeftInfo() const noexcept override { return { true, "Amount" }; }
+    AuxKnobInfo getAuxRightInfo() const noexcept override { return { true, "Spread" }; }
+    bool isMonoSafe() const noexcept override { return false; }
+    int getLatencySamples() const noexcept override { return 0; }
+
+    static constexpr int kNumStages = 4;
+    static constexpr float kFilterQ = 0.70710678f; // Butterworth, matches ComplementaryComb's crossover
+    static constexpr float kMaxSpreadOctaves = 2.0f;
+    static constexpr float kBaseFreqsHz[kNumStages] = { 200.0f, 700.0f, 2400.0f, 8000.0f };
+
+private:
+    void updateCascades(float spreadOctaves) noexcept;
+
+    double sampleRate = 48000.0;
+    float lastSpreadOctaves = -1.0f;
+
+    std::array<juce::dsp::IIR::Filter<float>, kNumStages> cascade1;
+    std::array<juce::dsp::IIR::Filter<float>, kNumStages> cascade2;
+};
