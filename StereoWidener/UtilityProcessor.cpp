@@ -18,6 +18,8 @@ void UtilityProcessor::process(juce::AudioBuffer<float>& buffer, const UtilityPa
     const float gainL = params.balance > 0.0f ? 1.0f - params.balance : 1.0f;
     const float gainR = params.balance < 0.0f ? 1.0f + params.balance : 1.0f;
 
+    const float outputGain = juce::Decibels::decibelsToGain(params.gainDb);
+
     for (int i = 0; i < numSamples; ++i)
     {
         float l = left[i];
@@ -52,6 +54,9 @@ void UtilityProcessor::process(juce::AudioBuffer<float>& buffer, const UtilityPa
             l = side;
             r = side;
         }
+
+        l *= outputGain;
+        r *= outputGain;
 
         left[i] = l;
         right[i] = r;

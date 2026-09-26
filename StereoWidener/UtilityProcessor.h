@@ -7,12 +7,14 @@
  *        (planing.md 2.2).
  *
  * Processing order: Rotation (the 2x2 image-plane matrix, 2.2) -> Balance (relative
- * L/R level) -> polarity Invert L/R -> Swap L/R -> Monitor mode. Monitor mode is
- * applied last, as an override for auditioning: it replaces L/R with either the mono
+ * L/R level) -> polarity Invert L/R -> Swap L/R -> Monitor mode -> output Gain trim.
+ * Monitor mode is an override for auditioning: it replaces L/R with either the mono
  * sum or the side signal, always reflecting everything upstream. This one control
  * covers two entries from planing.md 2.13 that are the same DSP operation viewed two
  * ways -- "Mono (sum)" and "mono check (listen to L+R)" -- plus "solo side (listen to
- * S)"; L/R swap and polarity invert are the other two entries there, verbatim.
+ * S)"; L/R swap and polarity invert are the other two entries there, verbatim. Gain
+ * is applied last of all, deliberately after Monitor mode, so it also trims whatever
+ * is currently being auditioned, the same way a final output fader would.
  *
  * Stateless (pure per-sample math, no filters or memory), so there is no need for
  * prepare()/reset() -- unlike the StereoAlgorithm classes in algorithms/, this always
@@ -35,6 +37,8 @@ struct UtilityParams
 
     enum MonitorMode { Normal = 0, MonoCheck = 1, SoloSide = 2 };
     int monitorMode = Normal;
+
+    float gainDb = 0.0f; // -24..+6, applied last (see the processing-order comment above)
 };
 
 class UtilityProcessor

@@ -348,6 +348,23 @@ const struct
 	const int numDecimalPlaces = 0;
 }g_paramBalance;
 
+// Output trim, applied last in UtilityProcessor (after Monitor mode, so it scales
+// whatever is currently being auditioned too -- see UtilityProcessor.h). stepSize
+// (not numDecimalPlaces) drives the actual knob/automation increment here -- 0.5 dB,
+// not a power of ten -- see makeFloatParameterWithStep() (StereoWidener.cpp).
+const struct
+{
+	const std::string ID = "outputGain";
+	const std::string name = "Gain";
+	const std::string unitName = "dB";
+	const float minValue = -24.0f;
+	const float maxValue = 6.0f;
+	const float defaultValue = 0.0f;
+	const float skew = 1.0f;
+	const int numDecimalPlaces = 1;
+	const float stepSize = 0.5f;
+}g_paramGain;
+
 const struct
 {
 	const std::string ID = "invertL";
@@ -438,6 +455,7 @@ private:
 
     juce::AudioParameterFloat* m_rotationParam = nullptr;
     juce::AudioParameterFloat* m_balanceParam = nullptr;
+    juce::AudioParameterFloat* m_gainParam = nullptr;
     juce::AudioParameterBool* m_invertLParam = nullptr;
     juce::AudioParameterBool* m_invertRParam = nullptr;
     juce::AudioParameterBool* m_swapLRParam = nullptr;
@@ -586,6 +604,10 @@ private:
     juce::Label m_balanceLabel;
     juce::Slider m_balanceKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow };
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> m_balanceAttachment;
+
+    juce::Label m_gainLabel;
+    juce::Slider m_gainKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> m_gainAttachment;
 
     // Caption above the toggle buttons -- previously the buttons' own text ("Swap",
     // "Inv L", "Inv R") was their only description; this names the group, matching the
