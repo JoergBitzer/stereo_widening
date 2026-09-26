@@ -135,3 +135,52 @@ Two more explicit requests:
 - `StereoWidener/StereoWidener.cpp`: `resized()` reserves the divider gap between the
   two panels; `paint()`'s panel colour now picks a brightness-adaptive direction.
 - `StereoWidener/CMakeLists.txt`: version bumped 0.1.12 -> 0.1.13.
+
+## Crash fix (v0.1.14): out-of-range log-frequency values crashing pluginval
+
+Found while verifying the v0.1.13 work above, not requested, but a real,
+pre-existing bug: `pluginval --strictness-level 10` intermittently crashed (exit 139,
+"Segmentation fault") during "Editor Automation", roughly 1 run in 6-8, and every run
+(even successful ones) printed dozens of "JUCE Assertion failure in
+juce_NormalisableRange.h:265" warnings -- present since the log-frequency knobs were
+introduced (Phase 5), just never chased down until it happened to be fatal under a
+debugger during this round's testing.
+
+- Root cause: `makeLogFrequencyParameter()`/`makeLogFrequencyParameterWithOff()`
+  (StereoWidener.cpp) gave their `NormalisableRange<float>` a custom
+  `snapToLegalValue` lambda that only rounded to the nearest whole Hz
+  (`std::round(value)`) and never clamped into `[rangeStart, rangeEnd]`, unlike
+  JUCE's own default implementation. Any out-of-range raw value reaching that lambda
+  (e.g. a `Slider`'s stale pre-attachment value, such as 10, being formatted against a
+  `[40, 400]` Hz parameter) sailed through unclamped into the log `convertTo0To1`
+  formula (`log(value/rangeStart)/log(rangeEnd/rangeStart)`), producing a result
+  outside `[0, 1]` and tripping `NormalisableRange::clampTo0To1`'s assertion --
+  benign as a logged warning without a debugger attached, but a fatal, uncaught
+  `SIGTRAP` under one (which is how pluginval's automation testing found it).
+- Confirmed via `gdb`-loop reproduction (12/12 attempts crashed identically before
+  the fix, at `clampTo0To1` called from `Slider::Pimpl::updateRange()`'s unconditional
+  final `updateText()`, formatting the slider's still-stale raw value through the
+  parameter's own `convertTo0to1` -- installed as the slider's `textFromValueFunction`
+  by `SliderParameterAttachment`'s constructor, bypassing the slider's own
+  (also-buggy) clamp entirely).
+- Fix: both lambdas now clamp before rounding --
+  `std::round(juce::jlimit(rangeStart, rangeEnd, value))`. Also pre-sync
+  `bindAuxKnob()`/`bindMultiKnob()`'s knob to the parameter's real value before
+  constructing the `SliderAttachment` (defensive; the clamp fix above is the actual
+  root-cause fix). Verified with 15/15 clean `gdb`-loop reproduction attempts
+  (previously 12/12 crashed) and multiple plain `pluginval` runs, all showing zero
+  assertion warnings (previously 20-40 per run) and `SUCCESS`.
+- A separate, unrelated, pre-existing crash was also observed during this
+  investigation: an intermittent `SIGSEGV` inside JUCE's own
+  `XEmbedComponent::Pimpl::handleX11Event` during editor teardown (X11/Linux
+  windowing only, no application code in the backtrace at all). Left as-is -- this
+  is a JUCE-internal Linux windowing race, out of scope for a plugin-side fix.
+
+### Files (crash fix)
+
+- `StereoWidener/StereoWidener.cpp`:
+  `makeLogFrequencyParameter()`/`makeLogFrequencyParameterWithOff()`'s
+  `snapToLegalValue` lambdas now clamp into range before rounding; `bindAuxKnob()`/
+  `bindMultiKnob()` also pre-sync the knob's raw value from the parameter before
+  constructing the `SliderAttachment`.
+- `StereoWidener/CMakeLists.txt`: version bumped 0.1.13 -> 0.1.14.

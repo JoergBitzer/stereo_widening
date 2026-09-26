@@ -453,6 +453,14 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      the card background being nearly invisible in Day mode (brightness-adaptive
      darken/brighten direction). See
      [phase6_gui_thirds.md](docs/algorithms/phase6_gui_thirds.md#follow-up-v0113-quarters-and-a-more-prominent-divider).
+   - ✅ Fixed a real, pre-existing intermittent pluginval crash (v0.1.14), found while
+     verifying the above, not requested: the log-frequency knobs' custom
+     `snapToLegalValue` lambda rounded to whole Hz but never clamped into range,
+     letting an out-of-range value reach `NormalisableRange::convertTo0to1`'s log
+     formula and trip a fatal assertion under a debugger; fixed by clamping before
+     rounding, confirmed with 15/15 clean `gdb`-loop reproduction attempts (previously
+     12/12 crashed). See
+     [phase6_gui_thirds.md](docs/algorithms/phase6_gui_thirds.md#crash-fix-v0114-out-of-range-log-frequency-values-crashing-pluginval).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.

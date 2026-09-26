@@ -252,9 +252,18 @@ namespace
             {
                 return std::log(value / rangeStart) / std::log(rangeEnd / rangeStart);
             },
-            [](float, float, float value) // snapToLegalValue: whole Hz steps
+            [](float rangeStart, float rangeEnd, float value) // snapToLegalValue: clamp, then whole Hz steps
             {
-                return std::round(value);
+                // Must clamp into [rangeStart, rangeEnd] here, not just round -- this is
+                // the ONLY thing standing between an out-of-domain value (e.g. a stale
+                // Slider value formatted before a SliderAttachment has synced the real
+                // one) and convertTo0To1's std::log(value/rangeStart) above, which is
+                // unconditional and produces a result outside [0,1] for any value
+                // outside the range, tripping NormalisableRange::clampTo0To1's
+                // assertion (fatal as SIGTRAP under a debugger, e.g. pluginval's
+                // "Editor Automation" test). JUCE's own default snapToLegalValue always
+                // clamps first; a custom one must do the same.
+                return std::round(juce::jlimit(rangeStart, rangeEnd, value));
             });
 
         auto attributes = juce::AudioParameterFloatAttributes()
@@ -288,9 +297,11 @@ namespace
             {
                 return std::log(value / rangeStart) / std::log(rangeEnd / rangeStart);
             },
-            [](float, float, float value) // snapToLegalValue: whole Hz steps
+            [](float rangeStart, float rangeEnd, float value) // snapToLegalValue: clamp, then whole Hz steps
             {
-                return std::round(value);
+                // See makeLogFrequencyParameterWithOff()'s identical lambda for why the
+                // clamp (not just the rounding) is essential.
+                return std::round(juce::jlimit(rangeStart, rangeEnd, value));
             });
 
         // Explicit whole-Hz formatting, same reason makeLogFrequencyParameterWithOff
@@ -635,6 +646,15 @@ void StereoWidenerGUI::bindAuxKnob(juce::Slider& knob, std::unique_ptr<SliderAtt
         knob.setTextValueSuffix(" %");
     }
 
+    // Pre-sync the knob's own raw value to the parameter's current one before
+    // constructing the attachment -- see bindMultiKnob()'s own comment on why:
+    // SliderAttachment's constructor formats the slider's CURRENT (possibly stale,
+    // e.g. still 0.0 from an earlier detached state) value for display before it
+    // syncs the real one, and g_paramBassCutoff/g_paramHighShelfFreq's true-log range
+    // (makeLogFrequencyParameterWithOff() above) computes log(0) = -inf for that,
+    // same underlying bug as the multiband crossover knobs.
+    if (auto* param = dynamic_cast<juce::AudioParameterFloat*>(m_apvts.getParameter(paramId)))
+        knob.setValue(param->get(), juce::dontSendNotification);
     attachment = std::make_unique<SliderAttachment>(m_apvts, paramId, knob);
 }
 
@@ -659,6 +679,24 @@ void StereoWidenerGUI::bindMultiKnob(int index, const juce::String& paramId)
                            || paramId == juce::String(g_paramMultibandFreq3.ID);
     if (!isFrequency)
         knob.setTextValueSuffix(" %");
+
+    // Pre-sync the knob's own raw value to the parameter's current one BEFORE
+    // constructing the attachment below: SliderAttachment's constructor calls
+    // Slider::setNormalisableRange() first, which immediately formats the slider's
+    // CURRENT value for display (Slider::Pimpl::updateRange() -> updateText()) --
+    // before its own later step syncs that value from the parameter. For an
+    // untouched/freshly-unbound knob (raw value still 0.0) rebinding to one of the
+    // three crossover-frequency parameters, whose NormalisableRange does a literal
+    // std::log(value/rangeStart) (makeLogFrequencyParameter() above), formatting
+    // value=0 computes log(0) = -inf, which fails a JUCE assertion in
+    // NormalisableRange::clampTo0To1 -- benign (if left running) without a debugger
+    // attached, but fatal (SIGTRAP, uncaught without one) under one, found via
+    // pluginval's "Editor Automation" test randomly automating the algorithm selector
+    // to Multiband Width under gdb. Fixed generally (not just for the frequency
+    // knobs), since any parameter's range could in principle be sensitive to its
+    // slider's stale/default value the same way.
+    if (auto* param = dynamic_cast<juce::AudioParameterFloat*>(m_apvts.getParameter(paramId)))
+        knob.setValue(param->get(), juce::dontSendNotification);
     attachment = std::make_unique<SliderAttachment>(m_apvts, paramId, knob);
 }
 
