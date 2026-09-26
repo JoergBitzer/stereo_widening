@@ -48,9 +48,19 @@ const float g_wheelstokeyboardratio(0.1f);
 // what the same meters look like in StereoAnalyzer, since the widener also needs room
 // below for the width knob and the algorithm selector.
 const int g_meterRowHeight(260);          // height of the input/goniometer/output row
-const int g_levelMeterWidth(115);         // fixed width for each side level meter (~60% of
-                                           // StereoAnalyzer's g_levelMeterMaxWidth = 190)
+// Width of each side level meter: quarters (input | goniometer x2 | output), per
+// explicit request that the level meters were "a little too big" relative to the
+// goniometer -- g_minGuiSize_x/4 = 120 at the default window width. Deliberately its
+// own constant, NOT shared with g_rightBlockWidth below (an earlier version reused
+// this same constant for both, coupling the meter row's proportions to the panel
+// row's; kept independent now, since the two rows were asked to use different
+// fractions -- quarters here, thirds below).
+const int g_levelMeterWidth(120);
 const int g_levelMeterPadding(2);
+// Goniometer's own horizontal breathing room from the level meters either side (its
+// vertical padding uses g_levelMeterPadding instead, see resized() -- must match the
+// level meters' own so all three panels come out exactly the same height, not "a
+// little smaller" for the goniometer).
 const int g_goniometerPadding(4);
 const juce::Colour g_goniometerInColour(juce::Colours::limegreen);  // input series
 const juce::Colour g_goniometerOutColour(juce::Colours::deepskyblue); // output series
@@ -61,43 +71,66 @@ const int g_footerHeight(14);
 
 const int g_rowGap(8);                    // vertical gap between the three stacked rows
 
-// Below the meter row sit three columns, left-edge-aligned with the input meter and
-// right-edge-aligned with the output meter respectively (StereoWidenerGUI::resized()):
-// left = the two aux knobs stacked vertically, middle = Width + the algorithm selector
-// + the mono-safe badge, right = Utilities. All three are top-anchored and vertically
-// centred within the tallest column's own height (currently the middle one).
+// GUI redesign ("divide the parameter part into thirds"): below the meter row sits
+// the algorithm-selector row, then two boxed "card" panels side by side -- left
+// two-thirds: the active algorithm's own parameters (aux knobs + Width [+ the
+// multiband grid, when active]); right third: Utilities. g_rightBlockWidth (not
+// g_levelMeterWidth -- the two rows use different fractions, quarters vs. thirds, see
+// g_levelMeterWidth's own comment) is the shared right-column width for both this row
+// and the algorithm-selector row above it. 165, not the mathematically exact
+// g_minGuiSize_x/3 = 160, for a few pixels of headroom for the Utilities panel's own
+// content (its widest row, the three Flip toggle buttons, needs ~144 px plus the
+// panel's own padding).
+const int g_rightBlockWidth(165);
+// Both panels are drawn with a slightly brighter background than the plugin's own
+// (StereoWidenerGUI::paint()), the same relative brightening in both themes.
+const int g_panelPadding(10);              // inset between a panel's card background and its content
+const int g_panelCornerSize(8);            // rounded-rect corner radius for the card backgrounds
+// Explicit gap between the two panels' card backgrounds, in the plain (unbrightened)
+// background colour -- a visible thin "dividing line", per explicit request, rather
+// than relying on the two rounded rects' corners happening to leave a sliver of
+// background showing near the top/bottom (they are otherwise flush against each
+// other along their straight edges, with no gap at all).
+const int g_panelDividerWidth(6);
 
 const int g_widthKnobSize(110);           // diameter of the big Width rotary knob
 const int g_widthKnobLabelHeight(18);
 
-// Aux knobs (left column): stacked vertically now (Phase 5 GUI compaction moved the
-// second one here from the right of Width, to make room for Utilities below the output
-// meter) -- their meaning depends on the active algorithm, see StereoAlgorithm::
-// getAuxLeftInfo()/getAuxRightInfo().
+// Aux knobs: now flanking Width in one horizontal row (aux-left, Width, aux-right)
+// inside the parameter panel, not stacked in their own column any more -- their
+// meaning depends on the active algorithm, see StereoAlgorithm::getAuxLeftInfo()/
+// getAuxRightInfo().
 const int g_auxKnobSize(64);
 const int g_auxKnobLabelHeight(16);
-const int g_auxKnobVGap(10);              // vertical gap between the two stacked aux knobs
+const int g_paramKnobGap(20);              // horizontal gap between aux-left/Width/aux-right
 
+// Algorithm selector row: centred within the left two-thirds (g_rightBlockWidth),
+// below the meter row (only approximately below the input meter + goniometer
+// specifically now that the meter row uses quarters rather than thirds -- see
+// g_levelMeterWidth's own comment on why the two rows are no longer coupled). The "?"
+// help button sits to the right of the combo box now (used to be to its left) and is
+// exactly as tall as it, not a separately-sized small square any more -- see
+// resized() (both derive from g_algorithmRowHeight, so there is only one height
+// constant to keep in sync).
 const int g_algorithmRowHeight(30);
 const int g_algorithmBoxWidth(260);
-const int g_helpButtonSize(22);           // small square "?" button, left of the algorithm box
 const int g_helpButtonGap(6);
 const int g_algorithmHelpPanelWidth(340);
 
-// "Not mono-safe" badge (Phase 5 step 4), directly below the algorithm selector row --
-// visible only when the active algorithm's isMonoSafe() is false (first needed by
-// algorithm 2.5, AllpassDecorrelation). Always reserved in the layout (empty text when
-// not shown) so switching algorithms never shifts anything below it.
+// "Not mono-safe" badge (Phase 5 step 4), inside the parameter panel, below the
+// aux/Width knob row -- visible only when the active algorithm's isMonoSafe() is
+// false (first needed by algorithm 2.5, AllpassDecorrelation). Always reserved in the
+// layout (empty text when not shown) so switching algorithms never shifts anything
+// below it or changes the parameter panel's own height.
 const int g_monoSafeBadgeHeight(18);
 
-// Utilities (Phase 4 step 2: planing.md 2.13 + 2.2; moved into its own column below the
-// output meter in Phase 5's GUI compaction, since every utility acts on the final
-// output signal -- see UtilityProcessor.h). Rotation/Balance knobs on top, then a
-// caption, the three toggle buttons, another caption, then the Monitor selector --
-// every widget in this column shares g_utilColumnWidth, so the Monitor box and the two
-// toggle/knob rows are all centred within (and the Monitor box exactly fills) the same
-// width.
-const int g_utilColumnWidth(150);
+// Utilities (Phase 4 step 2: planing.md 2.13 + 2.2; its own boxed panel, the right
+// third, since every utility acts on the final output signal regardless of the
+// selected algorithm -- see UtilityProcessor.h). Rotation/Balance knobs on top, then
+// a caption, the three toggle buttons, another caption, then the Monitor selector --
+// every widget in this column shares the same content width (the panel's own width
+// minus 2*g_panelPadding), so the Monitor box and the two toggle/knob rows are all
+// centred within (and the Monitor box exactly fills) the same width.
 const int g_utilKnobSize(48);
 const int g_utilKnobLabelHeight(14);
 const int g_utilKnobGap(12);              // horizontal gap between Rotation and Balance knobs
@@ -107,13 +140,14 @@ const int g_utilToggleWidth(44);          // Swap / Inv L / Inv R buttons
 const int g_utilToggleGap(6);
 const int g_utilMonitorBoxHeight(22);
 
-// Multiband width's dedicated parameter grid (Phase 5 algorithm 2.7): a full-width row
-// below the usual three columns, shown -- and given space, growing the whole window,
-// see StereoWidenerGUI::getRequiredContentHeight()/PluginEditor.cpp -- only when the
-// active algorithm's getNumMultiParams() > 0 (currently just Multiband Width; its 6
-// parameters don't fit the usual two-aux-knob pattern, see StereoAlgorithm.h's
-// StereoAlgorithmParams::multi). Laid out g_multiGridCols-wide, as many rows as needed
-// (Multiband Width's 6 params need exactly 2 rows of 3: crossovers, then widths).
+// Multiband width's dedicated parameter grid (Phase 5 algorithm 2.7): sits inside the
+// parameter panel, below the aux/Width knob row and mono-safe badge, growing that
+// panel's own height (and so the whole window's, see StereoWidenerGUI::
+// getRequiredContentHeight()/PluginEditor.cpp) only when the active algorithm's
+// getNumMultiParams() > 0 (currently just Multiband Width; its 6 parameters don't fit
+// the usual two-aux-knob pattern, see StereoAlgorithm.h's StereoAlgorithmParams::
+// multi). Laid out g_multiGridCols-wide, as many rows as needed (Multiband Width's 6
+// params need exactly 2 rows of 3: crossovers, then widths).
 const int g_multiGridCols(3);
 const int g_multiKnobSize(48);
 const int g_multiKnobTextBoxWidth(60);    // wider than the knob itself: fits "6000 Hz" without truncating

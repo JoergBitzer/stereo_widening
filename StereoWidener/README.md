@@ -127,15 +127,16 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
   preset (see `tools/PresetHandler.h`) rather than relying on the plugin to remember
   its last state.
 
-  Note: the two knobs are stacked to the left of Width (not flanking it any more,
-  since [phase5_gui_compaction.md](../docs/algorithms/phase5_gui_compaction.md)) and
-  are shared widgets -- which parameter they actually control, their range, and their
-  unit all change with the selected algorithm (rebound automatically on switch); they
-  are not per-algorithm knobs.
-- **Utilities** (stacked below the Output level meter, since every one of them acts on
-  the final output signal regardless of which algorithm is selected -- see
-  [phase4_settings.md](../docs/algorithms/phase4_settings.md) for what each one does
-  and [phase5_gui_compaction.md](../docs/algorithms/phase5_gui_compaction.md) for the
+  Note: the two knobs flank Width in one row, below the algorithm selector, inside a
+  boxed "parameter" card (left two-thirds of the window -- see
+  [phase6_gui_thirds.md](../docs/algorithms/phase6_gui_thirds.md) for the current
+  layout) -- and are shared widgets: which parameter they actually control, their
+  range, and their unit all change with the selected algorithm (rebound automatically
+  on switch); they are not per-algorithm knobs.
+- **Utilities** (its own boxed card, the right third of the window, since every one of
+  them acts on the final output signal regardless of which algorithm is selected --
+  see [phase4_settings.md](../docs/algorithms/phase4_settings.md) for what each one
+  does and [phase6_gui_thirds.md](../docs/algorithms/phase6_gui_thirds.md) for the
   layout):
   - **Rotation**: -45..+45 degrees, the stereo image's rotation in the L/R plane.
   - **Balance**: -100..+100 %. Positive attenuates L (image moves right), negative

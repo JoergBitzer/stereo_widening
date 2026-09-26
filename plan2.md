@@ -433,6 +433,26 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      static-initialisation-order hazard; changed to `static constexpr const char*`,
      confirmed with five consecutive clean pluginval runs afterward. See
      [phase6_daynight_theme.md](docs/algorithms/phase6_daynight_theme.md).
+   - ✅ Three-column GUI redesign ("divide the parameter part into thirds", v0.1.12), per
+     explicit request: fixed the goniometer coming out 4 px shorter than the level
+     meters either side (different `.reduced()` padding values, purely accidental);
+     widened `g_levelMeterWidth` (115 -> 165) so it doubles as the shared right-column
+     width for every row (meter row, algorithm selector, and the two boxed panels
+     below), making "directly below the input and goniometer display" exact rather
+     than approximate; moved the algorithm selector to its own row, centred in the
+     left two-thirds, "?" help button now to its right and exactly as tall as it;
+     consolidated the aux-left/Width/aux-right knobs into one row inside a boxed
+     "parameter" card (left two-thirds, matching the Utilities card's own new
+     treatment on the right third), both drawn with a slightly brighter background in
+     `StereoWidenerGUI::paint()`. See
+     [phase6_gui_thirds.md](docs/algorithms/phase6_gui_thirds.md).
+   - ✅ Quarters + more prominent divider (v0.1.13), per explicit request: meter row
+     switched from thirds to quarters (input 1/4, goniometer 2/4, output 1/4),
+     decoupled from the panel row's own thirds width via a separate constant; added an
+     explicit `g_panelDividerWidth` gap between the parameter/Utilities cards; fixed
+     the card background being nearly invisible in Day mode (brightness-adaptive
+     darken/brighten direction). See
+     [phase6_gui_thirds.md](docs/algorithms/phase6_gui_thirds.md#follow-up-v0113-quarters-and-a-more-prominent-divider).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.

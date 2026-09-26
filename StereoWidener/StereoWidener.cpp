@@ -745,29 +745,32 @@ int StereoWidenerGUI::getRequiredContentHeight() const noexcept
 {
     // Mirrors resized()'s own layout math at scale = 1.0 -- see the constants there
     // (PluginSettings.h) for what each term is.
-    const int auxUnitHeight = g_auxKnobLabelHeight + g_auxKnobSize + g_auxKnobLabelHeight;
-    const int leftColumnHeight = 2 * auxUnitHeight + g_auxKnobVGap;
+    const int knobRowHeight = g_widthKnobLabelHeight + g_widthKnobSize + g_widthKnobLabelHeight; // Width is the tallest of the three knobs in this row
+    const int paramBaseContentHeight = knobRowHeight + g_rowGap + g_monoSafeBadgeHeight;
 
-    const int middleColumnHeight = (g_widthKnobLabelHeight + g_widthKnobSize + g_widthKnobLabelHeight)
-                                  + g_rowGap + g_algorithmRowHeight + g_rowGap + g_monoSafeBadgeHeight;
-
-    const int rightColumnHeight = (g_utilKnobLabelHeight + g_utilKnobSize + g_utilKnobLabelHeight) + g_rowGap
+    const int utilContentHeight = (g_utilKnobLabelHeight + g_utilKnobSize + g_utilKnobLabelHeight) + g_rowGap
                                  + g_utilCaptionHeight + g_rowGap + g_utilToggleRowHeight + g_rowGap
                                  + g_utilCaptionHeight + g_rowGap + g_utilMonitorBoxHeight;
 
-    const int controlsHeight = juce::jmax(leftColumnHeight, juce::jmax(middleColumnHeight, rightColumnHeight));
+    // Both boxed panels share this height in the common case (like the three meter-row
+    // panels above, a matched pair of cards) -- the parameter panel grows further on
+    // its own below, only when the multiband grid is active.
+    const int baseContentHeight = juce::jmax(paramBaseContentHeight, utilContentHeight);
 
+    int paramContentHeight = baseContentHeight;
     const int index = juce::jlimit(0, m_processor.m_algo.getNumAlgorithms() - 1, m_algorithmBox.getSelectedItemIndex());
     const int numMultiParams = m_processor.m_algo.getAlgorithm(index).getNumMultiParams();
-    int multiGridHeight = 0;
     if (numMultiParams > 0)
     {
         const int rows = (numMultiParams + g_multiGridCols - 1) / g_multiGridCols;
         const int knobUnitHeight = g_multiKnobLabelHeight + g_multiKnobSize + g_multiKnobLabelHeight;
-        multiGridHeight = g_rowGap + rows * knobUnitHeight + (rows - 1) * g_multiKnobRowGap;
+        const int multiGridHeight = rows * knobUnitHeight + (rows - 1) * g_multiKnobRowGap;
+        paramContentHeight += g_rowGap + multiGridHeight;
     }
 
-    return g_meterRowHeight + g_rowGap + controlsHeight + multiGridHeight + g_rowGap + g_footerHeight;
+    const int panelsHeight = paramContentHeight + 2 * g_panelPadding; // always >= util panel's own height, see above
+
+    return g_meterRowHeight + g_rowGap + g_algorithmRowHeight + g_rowGap + panelsHeight + g_rowGap + g_footerHeight;
 }
 
 void StereoWidenerGUI::paint(juce::Graphics &g)
@@ -777,7 +780,26 @@ void StereoWidenerGUI::paint(juce::Graphics &g)
     // deliberately per mode, including a Night background darkened specifically so it
     // reads as one continuous surface with the (always-black) meter panels rather
     // than two visibly different shades -- see PluginLookAndFeel.h/.cpp.
-    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
+    const auto background = getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId);
+    g.fillAll(background);
+
+    // The parameter panel (left two-thirds) and Utilities panel (right third): a
+    // "card" background behind each, drawn here (so it sits behind every child
+    // component, painted afterwards in the usual z-order) at the bounds resized()
+    // computed. Direction (brighter vs. darker) follows the background's own
+    // perceived brightness rather than always brightening: Day's background is
+    // already close to white (~0.95), so "brighter" has almost no headroom left --
+    // tried first, and found (via the offline GUI render, not assumed) to make the
+    // panels -- and so the new divider line between them, below -- nearly invisible
+    // in Day mode specifically, while working fine in Night mode's near-black
+    // background. Darkening a light background (or brightening a dark one) always has
+    // real headroom to work with, so this stays visibly a "card" in either theme.
+    const bool backgroundIsLight = background.getPerceivedBrightness() > 0.5f;
+    const juce::Colour panelColour = backgroundIsLight ? background.darker(0.06f) : background.brighter(0.08f);
+    g.setColour(panelColour);
+    const float corner = (float) juce::roundToInt(g_panelCornerSize * m_processor.getScaleFactor());
+    g.fillRoundedRectangle(m_paramPanelBounds.toFloat(), corner);
+    g.fillRoundedRectangle(m_utilPanelBounds.toFloat(), corner);
 }
 
 void StereoWidenerGUI::resized()
@@ -797,33 +819,61 @@ void StereoWidenerGUI::resized()
     r.removeFromBottom(rowGap);
 
     // top row: input level meter | goniometer (in/out overlaid) | output level meter,
-    // all sized to ~60% of their StereoAnalyzer equivalents (see PluginSettings.h)
+    // all exactly the same height (goniometer's own vertical padding matches the level
+    // meters' horizontal one, so it is no longer "a little smaller" than them).
     auto meterRow = r.removeFromTop(juce::roundToInt(g_meterRowHeight * scale));
     r.removeFromTop(rowGap);
 
     const int levelWidth = juce::roundToInt(g_levelMeterWidth * scale);
-    m_levelMeterIn.setBounds(meterRow.removeFromLeft(levelWidth).reduced(juce::roundToInt(g_levelMeterPadding * scale)));
-    m_levelMeterOut.setBounds(meterRow.removeFromRight(levelWidth).reduced(juce::roundToInt(g_levelMeterPadding * scale)));
-    m_goniometer.setBounds(meterRow.reduced(juce::roundToInt(g_goniometerPadding * scale)));
+    const int levelPadding = juce::roundToInt(g_levelMeterPadding * scale);
+    const int goniometerPaddingX = juce::roundToInt(g_goniometerPadding * scale);
+    m_levelMeterIn.setBounds(meterRow.removeFromLeft(levelWidth).reduced(levelPadding));
+    m_levelMeterOut.setBounds(meterRow.removeFromRight(levelWidth).reduced(levelPadding));
+    m_goniometer.setBounds(meterRow.reduced(goniometerPaddingX, levelPadding));
 
-    // Below the meter row: three columns, left/right-edge-aligned with the input/output
-    // meters above them (Phase 5 GUI compaction -- see PluginSettings.h for the
-    // rationale). Left: the two aux knobs stacked vertically (moved here from flanking
-    // Width, freeing the right side for Utilities). Middle: Width, the algorithm
-    // selector and the mono-safe badge. Right: Utilities, since every utility acts on
-    // the final output signal. All three are computed to their own natural height, then
-    // top-anchored and vertically centred within the tallest one's height.
+    // Shared left-two-thirds/right-third split used by both the algorithm-selector row
+    // and the two boxed panels below -- g_rightBlockWidth, NOT levelWidth: the meter
+    // row uses quarters (input | goniometer x2 | output) while this and everything
+    // below it uses thirds, so the two are deliberately independent constants now (see
+    // g_levelMeterWidth's own comment).
+    const int rightBlockWidth = juce::roundToInt(g_rightBlockWidth * scale);
+    const int leftBlockWidth = getWidth() - rightBlockWidth;
+
+    // Algorithm selector row: centred within the left two-thirds. "?" help button to
+    // the right of the combo box (used to be to its left), exactly as tall as it (both
+    // derive from algoRowHeight, so there is nothing to keep in sync by hand).
+    const int algoRowHeight = juce::roundToInt(g_algorithmRowHeight * scale);
+    const int helpGap = juce::roundToInt(g_helpButtonGap * scale);
+    auto algoRow = r.removeFromTop(algoRowHeight);
+    r.removeFromTop(rowGap);
+
+    auto algoBlock = algoRow.removeFromLeft(leftBlockWidth);
+    const int boxWidth = juce::jmin(juce::roundToInt(g_algorithmBoxWidth * scale),
+                                     algoBlock.getWidth() - algoRowHeight - helpGap);
+    auto algoGroup = algoBlock.withSizeKeepingCentre(boxWidth + helpGap + algoRowHeight, algoRowHeight);
+    m_algorithmBox.setBounds(algoGroup.removeFromLeft(boxWidth));
+    algoGroup.removeFromLeft(helpGap);
+    m_helpButton.setBounds(algoGroup); // whatever's left = exactly algoRowHeight square
+
+    // Two boxed "card" panels side by side (drawn in paint(), from m_paramPanelBounds/
+    // m_utilPanelBounds set below): left two-thirds = the active algorithm's own
+    // parameters (aux knobs + Width [+ the multiband grid, when active]); right third
+    // = Utilities. An explicit g_panelDividerWidth gap is removed between the two
+    // outer (card-background) rectangles -- a visible thin line in the plain
+    // (unbrightened) background colour, per explicit request, rather than leaving them
+    // flush against each other (each panel's own g_panelPadding is a separate, inner
+    // inset between its background and its own content, not a gap between the panels).
+    const int panelPadding = juce::roundToInt(g_panelPadding * scale);
+    const int panelDividerWidth = juce::roundToInt(g_panelDividerWidth * scale);
+
     const int knobSize = juce::roundToInt(g_widthKnobSize * scale);
     const int labelHeight = juce::roundToInt(g_widthKnobLabelHeight * scale);
     const int textBoxHeight = labelHeight;
     const int auxKnobSize = juce::roundToInt(g_auxKnobSize * scale);
     const int auxLabelHeight = juce::roundToInt(g_auxKnobLabelHeight * scale);
-    const int auxVGap = juce::roundToInt(g_auxKnobVGap * scale);
-    const int helpSize = juce::roundToInt(g_helpButtonSize * scale);
-    const int helpGap = juce::roundToInt(g_helpButtonGap * scale);
-    const int algoRowHeight = juce::roundToInt(g_algorithmRowHeight * scale);
+    const int paramKnobGap = juce::roundToInt(g_paramKnobGap * scale);
     const int badgeHeight = juce::roundToInt(g_monoSafeBadgeHeight * scale);
-    const int utilColumnWidth = juce::roundToInt(g_utilColumnWidth * scale);
+
     const int utilKnobSize = juce::roundToInt(g_utilKnobSize * scale);
     const int utilLabelHeight = juce::roundToInt(g_utilKnobLabelHeight * scale);
     const int utilKnobGap = juce::roundToInt(g_utilKnobGap * scale);
@@ -833,117 +883,87 @@ void StereoWidenerGUI::resized()
     const int utilToggleGap = juce::roundToInt(g_utilToggleGap * scale);
     const int utilMonitorBoxHeight = juce::roundToInt(g_utilMonitorBoxHeight * scale);
 
-    const int auxUnitHeight = auxLabelHeight + auxKnobSize + auxLabelHeight; // label + (knob+textbox)
-    const int leftColumnHeight = 2 * auxUnitHeight + auxVGap;
-
-    const int middleColumnHeight = (labelHeight + knobSize + textBoxHeight) + rowGap + algoRowHeight + rowGap + badgeHeight;
-
-    const int rightColumnHeight = (utilLabelHeight + utilKnobSize + utilLabelHeight) + rowGap
+    const int knobRowHeight = labelHeight + knobSize + textBoxHeight; // Width is the tallest of the three knobs in this row
+    const int paramBaseContentHeight = knobRowHeight + rowGap + badgeHeight;
+    const int utilContentHeight = (utilLabelHeight + utilKnobSize + utilLabelHeight) + rowGap
                                  + utilCaptionHeight + rowGap + utilToggleRowHeight + rowGap
                                  + utilCaptionHeight + rowGap + utilMonitorBoxHeight;
+    const int baseContentHeight = juce::jmax(paramBaseContentHeight, utilContentHeight);
 
-    auto controlsRow = r.removeFromTop(juce::jmax(leftColumnHeight, middleColumnHeight, rightColumnHeight));
-
-    auto leftColumn = controlsRow.removeFromLeft(auxKnobSize);
-    auto rightColumn = controlsRow.removeFromRight(utilColumnWidth);
-    auto middleColumn = controlsRow; // remaining width
-
-    // Left column: the two aux knobs stacked (their meaning depends on the active
-    // algorithm, see updateAuxKnobsForActiveAlgorithm()).
-    auto leftStack = leftColumn.withSizeKeepingCentre(auxKnobSize, leftColumnHeight);
-    m_auxLeftKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, auxKnobSize, auxLabelHeight);
-    m_auxLeftLabel.setBounds(leftStack.removeFromTop(auxLabelHeight));
-    m_auxLeftKnob.setBounds(leftStack.removeFromTop(auxKnobSize + auxLabelHeight));
-    leftStack.removeFromTop(auxVGap);
-    m_auxRightKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, auxKnobSize, auxLabelHeight);
-    m_auxRightLabel.setBounds(leftStack.removeFromTop(auxLabelHeight));
-    m_auxRightKnob.setBounds(leftStack.removeFromTop(auxKnobSize + auxLabelHeight));
-
-    // Middle column: Width, then the "?" help button + algorithm selector, then the
-    // mono-safe badge, each individually centred within the column's own width.
-    auto middleStack = middleColumn.withSizeKeepingCentre(middleColumn.getWidth(), middleColumnHeight);
-
-    m_widthKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobSize, textBoxHeight);
-    auto widthArea = middleStack.removeFromTop(labelHeight + knobSize + textBoxHeight)
-                                 .withSizeKeepingCentre(knobSize, labelHeight + knobSize + textBoxHeight);
-    m_widthLabel.setBounds(widthArea.removeFromTop(labelHeight));
-    m_widthKnob.setBounds(widthArea);
-    middleStack.removeFromTop(rowGap);
-
-    auto algoRow = middleStack.removeFromTop(algoRowHeight);
-    const int boxWidth = juce::jmin(juce::roundToInt(g_algorithmBoxWidth * scale),
-                                     algoRow.getWidth() - helpSize - helpGap);
-    auto algoGroup = algoRow.withSizeKeepingCentre(helpSize + helpGap + boxWidth, algoRow.getHeight());
-    m_helpButton.setBounds(algoGroup.removeFromLeft(helpSize).withSizeKeepingCentre(helpSize, helpSize));
-    algoGroup.removeFromLeft(helpGap);
-    m_algorithmBox.setBounds(algoGroup);
-    middleStack.removeFromTop(rowGap);
-
-    // "Not mono-safe" badge (Phase 5 step 4): always reserved (empty text when the
-    // active algorithm is mono-safe).
-    m_monoSafeBadge.setBounds(middleStack.removeFromTop(badgeHeight));
-
-    // Right column: Utilities (Phase 4 step 2, moved here in Phase 5's GUI compaction
-    // since every utility acts on the final output signal, see UtilityProcessor.h) --
-    // Rotation/Balance knobs, a caption, the toggle buttons, another caption, then the
-    // Monitor selector, sharing g_utilColumnWidth throughout.
-    auto rightStack = rightColumn.withSizeKeepingCentre(utilColumnWidth, rightColumnHeight);
-
-    auto utilKnobRow = rightStack.removeFromTop(utilLabelHeight + utilKnobSize + utilLabelHeight);
-    auto utilKnobsCentred = utilKnobRow.withSizeKeepingCentre(2 * utilKnobSize + utilKnobGap, utilKnobRow.getHeight());
-    auto rotationArea = utilKnobsCentred.removeFromLeft(utilKnobSize);
-    utilKnobsCentred.removeFromLeft(utilKnobGap);
-    auto balanceArea = utilKnobsCentred;
-
-    m_rotationKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
-    m_rotationLabel.setBounds(rotationArea.removeFromTop(utilLabelHeight));
-    m_rotationKnob.setBounds(rotationArea);
-
-    m_balanceKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
-    m_balanceLabel.setBounds(balanceArea.removeFromTop(utilLabelHeight));
-    m_balanceKnob.setBounds(balanceArea);
-    rightStack.removeFromTop(rowGap);
-
-    m_toggleCaption.setBounds(rightStack.removeFromTop(utilCaptionHeight));
-    rightStack.removeFromTop(rowGap);
-
-    auto toggleRow = rightStack.removeFromTop(utilToggleRowHeight);
-    auto toggleGroup = toggleRow.withSizeKeepingCentre(3 * utilToggleWidth + 2 * utilToggleGap, toggleRow.getHeight());
-    m_swapLRButton.setBounds(toggleGroup.removeFromLeft(utilToggleWidth));
-    toggleGroup.removeFromLeft(utilToggleGap);
-    m_invertLButton.setBounds(toggleGroup.removeFromLeft(utilToggleWidth));
-    toggleGroup.removeFromLeft(utilToggleGap);
-    m_invertRButton.setBounds(toggleGroup.removeFromLeft(utilToggleWidth));
-    rightStack.removeFromTop(rowGap);
-
-    m_monitorLabel.setBounds(rightStack.removeFromTop(utilCaptionHeight));
-    rightStack.removeFromTop(rowGap);
-    m_monitorModeBox.setBounds(rightStack.removeFromTop(utilMonitorBoxHeight));
-
-    // Multiband width's dedicated parameter grid (Phase 5 algorithm 2.7): a full-width
-    // row below the usual three columns, only occupying space when the active
-    // algorithm needs it -- see getRequiredContentHeight()/PluginEditor.cpp for how the
-    // window itself grows to fit this.
     const int activeIndex = juce::jlimit(0, m_processor.m_algo.getNumAlgorithms() - 1, m_algorithmBox.getSelectedItemIndex());
     const int numMultiParams = m_processor.m_algo.getAlgorithm(activeIndex).getNumMultiParams();
+    const int multiKnobSize = juce::roundToInt(g_multiKnobSize * scale);
+    const int multiTextBoxWidth = juce::roundToInt(g_multiKnobTextBoxWidth * scale); // wider than the knob, fits "6000 Hz"
+    const int multiLabelHeight = juce::roundToInt(g_multiKnobLabelHeight * scale);
+    const int multiColGap = juce::roundToInt(g_multiKnobColGap * scale);
+    const int multiRowGap = juce::roundToInt(g_multiKnobRowGap * scale);
+    const int multiKnobUnitHeight = multiLabelHeight + multiKnobSize + multiLabelHeight;
+    const int multiRows = numMultiParams > 0 ? (numMultiParams + g_multiGridCols - 1) / g_multiGridCols : 0;
+    const int multiGridHeight = multiRows > 0 ? multiRows * multiKnobUnitHeight + (multiRows - 1) * multiRowGap : 0;
+
+    // The parameter panel grows past the shared base height on its own, only when the
+    // multiband grid is active -- the Utilities panel always stays at baseContentHeight
+    // (see getRequiredContentHeight()'s matching comment).
+    const int paramContentHeight = baseContentHeight + (numMultiParams > 0 ? rowGap + multiGridHeight : 0);
+
+    auto panelsRow = r.removeFromTop(paramContentHeight + 2 * panelPadding); // always >= the util panel's own height
+    auto paramOuter = panelsRow.removeFromLeft(leftBlockWidth - panelDividerWidth);
+    panelsRow.removeFromLeft(panelDividerWidth); // the visible dividing line -- see above
+    auto utilOuter = panelsRow; // remainder = rightBlockWidth
+
+    m_paramPanelBounds = paramOuter.withHeight(paramContentHeight + 2 * panelPadding);
+    m_utilPanelBounds = utilOuter.withHeight(baseContentHeight + 2 * panelPadding); // both top-anchored to the same Y, independent heights
+
+    auto paramArea = m_paramPanelBounds.reduced(panelPadding);
+    auto utilArea = m_utilPanelBounds.reduced(panelPadding);
+
+    // Parameter panel: aux-left / Width / aux-right in one row (their meaning depends
+    // on the active algorithm, see updateAuxKnobsForActiveAlgorithm()), each column
+    // vertically centred on its own (smaller, for the aux knobs) natural height within
+    // the row -- Width is the tallest of the three and so sets the row's own height.
+    auto knobRow = paramArea.removeFromTop(knobRowHeight);
+    auto knobRowCentred = knobRow.withSizeKeepingCentre(2 * auxKnobSize + knobSize + 2 * paramKnobGap, knobRow.getHeight());
+
+    auto auxLeftColumn = knobRowCentred.removeFromLeft(auxKnobSize);
+    knobRowCentred.removeFromLeft(paramKnobGap);
+    auto widthColumn = knobRowCentred.removeFromLeft(knobSize);
+    knobRowCentred.removeFromLeft(paramKnobGap);
+    auto auxRightColumn = knobRowCentred; // remainder
+
+    const int auxUnitHeight = auxLabelHeight + auxKnobSize + auxLabelHeight;
+    auto auxLeftStack = auxLeftColumn.withSizeKeepingCentre(auxKnobSize, auxUnitHeight);
+    m_auxLeftKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, auxKnobSize, auxLabelHeight);
+    m_auxLeftLabel.setBounds(auxLeftStack.removeFromTop(auxLabelHeight));
+    m_auxLeftKnob.setBounds(auxLeftStack.removeFromTop(auxKnobSize + auxLabelHeight));
+
+    m_widthKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobSize, textBoxHeight);
+    m_widthLabel.setBounds(widthColumn.removeFromTop(labelHeight));
+    m_widthKnob.setBounds(widthColumn.removeFromTop(knobSize + textBoxHeight));
+
+    auto auxRightStack = auxRightColumn.withSizeKeepingCentre(auxKnobSize, auxUnitHeight);
+    m_auxRightKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, auxKnobSize, auxLabelHeight);
+    m_auxRightLabel.setBounds(auxRightStack.removeFromTop(auxLabelHeight));
+    m_auxRightKnob.setBounds(auxRightStack.removeFromTop(auxKnobSize + auxLabelHeight));
+
+    paramArea.removeFromTop(rowGap);
+    // "Not mono-safe" badge (Phase 5 step 4): always reserved (empty text when the
+    // active algorithm is mono-safe).
+    m_monoSafeBadge.setBounds(paramArea.removeFromTop(badgeHeight));
+
+    // Multiband width's dedicated parameter grid (Phase 5 algorithm 2.7): below the
+    // badge, still inside the parameter panel, only occupying space when the active
+    // algorithm needs it -- see getRequiredContentHeight()/PluginEditor.cpp for how the
+    // window itself grows to fit this.
     if (numMultiParams > 0)
     {
-        const int multiKnobSize = juce::roundToInt(g_multiKnobSize * scale);
-        const int multiTextBoxWidth = juce::roundToInt(g_multiKnobTextBoxWidth * scale); // wider than the knob, fits "6000 Hz"
-        const int multiLabelHeight = juce::roundToInt(g_multiKnobLabelHeight * scale);
-        const int multiColGap = juce::roundToInt(g_multiKnobColGap * scale);
-        const int multiRowGap = juce::roundToInt(g_multiKnobRowGap * scale);
-        const int knobUnitHeight = multiLabelHeight + multiKnobSize + multiLabelHeight;
-        const int rows = (numMultiParams + g_multiGridCols - 1) / g_multiGridCols;
-
-        r.removeFromTop(rowGap);
-        auto gridArea = r.removeFromTop(rows * knobUnitHeight + (rows - 1) * multiRowGap);
+        paramArea.removeFromTop(rowGap);
+        auto gridArea = paramArea.removeFromTop(multiGridHeight);
         const int totalRowWidth = g_multiGridCols * multiTextBoxWidth + (g_multiGridCols - 1) * multiColGap;
         auto gridCentred = gridArea.withSizeKeepingCentre(totalRowWidth, gridArea.getHeight());
 
-        for (int row = 0; row < rows; ++row)
+        for (int row = 0; row < multiRows; ++row)
         {
-            auto rowArea = gridCentred.removeFromTop(knobUnitHeight);
+            auto rowArea = gridCentred.removeFromTop(multiKnobUnitHeight);
             for (int col = 0; col < g_multiGridCols; ++col)
             {
                 const int i = row * g_multiGridCols + col;
@@ -956,8 +976,48 @@ void StereoWidenerGUI::resized()
                 m_multiLabels[(size_t) i].setBounds(cell.removeFromTop(multiLabelHeight));
                 m_multiKnobs[(size_t) i].setBounds(cell.removeFromTop(multiKnobSize + multiLabelHeight));
             }
-            if (row < rows - 1)
+            if (row < multiRows - 1)
                 gridCentred.removeFromTop(multiRowGap);
         }
     }
+
+    // Utilities panel (Phase 4 step 2, its own boxed card since Phase 6's GUI redesign
+    // -- every utility acts on the final output signal, see UtilityProcessor.h) --
+    // Rotation/Balance knobs, a caption, the toggle buttons, another caption, then the
+    // Monitor selector, all sharing utilArea's own width. Vertically centred within
+    // utilArea's actual height (baseContentHeight, which can be taller than
+    // utilContentHeight itself if the parameter panel's own base row is the taller of
+    // the two) -- horizontally a no-op, since utilArea is already the right width.
+    auto utilStack = utilArea.withSizeKeepingCentre(utilArea.getWidth(), utilContentHeight);
+
+    auto utilKnobRow = utilStack.removeFromTop(utilLabelHeight + utilKnobSize + utilLabelHeight);
+    auto utilKnobsCentred = utilKnobRow.withSizeKeepingCentre(2 * utilKnobSize + utilKnobGap, utilKnobRow.getHeight());
+    auto rotationArea = utilKnobsCentred.removeFromLeft(utilKnobSize);
+    utilKnobsCentred.removeFromLeft(utilKnobGap);
+    auto balanceArea = utilKnobsCentred;
+
+    m_rotationKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
+    m_rotationLabel.setBounds(rotationArea.removeFromTop(utilLabelHeight));
+    m_rotationKnob.setBounds(rotationArea);
+
+    m_balanceKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
+    m_balanceLabel.setBounds(balanceArea.removeFromTop(utilLabelHeight));
+    m_balanceKnob.setBounds(balanceArea);
+    utilStack.removeFromTop(rowGap);
+
+    m_toggleCaption.setBounds(utilStack.removeFromTop(utilCaptionHeight));
+    utilStack.removeFromTop(rowGap);
+
+    auto toggleRow = utilStack.removeFromTop(utilToggleRowHeight);
+    auto toggleGroup = toggleRow.withSizeKeepingCentre(3 * utilToggleWidth + 2 * utilToggleGap, toggleRow.getHeight());
+    m_swapLRButton.setBounds(toggleGroup.removeFromLeft(utilToggleWidth));
+    toggleGroup.removeFromLeft(utilToggleGap);
+    m_invertLButton.setBounds(toggleGroup.removeFromLeft(utilToggleWidth));
+    toggleGroup.removeFromLeft(utilToggleGap);
+    m_invertRButton.setBounds(toggleGroup.removeFromLeft(utilToggleWidth));
+    utilStack.removeFromTop(rowGap);
+
+    m_monitorLabel.setBounds(utilStack.removeFromTop(utilCaptionHeight));
+    utilStack.removeFromTop(rowGap);
+    m_monitorModeBox.setBounds(utilStack.removeFromTop(utilMonitorBoxHeight));
 }

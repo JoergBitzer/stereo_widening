@@ -536,6 +536,14 @@ private:
 	StereoWidenerAudioProcessor& m_processor;
     juce::AudioProcessorValueTreeState& m_apvts;
 
+    // The parameter panel (left two-thirds: aux/Width knobs, mono-safe badge, and the
+    // multiband grid when active) and the Utilities panel (right third) are each drawn
+    // with a slightly brighter "card" background in paint() -- these are set in
+    // resized() and just read back in paint(), not used for child layout (that still
+    // happens directly against the Rectangle<int> locals in resized() itself).
+    juce::Rectangle<int> m_paramPanelBounds;
+    juce::Rectangle<int> m_utilPanelBounds;
+
     LevelMeterComponent m_levelMeterIn;
     GoniometerComponent m_goniometer;
     LevelMeterComponent m_levelMeterOut;
