@@ -141,6 +141,9 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
   - **Rotation**: -45..+45 degrees, the stereo image's rotation in the L/R plane.
   - **Balance**: -100..+100 %. Positive attenuates L (image moves right), negative
     attenuates R (image moves left).
+  - **Gain**: -24..+6 dB, 0.5 dB steps, defaults to 0 dB -- a final output trim,
+    applied last (after Monitor mode, so it also scales whatever is currently being
+    auditioned).
   - **Flip** (caption above the three toggle buttons): **Swap / Inv L / Inv R** --
     swap the two channels, or invert either channel's polarity.
   - **Monitor**: Normal / Mono Check (listen to L+R) / Solo Side (listen to S) --

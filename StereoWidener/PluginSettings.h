@@ -126,14 +126,17 @@ const int g_monoSafeBadgeHeight(18);
 
 // Utilities (Phase 4 step 2: planing.md 2.13 + 2.2; its own boxed panel, the right
 // third, since every utility acts on the final output signal regardless of the
-// selected algorithm -- see UtilityProcessor.h). Rotation/Balance knobs on top, then
-// a caption, the three toggle buttons, another caption, then the Monitor selector --
-// every widget in this column shares the same content width (the panel's own width
-// minus 2*g_panelPadding), so the Monitor box and the two toggle/knob rows are all
-// centred within (and the Monitor box exactly fills) the same width.
-const int g_utilKnobSize(48);
+// selected algorithm -- see UtilityProcessor.h). Rotation/Balance/Gain knobs on top,
+// then a caption, the three toggle buttons, another caption, then the Monitor
+// selector -- every widget in this column shares the same content width (the panel's
+// own width minus 2*g_panelPadding), so the Monitor box and the toggle/knob rows are
+// all centred within (and the Monitor box exactly fills) the same width.
+// g_utilKnobSize shrunk 48 -> 40 to fit a third knob (Gain) in the same row: 3*40 +
+// 2*12 (g_utilKnobGap) = 144, matching the toggle row's own width (3*44 + 2*6) so the
+// column doesn't need to widen.
+const int g_utilKnobSize(40);
 const int g_utilKnobLabelHeight(14);
-const int g_utilKnobGap(12);              // horizontal gap between Rotation and Balance knobs
+const int g_utilKnobGap(12);              // horizontal gap between Rotation/Balance/Gain knobs
 const int g_utilCaptionHeight(14);        // "Flip" above the toggle buttons, "Monitor" above the combo box
 const int g_utilToggleRowHeight(24);
 const int g_utilToggleWidth(44);          // Swap / Inv L / Inv R buttons

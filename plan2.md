@@ -461,6 +461,12 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      rounding, confirmed with 15/15 clean `gdb`-loop reproduction attempts (previously
      12/12 crashed). See
      [phase6_gui_thirds.md](docs/algorithms/phase6_gui_thirds.md#crash-fix-v0114-out-of-range-log-frequency-values-crashing-pluginval).
+   - ✅ Output Gain knob (v0.1.15), per explicit request: a third Utilities knob,
+     -24..+6 dB in 0.5 dB steps, defaulting to 0 dB, applied last in
+     `UtilityProcessor` (after Monitor mode, so it also trims whatever is currently
+     being auditioned). The other two utility knobs (Rotation/Balance) were shrunk
+     (48px -> 40px) to fit the row within the existing panel width. See
+     [phase6_output_gain.md](docs/algorithms/phase6_output_gain.md).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.

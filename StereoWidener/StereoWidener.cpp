@@ -169,6 +169,7 @@ int StereoWidenerAudio::processSynchronBlock(juce::AudioBuffer<float> & buffer, 
     UtilityParams utilityParams;
     utilityParams.rotationDeg = m_rotationParam != nullptr ? m_rotationParam->get() : 0.0f;
     utilityParams.balance = m_balanceParam != nullptr ? m_balanceParam->get() * 0.01f : 0.0f; // % -> -1..1
+    utilityParams.gainDb = m_gainParam != nullptr ? m_gainParam->get() : 0.0f;
     utilityParams.invertL = m_invertLParam != nullptr && m_invertLParam->get();
     utilityParams.invertR = m_invertRParam != nullptr && m_invertRParam->get();
     utilityParams.swapLR = m_swapLRParam != nullptr && m_swapLRParam->get();
@@ -196,6 +197,22 @@ namespace
         const float interval = std::pow(10.0f, (float) -p.numDecimalPlaces);
         return std::make_unique<juce::AudioParameterFloat>(p.ID, p.name,
             juce::NormalisableRange<float>(p.minValue, p.maxValue, interval, p.skew),
+            defaultValue,
+            juce::AudioParameterFloatAttributes().withLabel(p.unitName));
+    }
+
+    // Like makeFloatParameter, but takes an explicit step (p.stepSize) instead of
+    // deriving one from numDecimalPlaces -- needed for Gain's 0.5 dB increments (not a
+    // power of ten, so 10^-numDecimalPlaces can't express it). The displayed decimal
+    // count still comes out right on its own: AudioParameterFloat's default text
+    // formatting derives it from the NormalisableRange's own interval, not from
+    // numDecimalPlaces (which this parameter doesn't even need to declare correctly).
+    template <typename ParamDef>
+    std::unique_ptr<juce::AudioParameterFloat> makeFloatParameterWithStep(const ParamDef& p, float defaultValue)
+    {
+        defaultValue = juce::jlimit(p.minValue, p.maxValue, defaultValue);
+        return std::make_unique<juce::AudioParameterFloat>(p.ID, p.name,
+            juce::NormalisableRange<float>(p.minValue, p.maxValue, p.stepSize, p.skew),
             defaultValue,
             juce::AudioParameterFloatAttributes().withLabel(p.unitName));
     }
@@ -362,6 +379,7 @@ void StereoWidenerAudio::addParameter(std::vector<std::unique_ptr<juce::RangedAu
     // Utilities (Phase 4 step 2)
     paramVector.push_back(makeFloatParameter(g_paramRotation, g_paramRotation.defaultValue));
     paramVector.push_back(makeFloatParameter(g_paramBalance, g_paramBalance.defaultValue));
+    paramVector.push_back(makeFloatParameterWithStep(g_paramGain, g_paramGain.defaultValue));
     paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramInvertL.ID, g_paramInvertL.name, false));
     paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramInvertR.ID, g_paramInvertR.name, false));
     paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramSwapLR.ID, g_paramSwapLR.name, false));
@@ -392,6 +410,7 @@ void StereoWidenerAudio::prepareParameter(std::unique_ptr<juce::AudioProcessorVa
 
     m_rotationParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramRotation.ID));
     m_balanceParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramBalance.ID));
+    m_gainParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramGain.ID));
     m_invertLParam = dynamic_cast<juce::AudioParameterBool*>(vts->getParameter(g_paramInvertL.ID));
     m_invertRParam = dynamic_cast<juce::AudioParameterBool*>(vts->getParameter(g_paramInvertR.ID));
     m_swapLRParam = dynamic_cast<juce::AudioParameterBool*>(vts->getParameter(g_paramSwapLR.ID));
@@ -500,6 +519,14 @@ StereoWidenerGUI::StereoWidenerGUI(StereoWidenerAudioProcessor& p, juce::AudioPr
     addAndMakeVisible(m_balanceKnob);
     m_balanceAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         m_apvts, g_paramBalance.ID, m_balanceKnob);
+
+    m_gainLabel.setText("Gain", juce::dontSendNotification);
+    m_gainLabel.setJustificationType(juce::Justification::centred);
+    addAndMakeVisible(m_gainLabel);
+    m_gainKnob.setTextValueSuffix(" dB");
+    addAndMakeVisible(m_gainKnob);
+    m_gainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        m_apvts, g_paramGain.ID, m_gainKnob);
 
     m_toggleCaption.setText("Flip", juce::dontSendNotification);
     m_toggleCaption.setJustificationType(juce::Justification::centred);
@@ -1029,10 +1056,12 @@ void StereoWidenerGUI::resized()
     auto utilStack = utilArea.withSizeKeepingCentre(utilArea.getWidth(), utilContentHeight);
 
     auto utilKnobRow = utilStack.removeFromTop(utilLabelHeight + utilKnobSize + utilLabelHeight);
-    auto utilKnobsCentred = utilKnobRow.withSizeKeepingCentre(2 * utilKnobSize + utilKnobGap, utilKnobRow.getHeight());
+    auto utilKnobsCentred = utilKnobRow.withSizeKeepingCentre(3 * utilKnobSize + 2 * utilKnobGap, utilKnobRow.getHeight());
     auto rotationArea = utilKnobsCentred.removeFromLeft(utilKnobSize);
     utilKnobsCentred.removeFromLeft(utilKnobGap);
-    auto balanceArea = utilKnobsCentred;
+    auto balanceArea = utilKnobsCentred.removeFromLeft(utilKnobSize);
+    utilKnobsCentred.removeFromLeft(utilKnobGap);
+    auto gainArea = utilKnobsCentred;
 
     m_rotationKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
     m_rotationLabel.setBounds(rotationArea.removeFromTop(utilLabelHeight));
@@ -1041,6 +1070,10 @@ void StereoWidenerGUI::resized()
     m_balanceKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
     m_balanceLabel.setBounds(balanceArea.removeFromTop(utilLabelHeight));
     m_balanceKnob.setBounds(balanceArea);
+
+    m_gainKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
+    m_gainLabel.setBounds(gainArea.removeFromTop(utilLabelHeight));
+    m_gainKnob.setBounds(gainArea);
     utilStack.removeFromTop(rowGap);
 
     m_toggleCaption.setBounds(utilStack.removeFromTop(utilCaptionHeight));
