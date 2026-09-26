@@ -399,16 +399,19 @@ StereoWidenerGUI::StereoWidenerGUI(StereoWidenerAudioProcessor& p, juce::AudioPr
     m_goniometer.setPrimaryColour(g_goniometerInColour);
     m_goniometer.setSecondarySeries(&p.m_algo.m_meterStateOut, g_goniometerOutColour);
 
-    // same build/version footer as StereoAnalyzer's goniometer (see
-    // docs/algorithms/phase2_stereo_analyzer.md), but as a single line here rather than
-    // stacked, since this goniometer's bottom-left corner is much smaller
-    const juce::String versionText = "v" + juce::String(PLUGIN_VERSION_MAJOR) + "."
-                                    + juce::String(PLUGIN_VERSION_MINOR) + "." + juce::String(PLUGIN_VERSION_PATCH);
-    m_goniometer.setCornerText({ "Built at Jade Hochschule Oldenburg - " + versionText });
-
     addAndMakeVisible(m_levelMeterIn);
     addAndMakeVisible(m_goniometer);
     addAndMakeVisible(m_levelMeterOut);
+
+    // Build/version footer, anchored to the bottom of the whole plugin window in both
+    // themes (see m_footerLabel's own comment) -- previously drawn inside the
+    // goniometer's own corner (same text StereoAnalyzer's goniometer still shows).
+    const juce::String versionText = "v" + juce::String(PLUGIN_VERSION_MAJOR) + "."
+                                    + juce::String(PLUGIN_VERSION_MINOR) + "." + juce::String(PLUGIN_VERSION_PATCH);
+    m_footerLabel.setText("Built at Jade Hochschule Oldenburg - " + versionText, juce::dontSendNotification);
+    m_footerLabel.setJustificationType(juce::Justification::centred);
+    m_footerLabel.setFont(juce::Font(juce::FontOptions(11.0f)));
+    addAndMakeVisible(m_footerLabel);
 
     m_widthLabel.setText("Width", juce::dontSendNotification);
     m_widthLabel.setJustificationType(juce::Justification::centred);
@@ -764,12 +767,17 @@ int StereoWidenerGUI::getRequiredContentHeight() const noexcept
         multiGridHeight = g_rowGap + rows * knobUnitHeight + (rows - 1) * g_multiKnobRowGap;
     }
 
-    return g_meterRowHeight + g_rowGap + controlsHeight + multiGridHeight;
+    return g_meterRowHeight + g_rowGap + controlsHeight + multiGridHeight + g_rowGap + g_footerHeight;
 }
 
 void StereoWidenerGUI::paint(juce::Graphics &g)
 {
-    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId).brighter(0.3f));
+    // Plain ambient background, matching PluginEditor's own top bar exactly (no
+    // brightening offset any more): the day/night theme now chooses this colour
+    // deliberately per mode, including a Night background darkened specifically so it
+    // reads as one continuous surface with the (always-black) meter panels rather
+    // than two visibly different shades -- see PluginLookAndFeel.h/.cpp.
+    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 }
 
 void StereoWidenerGUI::resized()
@@ -781,6 +789,12 @@ void StereoWidenerGUI::resized()
 
     auto r = getLocalBounds();
     const int rowGap = juce::roundToInt(g_rowGap * scale);
+
+    // Footer: reserved from the bottom FIRST, so it always sits at the very bottom of
+    // the window regardless of which algorithm (and so which content height) is active.
+    const int footerHeight = juce::roundToInt(g_footerHeight * scale);
+    m_footerLabel.setBounds(r.removeFromBottom(footerHeight));
+    r.removeFromBottom(rowGap);
 
     // top row: input level meter | goniometer (in/out overlaid) | output level meter,
     // all sized to ~60% of their StereoAnalyzer equivalents (see PluginSettings.h)

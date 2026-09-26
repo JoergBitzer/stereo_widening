@@ -6,7 +6,7 @@
 
 set(TARGET_NAME StereoWidener)
 
-project(${TARGET_NAME} VERSION 0.1.10)
+project(${TARGET_NAME} VERSION 0.1.11)
 
 configure_file(Versioning.h.in Versioning.h)
 
@@ -33,6 +33,7 @@ target_sources(${TARGET_NAME}
     PRIVATE
         PluginEditor.cpp
         PluginProcessor.cpp
+        PluginLookAndFeel.cpp
         StereoWidener.cpp
         AlgorithmHelpPanel.cpp
         GlobalSettings.cpp

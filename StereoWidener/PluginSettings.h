@@ -33,6 +33,11 @@ const int g_minPresetHandlerHeight(30); // in pixels
 #define MIN_BUTTON_WIDTH_PRESET 40
 #define MIN_ELEMENT_HEIGHT_PRESET 20
 
+// day/night theme toggle button (PluginEditor's top-right corner, see resized()) --
+// small square icon button, same spirit as StereoWidenerGUI's own "?" help button
+const int g_themeButtonSize(24);
+const int g_themeButtonGap(6);
+
 // ------- Midi Keyboard display-------
 const float g_midikeyboardratio(0.13f); // in percent of height()
 const float g_wheelstokeyboardratio(0.1f);
@@ -49,6 +54,10 @@ const int g_levelMeterPadding(2);
 const int g_goniometerPadding(4);
 const juce::Colour g_goniometerInColour(juce::Colours::limegreen);  // input series
 const juce::Colour g_goniometerOutColour(juce::Colours::deepskyblue); // output series
+
+// build/version footer, anchored to the bottom of the whole plugin window (moved out
+// of the goniometer's own corner, see StereoWidenerGUI's m_footerLabel)
+const int g_footerHeight(14);
 
 const int g_rowGap(8);                    // vertical gap between the three stacked rows
 

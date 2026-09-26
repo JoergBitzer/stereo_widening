@@ -40,6 +40,8 @@ void GlobalSettings::load()
             earlyReflectionsPreDelayMs = (float) (double) obj->getProperty("earlyReflectionsPreDelayMs");
         if (obj->hasProperty("chorusRateHz"))
             chorusRateHz = (float) (double) obj->getProperty("chorusRateHz");
+        if (obj->hasProperty("useDayTheme"))
+            useDayTheme = (bool) obj->getProperty("useDayTheme");
     }
     // a missing/unparseable/incomplete file just keeps whichever defaults above were
     // not overwritten -- a broken settings file must never stop the plugin from loading
@@ -48,6 +50,12 @@ void GlobalSettings::load()
 void GlobalSettings::saveGuiScaleFactor(float newGuiScaleFactor)
 {
     guiScaleFactor = newGuiScaleFactor;
+    write(getSettingsFile());
+}
+
+void GlobalSettings::saveUseDayTheme(bool newUseDayTheme)
+{
+    useDayTheme = newUseDayTheme;
     write(getSettingsFile());
 }
 
@@ -62,6 +70,7 @@ void GlobalSettings::write(const juce::File& file) const
     obj->setProperty("combCrossoverHz", (double) combCrossoverHz);
     obj->setProperty("earlyReflectionsPreDelayMs", (double) earlyReflectionsPreDelayMs);
     obj->setProperty("chorusRateHz", (double) chorusRateHz);
+    obj->setProperty("useDayTheme", useDayTheme);
     const juce::var root(obj);
 
     file.getParentDirectory().createDirectory();

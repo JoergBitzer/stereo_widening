@@ -146,6 +146,15 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     auditioning modes that override the final output; always switch back to Normal
     before bouncing/exporting.
 
+## Day/night theme
+
+The small icon button in the top-right corner (sun/moon) switches between two GUI
+colour themes -- Day (the "Jade" house style: white background, red knob handles) and
+Night (this plugin's original dark look, recoloured to match: grey knobs, same red
+handles). Purely cosmetic: it does not affect the metering/goniometer displays, or any
+parameter value. The choice is remembered (global settings file, below), default
+Night. See [phase6_daynight_theme.md](../docs/algorithms/phase6_daynight_theme.md).
+
 ## Global settings file
 
 See [../docs/algorithms/phase4_settings.md](../docs/algorithms/phase4_settings.md) (and

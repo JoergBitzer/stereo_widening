@@ -69,6 +69,13 @@ public:
      *  m_pluginScaleFactor before any project state is restored). Default 1.0. */
     float getGuiScaleFactor() const noexcept { return guiScaleFactor; }
 
+    /** Day/night GUI theme (see PluginLookAndFeel.h) for a brand new instance. Default
+     *  false (Night) -- the plugin's existing look, unchanged for anyone who never
+     *  touches the toggle. A pure UI convenience like guiScaleFactor, not a processing
+     *  default, so it is not affected by the "parameter defaults never drift" reasoning
+     *  in the file header. */
+    bool getUseDayTheme() const noexcept { return useDayTheme; }
+
     /** Default meter ballistics (StereoMeterState::prepare()'s own parameters) for a
      *  brand new instance. StereoWidener has no per-project override for these yet
      *  (unlike StereoAnalyzer's Settings popup), so these are the only source for now. */
@@ -82,6 +89,10 @@ public:
      *  values (see the file header), the GUI size is a pure UI convenience, not a
      *  processing default, so it is not affected by the reasoning above. */
     void saveGuiScaleFactor(float newGuiScaleFactor);
+
+    /** Called from the theme-toggle button's click handler (StereoWidenerAudioProcessorEditor),
+     *  same immediate-persist pattern as saveGuiScaleFactor() above. */
+    void saveUseDayTheme(bool newUseDayTheme);
 
     /** Where the settings file lives. Exposed mainly for logging/diagnostics. */
     static juce::File getSettingsFile();
@@ -98,4 +109,5 @@ private:
     float combCrossoverHz = 300.0f; // matches planing.md 2.4's own suggested value
     float earlyReflectionsPreDelayMs = 5.0f;
     float chorusRateHz = 0.3f;
+    bool useDayTheme = false;
 };

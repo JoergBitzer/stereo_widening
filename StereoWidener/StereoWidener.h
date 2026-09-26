@@ -560,6 +560,13 @@ private:
     // algorithm's isMonoSafe() is false, updated by updateAuxKnobsForActiveAlgorithm().
     juce::Label m_monoSafeBadge;
 
+    // Build/version footer, anchored to the very bottom of the whole plugin window in
+    // both themes -- text set once in the constructor. Previously drawn inside the
+    // goniometer's own corner (GoniometerComponent::setCornerText()); moved out to its
+    // own label per explicit request, so it isn't tied to the meter panel's own
+    // (unthemed, always-black) background.
+    juce::Label m_footerLabel;
+
     // Utilities (Phase 4 step 2), applied regardless of the selected algorithm -- see
     // UtilityProcessor.h. Stacked in their own column below the output meter (Phase 5
     // GUI compaction: every utility acts on the final output signal), not a full-width

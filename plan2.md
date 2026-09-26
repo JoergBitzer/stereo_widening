@@ -395,6 +395,44 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
 ### Phase 6 – v1 release
 1. GUI: profile switch, mode selector (filtered by profile), macro width, parameter panel
    for the selected mode, in/out meters, latency display.
+   - ✅ Day/night theme (v0.1.11): a runtime-switchable colour theme for every widget
+     except the metering/goniometer displays (confirmed via grep before writing any
+     code that those draw from their own independent colour constants, never via
+     juce::LookAndFeel, so a theme switch cannot touch them). Day mode reuses the
+     "Jade" house style (white background, grey knob disc, red handle/pointer,
+     Libs/TGMTools/JadeLookAndFeel.h); Night mode keeps the plugin's existing dark
+     look, recoloured to match (grey knob disc, same red handle). One
+     `juce::LookAndFeel_V4` subclass (`StereoWidener/PluginLookAndFeel.{h,cpp}`)
+     shares one `drawRotarySlider()` routine between both themes, driven by
+     per-theme member colours rather than duplicating Jade's own hardcoded-palette
+     drawing code. Persisted via `GlobalSettings::getUseDayTheme()`/
+     `saveUseDayTheme()` (same pattern as `guiScaleFactor`), default Night (unchanged
+     look for anyone who never touches the toggle button, new in `PluginEditor`'s
+     top-right corner). Found and fixed two bugs during GUI-offline-render
+     verification: button text became invisible in Day mode (a colour-role
+     collision -- button text was aliased to the same colour as the button's own
+     fill), and the moon toggle icon rendered as a blank glyph (a supplementary-plane
+     colour-emoji codepoint with no font support where tested; switched to a plain
+     Unicode symbol from the same block as the sun icon). Follow-up tweaks after
+     seeing it rendered: build/version footer moved out of the goniometer's own
+     corner to the bottom of the whole plugin window (`StereoWidenerGUI::
+     m_footerLabel`); Day mode's knob/button fill lightened significantly (was too
+     dark/high-contrast against the white background); Night mode's background
+     darkened significantly; the theme-toggle button's own icon now uses a fixed dark
+     moon/bright sun colour with a white (Day) or ambient-matching (Night) button
+     fill, rather than following the general button-text convention. Second follow-up
+     round after that: Night's knob/button fill (initially matched exactly to
+     `MeterLookAndFeel`'s black, per the first request) changed to a colour a little
+     LIGHTER than the window background instead -- matching exactly made
+     knobs/buttons barely distinguishable from the window once both were near-black;
+     the theme-toggle button gained a visible border (JUCE's stock `LookAndFeel_V4`
+     draws no border at all for a standalone `TextButton`, confirmed by reading its
+     source, not assumed). Also found and fixed an intermittent pluginval segfault
+     during this round, unrelated to the colours themselves: a `static const
+     juce::String` at namespace scope is a known cross-translation-unit
+     static-initialisation-order hazard; changed to `static constexpr const char*`,
+     confirmed with five consecutive clean pluginval runs afterward. See
+     [phase6_daynight_theme.md](docs/algorithms/phase6_daynight_theme.md).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.
