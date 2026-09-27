@@ -6,30 +6,33 @@
  *
  * Same M/S recombination as MSWidthBroadband, but the side signal S first runs through
  * two filters:
- *  1. A high-pass at the Bass Cutoff frequency (StereoWidenerGUI's left aux knob,
- *     params.auxLeft). Content below the cutoff is removed from S entirely -- forced
- *     into M, i.e. mono -- while content above it passes through to the width control
- *     unchanged. This is the standard "keep the bass mono" mastering trick: low
- *     frequencies translate better to mono playback and carry most of a mix's energy,
- *     so collapsing them to the centre is usually inaudible as a width change but
- *     avoids phase-cancellation problems on mono sum.
- *  2. A high shelf at the High Shelf frequency (the right aux knob, params.auxRight),
- *     boosting the side signal above that frequency by highShelfGainDb (default 3 dB,
- *     see setHighShelfGainDb()). This restores some of the high-frequency "air"/
- *     openness that step 1 and the width control together tend to reduce perceptually.
- *     Only the frequency is exposed as an automatable parameter for this first version
- *     (see docs/algorithms/phase3_stereo_widener.md); the gain is a user-configurable
- *     default from GlobalSettings (StereoWidener/GlobalSettings.h, Phase 4), set once
- *     by StereoWidenerAudio's constructor -- not itself an automatable parameter.
+ *  1. A high-pass at the Bass Cutoff frequency (kBassCutoff). Content below the
+ *     cutoff is removed from S entirely -- forced into M, i.e. mono -- while content
+ *     above it passes through to the width control unchanged. This is the standard
+ *     "keep the bass mono" mastering trick: low frequencies translate better to mono
+ *     playback and carry most of a mix's energy, so collapsing them to the centre is
+ *     usually inaudible as a width change but avoids phase-cancellation problems on
+ *     mono sum.
+ *  2. A high shelf at the High Shelf frequency (kHighShelf), boosting the side signal
+ *     above that frequency by highShelfGainDb (default 3 dB, see setHighShelfGainDb()).
+ *     This restores some of the high-frequency "air"/openness that step 1 and the
+ *     width control together tend to reduce perceptually. The gain is still a
+ *     user-configurable default from GlobalSettings (StereoWidener/GlobalSettings.h),
+ *     set once by StereoWidenerAudio's constructor -- not yet an automatable parameter
+ *     (planned, see plan_changeGUI.md).
  *
- * Both knobs have an "off" zone past their normal range, a common pattern for a cutoff
- * control: dragging Bass Cutoff below kBassCutoffOffThreshold (its range extends a bit
- * further down than that) bypasses the high-pass entirely (the side signal passes
- * through untouched, no bass-mono effect at all); dragging High Shelf above
- * kHighShelfOffThreshold bypasses the shelf. StereoWidener.h's g_paramBassCutoff /
- * g_paramHighShelfFreq and StereoWidenerGUI both read these two constants, so the
- * parameter range, the DAW-visible "Off" text, and the actual DSP bypass all agree on
- * the same threshold.
+ * Both frequency parameters have an "off" zone past their normal range, a common
+ * pattern for a cutoff control: dragging Bass Cutoff below kBassCutoffOffThreshold
+ * (its range extends a bit further down than that) bypasses the high-pass entirely
+ * (the side signal passes through untouched, no bass-mono effect at all); dragging
+ * High Shelf above kHighShelfOffThreshold bypasses the shelf. getParamSpecs() uses the
+ * same two constants for the displayed "Off" text, so the parameter range, the
+ * DAW-visible text, and the actual DSP bypass all agree on the same threshold.
+ *
+ * Bass Cutoff is linear on purpose: a skewed mapping would give the low end -- exactly
+ * where the narrow 30-40 Hz Off zone sits -- disproportionately much of the knob's
+ * rotation. High Shelf spans more than four octaves (1-16.5 kHz), so it uses a true
+ * log mapping instead; linear would cram the useful 1-4 kHz into a sliver of the knob.
  *
  * Both filters are recomputed only when their controlling parameter actually changes
  * (see updateFiltersIfNeeded() in the .cpp), not every sample, since juce::dsp::IIR
@@ -55,12 +58,24 @@ class MSWidthFiltered : public StereoAlgorithm
 public:
     void prepare(double sampleRate, int maxBlockSize) override;
     void reset() override;
-    void process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept override;
+    void process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept override;
+
+    enum ParamIndex { kWidth = 0, kBassCutoff, kHighShelf };
+    std::vector<AlgorithmParamSpec> getParamSpecs() const override
+    {
+        // Both frequency controls default to Off, so the algorithm starts out identical
+        // to MSWidthBroadband until the user dials them in.
+        return {
+            AlgorithmParamSpec::width("filteredWidth"),
+            AlgorithmParamSpec::linear("bassCutoff", "Bass Cutoff", "Hz", 30.0f, 500.0f, 30.0f)
+                .withOffBelow(kBassCutoffOffThreshold),
+            AlgorithmParamSpec::logFrequency("highShelfFreq", "High Shelf", 1000.0f, 16500.0f, 16500.0f)
+                .withOffAbove(kHighShelfOffThreshold)
+        };
+    }
 
     const char* getName() const noexcept override { return "M/S Width (Filtered / Bass Mono)"; }
     juce::String getDescription() const override;
-    AuxKnobInfo getAuxLeftInfo() const noexcept override { return { true, "Bass Cutoff" }; }
-    AuxKnobInfo getAuxRightInfo() const noexcept override { return { true, "High Shelf" }; }
     bool isMonoSafe() const noexcept override { return true; }
     int getLatencySamples() const noexcept override { return 0; }
 
@@ -75,7 +90,7 @@ public:
 
     static constexpr float kFilterQ = 0.70710678f;  // Butterworth (maximally flat)
 
-    // "Off" zone thresholds, see the file header. The parameter ranges (StereoWidener.h)
+    // "Off" zone thresholds, see the file header. The parameter ranges (getParamSpecs())
     // extend a bit past these on the "off" side, e.g. Bass Cutoff's range starts below
     // kBassCutoffOffThreshold, so there is room on the knob to reach the off position.
     static constexpr float kBassCutoffOffThreshold = 40.0f;

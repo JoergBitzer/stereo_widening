@@ -66,9 +66,9 @@
  * (not user-adjustable during play, like ComplementaryComb's crossoverHz).
  *
  * Two user-facing parameters, per the project's "2 + Width" convention:
- * - Amount (StereoWidenerGUI's left aux knob): 0-100 %, defaults to 0 % -- an exact,
+ * - Amount: 0-100 %, defaults to 0 % -- an exact,
  *   algebraically neutral bypass (see phase5_comb.md's "Removing last-used state").
- * - Depth (right aux knob): 0-100 %, scales the LFO's modulation excursion. No neutral
+ * - Depth: 0-100 %, scales the LFO's modulation excursion. No neutral
  *   value of its own -- inert whenever Amount = 0, same reasoning as comb's Delay/
  *   allpass's Spread/early reflections' Room Size defaults.
  * - Rate (Hz): NOT a user-facing parameter -- a GlobalSettings default (like comb's
@@ -94,12 +94,20 @@ class ChorusDoubler : public StereoAlgorithm
 public:
     void prepare(double sampleRate, int maxBlockSize) override;
     void reset() override;
-    void process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept override;
+    void process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept override;
+
+    enum ParamIndex { kWidth = 0, kAmount, kDepth };
+    std::vector<AlgorithmParamSpec> getParamSpecs() const override
+    {
+        return {
+            AlgorithmParamSpec::width("chorusWidth"),
+            AlgorithmParamSpec::linear("chorusAmount", "Amount", "%", 0.0f, 100.0f, 0.0f),
+            AlgorithmParamSpec::linear("chorusDepth", "Depth", "%", 0.0f, 100.0f, 50.0f)
+        };
+    }
 
     const char* getName() const noexcept override { return "Chorus Doubler (Dimension D)"; }
     juce::String getDescription() const override;
-    AuxKnobInfo getAuxLeftInfo() const noexcept override { return { true, "Amount" }; }
-    AuxKnobInfo getAuxRightInfo() const noexcept override { return { true, "Depth" }; }
     bool isMonoSafe() const noexcept override { return false; }
     int getLatencySamples() const noexcept override { return 0; }
 

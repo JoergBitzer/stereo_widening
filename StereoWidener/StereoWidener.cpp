@@ -27,48 +27,13 @@ StereoWidenerAudio::StereoWidenerAudio(StereoWidenerAudioProcessor* processor)
         chorus->setRateHz(m_globalSettings.getChorusRateHz());
 }
 
-StereoAlgorithmParams StereoWidenerAudio::paramsFor(int algorithmIndex, float width) const noexcept
+AlgorithmParamValues StereoWidenerAudio::valuesFor(int algorithmIndex) const noexcept
 {
-    StereoAlgorithmParams p;
-    p.width = width;
-
-    // Which parameters feed auxLeft/auxRight is per-algorithm -- the one place that
-    // needs to know about every algorithm's own aux parameters, matching
-    // StereoWidenerGUI::auxLeftParamIdFor()/auxRightParamIdFor() (same index order).
-    switch (algorithmIndex)
-    {
-        case 1: // MSWidthFiltered: Bass Cutoff (Hz), High Shelf (Hz)
-            p.auxLeft = m_bassCutoffParam != nullptr ? m_bassCutoffParam->get() : g_paramBassCutoff.defaultValue;
-            p.auxRight = m_highShelfFreqParam != nullptr ? m_highShelfFreqParam->get() : g_paramHighShelfFreq.defaultValue;
-            break;
-        case 2: // ComplementaryComb: Delay (ms), Gain (0-100 % -> 0-1)
-            p.auxLeft = m_combDelayParam != nullptr ? m_combDelayParam->get() : g_paramCombDelay.defaultValue;
-            p.auxRight = (m_combGainParam != nullptr ? m_combGainParam->get() : g_paramCombGain.defaultValue) * 0.01f;
-            break;
-        case 3: // AllpassDecorrelation: Amount (0-100 % -> 0-1), Spread (0-100 % -> 0-1)
-            p.auxLeft = (m_allpassAmountParam != nullptr ? m_allpassAmountParam->get() : g_paramAllpassAmount.defaultValue) * 0.01f;
-            p.auxRight = (m_allpassSpreadParam != nullptr ? m_allpassSpreadParam->get() : g_paramAllpassSpread.defaultValue) * 0.01f;
-            break;
-        case 4: // MultibandWidth: 3 crossover frequencies (Hz) + 3 band widths (0-200 % -> 0-2), see MultibandWidth::MultiParamIndex
-            p.multi[MultibandWidth::kFreq1] = m_multibandFreq1Param != nullptr ? m_multibandFreq1Param->get() : g_paramMultibandFreq1.defaultValue;
-            p.multi[MultibandWidth::kFreq2] = m_multibandFreq2Param != nullptr ? m_multibandFreq2Param->get() : g_paramMultibandFreq2.defaultValue;
-            p.multi[MultibandWidth::kFreq3] = m_multibandFreq3Param != nullptr ? m_multibandFreq3Param->get() : g_paramMultibandFreq3.defaultValue;
-            p.multi[MultibandWidth::kWidth2] = (m_multibandWidth2Param != nullptr ? m_multibandWidth2Param->get() : g_paramMultibandWidth2.defaultValue) * 0.01f;
-            p.multi[MultibandWidth::kWidth3] = (m_multibandWidth3Param != nullptr ? m_multibandWidth3Param->get() : g_paramMultibandWidth3.defaultValue) * 0.01f;
-            p.multi[MultibandWidth::kWidth4] = (m_multibandWidth4Param != nullptr ? m_multibandWidth4Param->get() : g_paramMultibandWidth4.defaultValue) * 0.01f;
-            break;
-        case 5: // EarlyReflections: Amount (0-100 % -> 0-1), Room Size (0-100 % -> 0-1)
-            p.auxLeft = (m_earlyReflAmountParam != nullptr ? m_earlyReflAmountParam->get() : g_paramEarlyReflAmount.defaultValue) * 0.01f;
-            p.auxRight = (m_earlyReflRoomSizeParam != nullptr ? m_earlyReflRoomSizeParam->get() : g_paramEarlyReflRoomSize.defaultValue) * 0.01f;
-            break;
-        case 6: // ChorusDoubler: Amount (0-100 % -> 0-1), Depth (0-100 % -> 0-1)
-            p.auxLeft = (m_chorusAmountParam != nullptr ? m_chorusAmountParam->get() : g_paramChorusAmount.defaultValue) * 0.01f;
-            p.auxRight = (m_chorusDepthParam != nullptr ? m_chorusDepthParam->get() : g_paramChorusDepth.defaultValue) * 0.01f;
-            break;
-        default: // MSWidthBroadband and any future algorithm with no aux params
-            break;
-    }
-    return p;
+    AlgorithmParamValues values {};
+    const auto& params = m_algorithmParams[(size_t) algorithmIndex];
+    for (size_t i = 0; i < params.size(); ++i)
+        values[i] = params[i]->get();
+    return values;
 }
 
 void StereoWidenerAudio::prepareToPlay(double sampleRate, int max_samplesPerBlock, int max_channels)
@@ -115,7 +80,6 @@ int StereoWidenerAudio::processSynchronBlock(juce::AudioBuffer<float> & buffer, 
         return 0;
     }
 
-    const float width = m_widthParam != nullptr ? m_widthParam->get() * 0.01f : 1.0f; // 0-200 % -> 0-2
     const int selectedIndex = m_algorithmParam != nullptr ? m_algorithmParam->getIndex() : m_activeIndex;
 
     if (selectedIndex != m_activeIndex && !m_crossfading)
@@ -134,8 +98,8 @@ int StereoWidenerAudio::processSynchronBlock(juce::AudioBuffer<float> & buffer, 
         m_crossfadeScratch.setSize(numChannels, numSamples, false, false, true);
         m_crossfadeScratch.makeCopyOf(buffer, true);
 
-        m_algorithms[(size_t) m_activeIndex]->process(buffer, paramsFor(m_activeIndex, width));
-        m_algorithms[(size_t) m_targetIndex]->process(m_crossfadeScratch, paramsFor(m_targetIndex, width));
+        m_algorithms[(size_t) m_activeIndex]->process(buffer, valuesFor(m_activeIndex));
+        m_algorithms[(size_t) m_targetIndex]->process(m_crossfadeScratch, valuesFor(m_targetIndex));
 
         for (int i = 0; i < numSamples; ++i)
         {
@@ -160,7 +124,7 @@ int StereoWidenerAudio::processSynchronBlock(juce::AudioBuffer<float> & buffer, 
     }
     else
     {
-        m_algorithms[(size_t) m_activeIndex]->process(buffer, paramsFor(m_activeIndex, width));
+        m_algorithms[(size_t) m_activeIndex]->process(buffer, valuesFor(m_activeIndex));
     }
 
     // Utilities (Phase 4 step 2, planing.md 2.13 + 2.2): applied once, after whichever
@@ -217,50 +181,12 @@ namespace
             juce::AudioParameterFloatAttributes().withLabel(p.unitName));
     }
 
-    // Like makeFloatParameter, but the parameter's own displayed text (used by this
-    // plugin's knobs via Slider::textFromValueFunction below, and independently by any
-    // host's generic parameter/automation view) reads "Off" once the value crosses
-    // offThreshold, instead of a plain number -- see MSWidthFiltered::
-    // kBassCutoffOffThreshold / kHighShelfOffThreshold. offIsBelow selects which side of
-    // the threshold counts as "off": true for Bass Cutoff (off below 40 Hz), false for
-    // High Shelf (off above 16 kHz).
-    template <typename ParamDef>
-    std::unique_ptr<juce::AudioParameterFloat> makeFrequencyParameterWithOff(const ParamDef& p, float offThreshold,
-                                                                              bool offIsBelow, float defaultValue)
+    // A true logarithmic range (equal frequency ratios get equal knob rotation), for
+    // parameters spanning several octaves, where a linear or power-law skewed mapping
+    // would cram the musically useful low end into a sliver of the knob.
+    juce::NormalisableRange<float> makeLogFrequencyRange(float minHz, float maxHz)
     {
-        defaultValue = juce::jlimit(p.minValue, p.maxValue, defaultValue);
-        const float interval = std::pow(10.0f, (float) -p.numDecimalPlaces);
-        auto attributes = juce::AudioParameterFloatAttributes()
-            .withStringFromValueFunction([offThreshold, offIsBelow](float value, int) -> juce::String
-            {
-                const bool isOff = offIsBelow ? (value < offThreshold) : (value > offThreshold);
-                return isOff ? juce::String("Off") : juce::String(juce::roundToInt(value)) + " Hz";
-            })
-            .withValueFromStringFunction([offThreshold, offIsBelow](const juce::String& text) -> float
-            {
-                if (text.trim().equalsIgnoreCase("off"))
-                    return offIsBelow ? offThreshold - 1.0f : offThreshold + 1.0f;
-                return text.getFloatValue();
-            });
-        return std::make_unique<juce::AudioParameterFloat>(p.ID, p.name,
-            juce::NormalisableRange<float>(p.minValue, p.maxValue, interval, p.skew),
-            defaultValue, attributes);
-    }
-
-    // Like makeFrequencyParameterWithOff, but with a *true* logarithmic mapping (equal
-    // Hz ratios get equal knob rotation) instead of a linear-or-power-law one: needed
-    // for a range spanning several octaves (High Shelf: 1000-16500 Hz, over four),
-    // where linear would cram the musically useful low end into a sliver of the knob
-    // (see the comment on g_paramHighShelfFreq, StereoWidener.h). Always "off above
-    // offThreshold" (High Shelf's only need so far); unlike the linear version, the log
-    // compression at the top of the range keeps that Off zone a small rotation sliver
-    // on its own, without needing to also keep it narrow in absolute Hz.
-    template <typename ParamDef>
-    std::unique_ptr<juce::AudioParameterFloat> makeLogFrequencyParameterWithOff(const ParamDef& p, float offThreshold,
-                                                                                 float defaultValue)
-    {
-        defaultValue = juce::jlimit(p.minValue, p.maxValue, defaultValue);
-        juce::NormalisableRange<float> range(p.minValue, p.maxValue,
+        return juce::NormalisableRange<float>(minHz, maxHz,
             [](float rangeStart, float rangeEnd, float normalised) // convertFrom0To1
             {
                 return rangeStart * std::pow(rangeEnd / rangeStart, normalised);
@@ -282,68 +208,56 @@ namespace
                 // clamps first; a custom one must do the same.
                 return std::round(juce::jlimit(rangeStart, rangeEnd, value));
             });
-
-        auto attributes = juce::AudioParameterFloatAttributes()
-            .withStringFromValueFunction([offThreshold](float value, int) -> juce::String
-            {
-                return value > offThreshold ? juce::String("Off") : juce::String(juce::roundToInt(value)) + " Hz";
-            })
-            .withValueFromStringFunction([offThreshold](const juce::String& text) -> float
-            {
-                return text.trim().equalsIgnoreCase("off") ? offThreshold + 1.0f : text.getFloatValue();
-            });
-
-        return std::make_unique<juce::AudioParameterFloat>(p.ID, p.name, range, defaultValue, attributes);
     }
 
-    // Like makeLogFrequencyParameterWithOff, but with no "Off" zone -- MultibandWidth's
-    // three crossover frequencies are always active (there is no "bypass this
-    // crossover" concept), so the displayed text is just a plain "1500 Hz", nothing
-    // else needs the true-log range treatment's reasoning (see that function's own
-    // comment) to not apply here too.
-    template <typename ParamDef>
-    std::unique_ptr<juce::AudioParameterFloat> makeLogFrequencyParameter(const ParamDef& p, float defaultValue)
+    // One APVTS parameter from an algorithm's AlgorithmParamSpec. The displayed text
+    // includes the unit ("150 Hz", "10.0 ms", "100 %") or reads "Off" inside an Off
+    // zone, so every host's generic view and the playground knobs (which show the
+    // parameter's own text) agree, and no GUI code has to add unit suffixes itself.
+    std::unique_ptr<juce::AudioParameterFloat> makeAlgorithmParameter(const AlgorithmParamSpec& spec)
     {
-        defaultValue = juce::jlimit(p.minValue, p.maxValue, defaultValue);
-        juce::NormalisableRange<float> range(p.minValue, p.maxValue,
-            [](float rangeStart, float rangeEnd, float normalised) // convertFrom0To1
+        const auto range = spec.scale == AlgorithmParamSpec::Scale::LogFrequency
+            ? makeLogFrequencyRange(spec.minValue, spec.maxValue)
+            : juce::NormalisableRange<float>(spec.minValue, spec.maxValue, std::pow(10.0f, (float) -spec.numDecimalPlaces));
+
+        const juce::String unit(spec.unit);
+        const int decimals = spec.numDecimalPlaces;
+        const float offBelow = spec.offBelow;
+        const float offAbove = spec.offAbove;
+        const float minValue = spec.minValue;
+        const float maxValue = spec.maxValue;
+
+        auto attributes = juce::AudioParameterFloatAttributes()
+            .withStringFromValueFunction([unit, decimals, offBelow, offAbove](float value, int maxLength) -> juce::String
             {
-                return rangeStart * std::pow(rangeEnd / rangeStart, normalised);
-            },
-            [](float rangeStart, float rangeEnd, float value) // convertTo0To1
+                juce::String text;
+                if (value < offBelow || value > offAbove)
+                    text = "Off";
+                else
+                {
+                    text = decimals == 0 ? juce::String(juce::roundToInt(value)) : juce::String(value, decimals);
+                    if (unit.isNotEmpty())
+                        text << " " << unit;
+                }
+                return maxLength > 0 ? text.substring(0, maxLength) : text;
+            })
+            .withValueFromStringFunction([offBelow, offAbove, minValue, maxValue](const juce::String& text) -> float
             {
-                return std::log(value / rangeStart) / std::log(rangeEnd / rangeStart);
-            },
-            [](float rangeStart, float rangeEnd, float value) // snapToLegalValue: clamp, then whole Hz steps
-            {
-                // See makeLogFrequencyParameterWithOff()'s identical lambda for why the
-                // clamp (not just the rounding) is essential.
-                return std::round(juce::jlimit(rangeStart, rangeEnd, value));
+                if (text.trim().equalsIgnoreCase("off"))
+                    return offBelow > minValue ? minValue : (offAbove < maxValue ? maxValue : minValue);
+                return text.getFloatValue();
             });
 
-        // Explicit whole-Hz formatting, same reason makeLogFrequencyParameterWithOff
-        // needs its own: this custom (non-interval-based) NormalisableRange has no
-        // "interval" for AudioParameterFloat's default text formatting to derive a
-        // sensible decimal-place count from, so without this it displays far too many
-        // decimals (e.g. "150.0000..." instead of "150 Hz") -- discovered because the
-        // knob's OWN text formatting (Slider::setNumDecimalPlacesToDisplay(),
-        // StereoWidenerGUI::bindMultiKnob()) turned out to have no effect here: once a
-        // SliderAttachment is bound, the displayed text comes from the parameter's own
-        // getText(), not the Slider's.
-        auto attributes = juce::AudioParameterFloatAttributes()
-            .withLabel(p.unitName)
-            .withStringFromValueFunction([](float value, int) -> juce::String
-            {
-                return juce::String(juce::roundToInt(value)) + " Hz";
-            });
-        return std::make_unique<juce::AudioParameterFloat>(p.ID, p.name, range, defaultValue, attributes);
+        return std::make_unique<juce::AudioParameterFloat>(spec.id, spec.name, range,
+            juce::jlimit(spec.minValue, spec.maxValue, spec.defaultValue), attributes);
     }
 }
 
 void StereoWidenerAudio::addParameter(std::vector<std::unique_ptr<juce::RangedAudioParameter>> &paramVector)
 {
-    // Every parameter's default is its own compiled-in g_param*.defaultValue, chosen to
-    // be as close to neutral (unchanged/pass-through) processing as possible for its
+    // Every parameter's default is its own compiled-in default (the algorithm's
+    // AlgorithmParamSpec::defaultValue, or the g_param* struct for the utilities), chosen
+    // to be as close to neutral (unchanged/pass-through) processing as possible for its
     // algorithm -- this is also the value a double-click on the GUI knob resets to
     // (JUCE's SliderParameterAttachment wires that up automatically from the
     // parameter's own default). A brand new instance therefore always starts neutral;
@@ -353,25 +267,9 @@ void StereoWidenerAudio::addParameter(std::vector<std::unique_ptr<juce::RangedAu
     // double-click reset to whatever was last dialled in rather than neutral, and the
     // init.xml preset already covers "restore my last settings" better -- see
     // GlobalSettings.h).
-    paramVector.push_back(makeFloatParameter(g_paramWidth, g_paramWidth.defaultValue));
-    paramVector.push_back(makeFrequencyParameterWithOff(g_paramBassCutoff, MSWidthFiltered::kBassCutoffOffThreshold, true,
-        g_paramBassCutoff.defaultValue));
-    paramVector.push_back(makeLogFrequencyParameterWithOff(g_paramHighShelfFreq, MSWidthFiltered::kHighShelfOffThreshold,
-        g_paramHighShelfFreq.defaultValue));
-    paramVector.push_back(makeFloatParameter(g_paramCombDelay, g_paramCombDelay.defaultValue));
-    paramVector.push_back(makeFloatParameter(g_paramCombGain, g_paramCombGain.defaultValue));
-    paramVector.push_back(makeFloatParameter(g_paramAllpassAmount, g_paramAllpassAmount.defaultValue));
-    paramVector.push_back(makeFloatParameter(g_paramAllpassSpread, g_paramAllpassSpread.defaultValue));
-    paramVector.push_back(makeLogFrequencyParameter(g_paramMultibandFreq1, g_paramMultibandFreq1.defaultValue));
-    paramVector.push_back(makeLogFrequencyParameter(g_paramMultibandFreq2, g_paramMultibandFreq2.defaultValue));
-    paramVector.push_back(makeLogFrequencyParameter(g_paramMultibandFreq3, g_paramMultibandFreq3.defaultValue));
-    paramVector.push_back(makeFloatParameter(g_paramMultibandWidth2, g_paramMultibandWidth2.defaultValue));
-    paramVector.push_back(makeFloatParameter(g_paramMultibandWidth3, g_paramMultibandWidth3.defaultValue));
-    paramVector.push_back(makeFloatParameter(g_paramMultibandWidth4, g_paramMultibandWidth4.defaultValue));
-    paramVector.push_back(makeFloatParameter(g_paramEarlyReflAmount, g_paramEarlyReflAmount.defaultValue));
-    paramVector.push_back(makeFloatParameter(g_paramEarlyReflRoomSize, g_paramEarlyReflRoomSize.defaultValue));
-    paramVector.push_back(makeFloatParameter(g_paramChorusAmount, g_paramChorusAmount.defaultValue));
-    paramVector.push_back(makeFloatParameter(g_paramChorusDepth, g_paramChorusDepth.defaultValue));
+    for (const auto& algorithm : m_algorithms)
+        for (const auto& spec : algorithm->getParamSpecs())
+            paramVector.push_back(makeAlgorithmParameter(spec));
 
     paramVector.push_back(std::make_unique<juce::AudioParameterChoice>(g_paramAlgorithmID, g_paramAlgorithmName,
         g_algorithmNames, 0));
@@ -389,23 +287,19 @@ void StereoWidenerAudio::addParameter(std::vector<std::unique_ptr<juce::RangedAu
 
 void StereoWidenerAudio::prepareParameter(std::unique_ptr<juce::AudioProcessorValueTreeState> &vts)
 {
-    m_widthParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramWidth.ID));
-    m_bassCutoffParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramBassCutoff.ID));
-    m_highShelfFreqParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramHighShelfFreq.ID));
-    m_combDelayParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramCombDelay.ID));
-    m_combGainParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramCombGain.ID));
-    m_allpassAmountParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramAllpassAmount.ID));
-    m_allpassSpreadParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramAllpassSpread.ID));
-    m_multibandFreq1Param = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramMultibandFreq1.ID));
-    m_multibandFreq2Param = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramMultibandFreq2.ID));
-    m_multibandFreq3Param = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramMultibandFreq3.ID));
-    m_multibandWidth2Param = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramMultibandWidth2.ID));
-    m_multibandWidth3Param = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramMultibandWidth3.ID));
-    m_multibandWidth4Param = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramMultibandWidth4.ID));
-    m_earlyReflAmountParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramEarlyReflAmount.ID));
-    m_earlyReflRoomSizeParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramEarlyReflRoomSize.ID));
-    m_chorusAmountParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramChorusAmount.ID));
-    m_chorusDepthParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramChorusDepth.ID));
+    m_algorithmParams.clear();
+    for (const auto& algorithm : m_algorithms)
+    {
+        std::vector<juce::AudioParameterFloat*> params;
+        for (const auto& spec : algorithm->getParamSpecs())
+        {
+            auto* param = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(spec.id));
+            jassert(param != nullptr); // every spec was registered by addParameter()
+            params.push_back(param);
+        }
+        jassert(params.size() <= (size_t) kMaxAlgorithmParams);
+        m_algorithmParams.push_back(std::move(params));
+    }
     m_algorithmParam = dynamic_cast<juce::AudioParameterChoice*>(vts->getParameter(g_paramAlgorithmID));
 
     m_rotationParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramRotation.ID));
@@ -443,26 +337,14 @@ StereoWidenerGUI::StereoWidenerGUI(StereoWidenerAudioProcessor& p, juce::AudioPr
     m_footerLabel.setFont(juce::Font(juce::FontOptions(11.0f)));
     addAndMakeVisible(m_footerLabel);
 
-    m_widthLabel.setText("Width", juce::dontSendNotification);
-    m_widthLabel.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(m_widthLabel);
-
-    m_widthKnob.setTextValueSuffix(" %");
-    addAndMakeVisible(m_widthKnob);
-    m_widthAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-        m_apvts, g_paramWidth.ID, m_widthKnob);
-
-    // Widgets only here -- which parameter each one is bound to (and that parameter's
-    // own display formatting, e.g. MSWidthFiltered's "Off" zones) depends on the active
-    // algorithm and is set up by bindAuxKnob(), called from
-    // updateAuxKnobsForActiveAlgorithm() below.
-    m_auxLeftLabel.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(m_auxLeftLabel);
-    addAndMakeVisible(m_auxLeftKnob);
-
-    m_auxRightLabel.setJustificationType(juce::Justification::centred);
-    addAndMakeVisible(m_auxRightLabel);
-    addAndMakeVisible(m_auxRightKnob);
+    // One playground per algorithm, all created up front and bound permanently to
+    // their own parameters; showPlaygroundForSelectedAlgorithm() only toggles which one
+    // is visible.
+    for (int i = 0; i < m_processor.m_algo.getNumAlgorithms(); ++i)
+    {
+        m_playgrounds.push_back(createPlayground(m_apvts, m_processor.m_algo.getAlgorithm(i)));
+        addChildComponent(*m_playgrounds.back()); // starts invisible, unlike addAndMakeVisible
+    }
 
     m_helpButton.onClick = [this] { showAlgorithmHelp(); };
     addAndMakeVisible(m_helpButton);
@@ -470,7 +352,7 @@ StereoWidenerGUI::StereoWidenerGUI(StereoWidenerAudioProcessor& p, juce::AudioPr
     for (int i = 0; i < g_algorithmNames.size(); ++i)
         m_algorithmBox.addItem(g_algorithmNames[i], i + 1); // JUCE ComboBox item IDs are 1-based
     addAndMakeVisible(m_algorithmBox);
-    m_algorithmBox.onChange = [this] { updateAuxKnobsForActiveAlgorithm(); };
+    m_algorithmBox.onChange = [this] { showPlaygroundForSelectedAlgorithm(); };
     m_algorithmAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
         m_apvts, g_paramAlgorithmID, m_algorithmBox);
 
@@ -478,26 +360,7 @@ StereoWidenerGUI::StereoWidenerGUI(StereoWidenerAudioProcessor& p, juce::AudioPr
     m_monoSafeBadge.setColour(juce::Label::textColourId, juce::Colours::orange);
     addAndMakeVisible(m_monoSafeBadge);
 
-    // Multiband width's dedicated parameter grid (Phase 5 algorithm 2.7): widgets only
-    // here, same as the two aux knobs above -- which parameter each one is bound to is
-    // set up by bindMultiKnob(), called from updateAuxKnobsForActiveAlgorithm() below.
-    // Hidden (not just disabled) when not needed, since there can be up to
-    // kMaxMultiParams of them and most algorithms use 0.
-    for (int i = 0; i < kMaxMultiParams; ++i)
-    {
-        m_multiKnobs[(size_t) i].setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-        m_multiLabels[(size_t) i].setJustificationType(juce::Justification::centred);
-        addChildComponent(m_multiLabels[(size_t) i]); // addChildComponent: starts invisible, unlike addAndMakeVisible
-        addChildComponent(m_multiKnobs[(size_t) i]);
-    }
-    // Keeps MultibandWidth's three crossover-frequency knobs from being dragged past
-    // their neighbour -- see clampCrossoverKnob()'s own comment (StereoWidener.h) for
-    // why this lives here (attached once) rather than in bindMultiKnob().
-    m_multiKnobs[0].onValueChange = [this] { clampCrossoverKnob(0); };
-    m_multiKnobs[1].onValueChange = [this] { clampCrossoverKnob(1); };
-    m_multiKnobs[2].onValueChange = [this] { clampCrossoverKnob(2); };
-
-    updateAuxKnobsForActiveAlgorithm(); // onChange above only fires on a later *change*, not this initial state
+    showPlaygroundForSelectedAlgorithm(); // onChange above only fires on a later *change*, not this initial state
 
     // Utilities (Phase 4 step 2), applied regardless of the selected algorithm -- see
     // UtilityProcessor.h. Stacked below the output meter (Phase 5 GUI compaction), not
@@ -558,196 +421,6 @@ StereoWidenerGUI::StereoWidenerGUI(StereoWidenerAudioProcessor& p, juce::AudioPr
         m_apvts, g_paramMonitorModeID, m_monitorModeBox);
 }
 
-namespace
-{
-    // Which APVTS parameter each aux knob should be rebound to for a given algorithm
-    // index -- the GUI-side counterpart of StereoWidenerAudio::paramsFor(), and must
-    // stay in the same index order as g_algorithmNames/the algorithm instances (see the
-    // comment there). Empty string means "this algorithm has no such parameter" --
-    // bindAuxKnob() then detaches and disables the knob.
-    juce::String auxLeftParamIdFor(int algorithmIndex)
-    {
-        switch (algorithmIndex)
-        {
-            case 1: return g_paramBassCutoff.ID;
-            case 2: return g_paramCombDelay.ID;
-            case 3: return g_paramAllpassAmount.ID;
-            case 5: return g_paramEarlyReflAmount.ID;
-            case 6: return g_paramChorusAmount.ID;
-            default: return {};
-        }
-    }
-
-    juce::String auxRightParamIdFor(int algorithmIndex)
-    {
-        switch (algorithmIndex)
-        {
-            case 1: return g_paramHighShelfFreq.ID;
-            case 2: return g_paramCombGain.ID;
-            case 3: return g_paramAllpassSpread.ID;
-            case 5: return g_paramEarlyReflRoomSize.ID;
-            case 6: return g_paramChorusDepth.ID;
-            default: return {};
-        }
-    }
-
-    // GUI-side counterpart of StereoWidenerAudio::paramsFor()'s case 4 -- which
-    // parameter each of the multi-param grid's knobs is bound to, in
-    // MultibandWidth::MultiParamIndex order. Empty for every other algorithm (they all
-    // have getNumMultiParams() == 0, so updateAuxKnobsForActiveAlgorithm() never calls
-    // this for them, but a defined-empty fallback is still the safe default).
-    juce::String auxMultiParamIdFor(int algorithmIndex, int multiIndex)
-    {
-        if (algorithmIndex != 4)
-            return {};
-        switch (multiIndex)
-        {
-            case MultibandWidth::kFreq1:  return g_paramMultibandFreq1.ID;
-            case MultibandWidth::kFreq2:  return g_paramMultibandFreq2.ID;
-            case MultibandWidth::kFreq3:  return g_paramMultibandFreq3.ID;
-            case MultibandWidth::kWidth2: return g_paramMultibandWidth2.ID;
-            case MultibandWidth::kWidth3: return g_paramMultibandWidth3.ID;
-            case MultibandWidth::kWidth4: return g_paramMultibandWidth4.ID;
-            default: return {};
-        }
-    }
-}
-
-void StereoWidenerGUI::bindAuxKnob(juce::Slider& knob, std::unique_ptr<SliderAttachment>& attachment, const juce::String& paramId)
-{
-    attachment.reset(); // must be destroyed before a new one is created on the same slider
-
-    knob.textFromValueFunction = nullptr;
-    knob.valueFromTextFunction = nullptr;
-    knob.setTextValueSuffix({});
-
-    if (paramId.isEmpty())
-    {
-        // No parameter behind this knob for the active algorithm (e.g.
-        // MSWidthBroadband): blank the text box instead of showing the detached
-        // slider's own raw numeric value (e.g. "0.0000000"), which would look broken.
-        knob.textFromValueFunction = [](double) -> juce::String { return {}; };
-        knob.updateText(); // no attachment will run to refresh the cached text box otherwise
-        return;
-    }
-
-    // Custom text display (not just a unit suffix) for the two parameters with an "Off"
-    // zone (see g_paramBassCutoff/g_paramHighShelfFreq); everything else just shows its
-    // own unit suffix.
-    if (paramId == juce::String(g_paramBassCutoff.ID))
-    {
-        knob.textFromValueFunction = [](double value) -> juce::String
-        {
-            return value < MSWidthFiltered::kBassCutoffOffThreshold ? "Off"
-                 : juce::String(juce::roundToInt(value)) + " Hz";
-        };
-        knob.valueFromTextFunction = [](const juce::String& text) -> double
-        {
-            return text.trim().equalsIgnoreCase("off") ? (double) g_paramBassCutoff.minValue : text.getDoubleValue();
-        };
-    }
-    else if (paramId == juce::String(g_paramHighShelfFreq.ID))
-    {
-        knob.textFromValueFunction = [](double value) -> juce::String
-        {
-            return value > MSWidthFiltered::kHighShelfOffThreshold ? "Off"
-                 : juce::String(juce::roundToInt(value)) + " Hz";
-        };
-        knob.valueFromTextFunction = [](const juce::String& text) -> double
-        {
-            return text.trim().equalsIgnoreCase("off") ? (double) g_paramHighShelfFreq.maxValue : text.getDoubleValue();
-        };
-    }
-    else if (paramId == juce::String(g_paramCombDelay.ID))
-    {
-        knob.setTextValueSuffix(" ms");
-    }
-    else if (paramId == juce::String(g_paramCombGain.ID)
-             || paramId == juce::String(g_paramAllpassAmount.ID)
-             || paramId == juce::String(g_paramAllpassSpread.ID)
-             || paramId == juce::String(g_paramEarlyReflAmount.ID)
-             || paramId == juce::String(g_paramEarlyReflRoomSize.ID)
-             || paramId == juce::String(g_paramChorusAmount.ID)
-             || paramId == juce::String(g_paramChorusDepth.ID))
-    {
-        knob.setTextValueSuffix(" %");
-    }
-
-    // Pre-sync the knob's own raw value to the parameter's current one before
-    // constructing the attachment -- see bindMultiKnob()'s own comment on why:
-    // SliderAttachment's constructor formats the slider's CURRENT (possibly stale,
-    // e.g. still 0.0 from an earlier detached state) value for display before it
-    // syncs the real one, and g_paramBassCutoff/g_paramHighShelfFreq's true-log range
-    // (makeLogFrequencyParameterWithOff() above) computes log(0) = -inf for that,
-    // same underlying bug as the multiband crossover knobs.
-    if (auto* param = dynamic_cast<juce::AudioParameterFloat*>(m_apvts.getParameter(paramId)))
-        knob.setValue(param->get(), juce::dontSendNotification);
-    attachment = std::make_unique<SliderAttachment>(m_apvts, paramId, knob);
-}
-
-void StereoWidenerGUI::bindMultiKnob(int index, const juce::String& paramId)
-{
-    auto& knob = m_multiKnobs[(size_t) index];
-    auto& attachment = m_multiAttachments[(size_t) index];
-    attachment.reset();
-    knob.setTextValueSuffix({});
-
-    if (paramId.isEmpty())
-        return; // hidden by updateAuxKnobsForActiveAlgorithm(), nothing to bind
-
-    // Once attached, SliderAttachment wires the knob's displayed text to the
-    // parameter's own getText(): makeLogFrequencyParameter()'s explicit whole-Hz
-    // formatting already includes the unit for the three crossover frequencies (a
-    // suffix on top of that was found to double it up, e.g. "150 Hz Hz"), but
-    // makeFloatParameter()'s default text for the three widths does NOT include its
-    // own .withLabel() unit, so that case alone still needs an explicit suffix here.
-    const bool isFrequency = paramId == juce::String(g_paramMultibandFreq1.ID)
-                           || paramId == juce::String(g_paramMultibandFreq2.ID)
-                           || paramId == juce::String(g_paramMultibandFreq3.ID);
-    if (!isFrequency)
-        knob.setTextValueSuffix(" %");
-
-    // Pre-sync the knob's own raw value to the parameter's current one BEFORE
-    // constructing the attachment below: SliderAttachment's constructor calls
-    // Slider::setNormalisableRange() first, which immediately formats the slider's
-    // CURRENT value for display (Slider::Pimpl::updateRange() -> updateText()) --
-    // before its own later step syncs that value from the parameter. For an
-    // untouched/freshly-unbound knob (raw value still 0.0) rebinding to one of the
-    // three crossover-frequency parameters, whose NormalisableRange does a literal
-    // std::log(value/rangeStart) (makeLogFrequencyParameter() above), formatting
-    // value=0 computes log(0) = -inf, which fails a JUCE assertion in
-    // NormalisableRange::clampTo0To1 -- benign (if left running) without a debugger
-    // attached, but fatal (SIGTRAP, uncaught without one) under one, found via
-    // pluginval's "Editor Automation" test randomly automating the algorithm selector
-    // to Multiband Width under gdb. Fixed generally (not just for the frequency
-    // knobs), since any parameter's range could in principle be sensitive to its
-    // slider's stale/default value the same way.
-    if (auto* param = dynamic_cast<juce::AudioParameterFloat*>(m_apvts.getParameter(paramId)))
-        knob.setValue(param->get(), juce::dontSendNotification);
-    attachment = std::make_unique<SliderAttachment>(m_apvts, paramId, knob);
-}
-
-void StereoWidenerGUI::clampCrossoverKnob(int index)
-{
-    if (m_bindingMultiKnobs)
-        return; // see m_bindingMultiKnobs' own comment (StereoWidener.h)
-
-    constexpr double minRatioHz = 1.05; // keep adjacent crossovers >= 5 % apart, matches MultibandWidth's own DSP-side safety net
-    auto& knob = m_multiKnobs[(size_t) index];
-    if (index > 0)
-    {
-        const double neighbour = m_multiKnobs[(size_t) index - 1].getValue();
-        if (knob.getValue() < neighbour * minRatioHz)
-            knob.setValue(neighbour * minRatioHz, juce::sendNotificationSync);
-    }
-    if (index < 2)
-    {
-        const double neighbour = m_multiKnobs[(size_t) index + 1].getValue();
-        if (knob.getValue() > neighbour / minRatioHz)
-            knob.setValue(neighbour / minRatioHz, juce::sendNotificationSync);
-    }
-}
-
 void StereoWidenerGUI::showAlgorithmHelp()
 {
     const int index = juce::jlimit(0, m_processor.m_algo.getNumAlgorithms() - 1, m_algorithmBox.getSelectedItemIndex());
@@ -756,84 +429,28 @@ void StereoWidenerGUI::showAlgorithmHelp()
     juce::CallOutBox::launchAsynchronously(std::move(panel), m_helpButton.getScreenBounds(), nullptr);
 }
 
-void StereoWidenerGUI::updateAuxKnobsForActiveAlgorithm()
+void StereoWidenerGUI::showPlaygroundForSelectedAlgorithm()
 {
     const int index = juce::jlimit(0, m_processor.m_algo.getNumAlgorithms() - 1, m_algorithmBox.getSelectedItemIndex());
-    const auto& algorithm = m_processor.m_algo.getAlgorithm(index);
-
-    const auto leftInfo = algorithm.getAuxLeftInfo();
-    m_auxLeftKnob.setEnabled(leftInfo.enabled);
-    m_auxLeftLabel.setText(leftInfo.enabled ? leftInfo.label : juce::String(), juce::dontSendNotification);
-    bindAuxKnob(m_auxLeftKnob, m_auxLeftAttachment, leftInfo.enabled ? auxLeftParamIdFor(index) : juce::String());
-
-    const auto rightInfo = algorithm.getAuxRightInfo();
-    m_auxRightKnob.setEnabled(rightInfo.enabled);
-    m_auxRightLabel.setText(rightInfo.enabled ? rightInfo.label : juce::String(), juce::dontSendNotification);
-    bindAuxKnob(m_auxRightKnob, m_auxRightAttachment, rightInfo.enabled ? auxRightParamIdFor(index) : juce::String());
+    for (size_t i = 0; i < m_playgrounds.size(); ++i)
+        m_playgrounds[i]->setVisible((int) i == index);
 
     // "Not mono-safe" badge (plan2.md Phase 5 step 4): empty (but still laid out, see
-    // resized()) for every mono-safe algorithm, so switching algorithms never shifts
-    // the Utilities section below it.
-    m_monoSafeBadge.setText(algorithm.isMonoSafe() ? juce::String()
+    // resized()) for every mono-safe algorithm.
+    m_monoSafeBadge.setText(m_processor.m_algo.getAlgorithm(index).isMonoSafe() ? juce::String()
         : juce::String::fromUTF8("\xe2\x9a\xa0 Not mono-safe -- check Utilities \xe2\x86\x92 Monitor \xe2\x86\x92 Mono Check"),
         juce::dontSendNotification);
-
-    // Multiband width's dedicated parameter grid (Phase 5 algorithm 2.7): shown only
-    // for an algorithm with getNumMultiParams() > 0 -- every other algorithm hides all
-    // kMaxMultiParams slots, same "disabled/hidden means it does nothing" idea as the
-    // two aux knobs above.
-    const int numMultiParams = algorithm.getNumMultiParams();
-    m_bindingMultiKnobs = true;
-    for (int i = 0; i < kMaxMultiParams; ++i)
-    {
-        const bool visible = i < numMultiParams;
-        m_multiKnobs[(size_t) i].setVisible(visible);
-        m_multiLabels[(size_t) i].setVisible(visible);
-        if (visible)
-        {
-            const auto info = algorithm.getMultiParamInfo(i);
-            m_multiLabels[(size_t) i].setText(info.label, juce::dontSendNotification);
-            bindMultiKnob(i, auxMultiParamIdFor(index, i));
-        }
-        else
-        {
-            bindMultiKnob(i, {});
-        }
-    }
-    m_bindingMultiKnobs = false;
-
-    if (onActiveAlgorithmChanged != nullptr)
-        onActiveAlgorithmChanged();
 }
 
-int StereoWidenerGUI::getRequiredContentHeight() const noexcept
+int StereoWidenerGUI::getRequiredContentHeight() noexcept
 {
     // Mirrors resized()'s own layout math at scale = 1.0 -- see the constants there
     // (PluginSettings.h) for what each term is.
-    const int knobRowHeight = g_widthKnobLabelHeight + g_widthKnobSize + g_widthKnobLabelHeight; // Width is the tallest of the three knobs in this row
-    const int paramBaseContentHeight = knobRowHeight + g_rowGap + g_monoSafeBadgeHeight;
-
+    const int paramContentHeight = g_playgroundHeight + g_rowGap + g_monoSafeBadgeHeight;
     const int utilContentHeight = (g_utilKnobLabelHeight + g_utilKnobSize + g_utilKnobLabelHeight) + g_rowGap
                                  + g_utilCaptionHeight + g_rowGap + g_utilToggleRowHeight + g_rowGap
                                  + g_utilCaptionHeight + g_rowGap + g_utilMonitorBoxHeight;
-
-    // Both boxed panels share this height in the common case (like the three meter-row
-    // panels above, a matched pair of cards) -- the parameter panel grows further on
-    // its own below, only when the multiband grid is active.
-    const int baseContentHeight = juce::jmax(paramBaseContentHeight, utilContentHeight);
-
-    int paramContentHeight = baseContentHeight;
-    const int index = juce::jlimit(0, m_processor.m_algo.getNumAlgorithms() - 1, m_algorithmBox.getSelectedItemIndex());
-    const int numMultiParams = m_processor.m_algo.getAlgorithm(index).getNumMultiParams();
-    if (numMultiParams > 0)
-    {
-        const int rows = (numMultiParams + g_multiGridCols - 1) / g_multiGridCols;
-        const int knobUnitHeight = g_multiKnobLabelHeight + g_multiKnobSize + g_multiKnobLabelHeight;
-        const int multiGridHeight = rows * knobUnitHeight + (rows - 1) * g_multiKnobRowGap;
-        paramContentHeight += g_rowGap + multiGridHeight;
-    }
-
-    const int panelsHeight = paramContentHeight + 2 * g_panelPadding; // always >= util panel's own height, see above
+    const int panelsHeight = juce::jmax(paramContentHeight, utilContentHeight) + 2 * g_panelPadding;
 
     return g_meterRowHeight + g_rowGap + g_algorithmRowHeight + g_rowGap + panelsHeight + g_rowGap + g_footerHeight;
 }
@@ -878,7 +495,7 @@ void StereoWidenerGUI::resized()
     const int rowGap = juce::roundToInt(g_rowGap * scale);
 
     // Footer: reserved from the bottom FIRST, so it always sits at the very bottom of
-    // the window regardless of which algorithm (and so which content height) is active.
+    // the window.
     const int footerHeight = juce::roundToInt(g_footerHeight * scale);
     m_footerLabel.setBounds(r.removeFromBottom(footerHeight));
     r.removeFromBottom(rowGap);
@@ -921,22 +538,17 @@ void StereoWidenerGUI::resized()
     m_helpButton.setBounds(algoGroup); // whatever's left = exactly algoRowHeight square
 
     // Two boxed "card" panels side by side (drawn in paint(), from m_paramPanelBounds/
-    // m_utilPanelBounds set below): left two-thirds = the active algorithm's own
-    // parameters (aux knobs + Width [+ the multiband grid, when active]); right third
-    // = Utilities. An explicit g_panelDividerWidth gap is removed between the two
-    // outer (card-background) rectangles -- a visible thin line in the plain
+    // m_utilPanelBounds set below): left two-thirds = the selected algorithm's
+    // playground plus the mono-safe badge; right third = Utilities. Both have the same
+    // fixed height for every algorithm. An explicit g_panelDividerWidth gap is removed
+    // between the two outer (card-background) rectangles -- a visible thin line in the plain
     // (unbrightened) background colour, per explicit request, rather than leaving them
     // flush against each other (each panel's own g_panelPadding is a separate, inner
     // inset between its background and its own content, not a gap between the panels).
     const int panelPadding = juce::roundToInt(g_panelPadding * scale);
     const int panelDividerWidth = juce::roundToInt(g_panelDividerWidth * scale);
 
-    const int knobSize = juce::roundToInt(g_widthKnobSize * scale);
-    const int labelHeight = juce::roundToInt(g_widthKnobLabelHeight * scale);
-    const int textBoxHeight = labelHeight;
-    const int auxKnobSize = juce::roundToInt(g_auxKnobSize * scale);
-    const int auxLabelHeight = juce::roundToInt(g_auxKnobLabelHeight * scale);
-    const int paramKnobGap = juce::roundToInt(g_paramKnobGap * scale);
+    const int playgroundHeight = juce::roundToInt(g_playgroundHeight * scale);
     const int badgeHeight = juce::roundToInt(g_monoSafeBadgeHeight * scale);
 
     const int utilKnobSize = juce::roundToInt(g_utilKnobSize * scale);
@@ -948,111 +560,38 @@ void StereoWidenerGUI::resized()
     const int utilToggleGap = juce::roundToInt(g_utilToggleGap * scale);
     const int utilMonitorBoxHeight = juce::roundToInt(g_utilMonitorBoxHeight * scale);
 
-    const int knobRowHeight = labelHeight + knobSize + textBoxHeight; // Width is the tallest of the three knobs in this row
-    const int paramBaseContentHeight = knobRowHeight + rowGap + badgeHeight;
+    const int paramContentHeight = playgroundHeight + rowGap + badgeHeight;
     const int utilContentHeight = (utilLabelHeight + utilKnobSize + utilLabelHeight) + rowGap
                                  + utilCaptionHeight + rowGap + utilToggleRowHeight + rowGap
                                  + utilCaptionHeight + rowGap + utilMonitorBoxHeight;
-    const int baseContentHeight = juce::jmax(paramBaseContentHeight, utilContentHeight);
+    const int contentHeight = juce::jmax(paramContentHeight, utilContentHeight);
 
-    const int activeIndex = juce::jlimit(0, m_processor.m_algo.getNumAlgorithms() - 1, m_algorithmBox.getSelectedItemIndex());
-    const int numMultiParams = m_processor.m_algo.getAlgorithm(activeIndex).getNumMultiParams();
-    const int multiKnobSize = juce::roundToInt(g_multiKnobSize * scale);
-    const int multiTextBoxWidth = juce::roundToInt(g_multiKnobTextBoxWidth * scale); // wider than the knob, fits "6000 Hz"
-    const int multiLabelHeight = juce::roundToInt(g_multiKnobLabelHeight * scale);
-    const int multiColGap = juce::roundToInt(g_multiKnobColGap * scale);
-    const int multiRowGap = juce::roundToInt(g_multiKnobRowGap * scale);
-    const int multiKnobUnitHeight = multiLabelHeight + multiKnobSize + multiLabelHeight;
-    const int multiRows = numMultiParams > 0 ? (numMultiParams + g_multiGridCols - 1) / g_multiGridCols : 0;
-    const int multiGridHeight = multiRows > 0 ? multiRows * multiKnobUnitHeight + (multiRows - 1) * multiRowGap : 0;
-
-    // The parameter panel grows past the shared base height on its own, only when the
-    // multiband grid is active -- the Utilities panel always stays at baseContentHeight
-    // (see getRequiredContentHeight()'s matching comment).
-    const int paramContentHeight = baseContentHeight + (numMultiParams > 0 ? rowGap + multiGridHeight : 0);
-
-    auto panelsRow = r.removeFromTop(paramContentHeight + 2 * panelPadding); // always >= the util panel's own height
-    auto paramOuter = panelsRow.removeFromLeft(leftBlockWidth - panelDividerWidth);
+    auto panelsRow = r.removeFromTop(contentHeight + 2 * panelPadding);
+    m_paramPanelBounds = panelsRow.removeFromLeft(leftBlockWidth - panelDividerWidth);
     panelsRow.removeFromLeft(panelDividerWidth); // the visible dividing line -- see above
-    auto utilOuter = panelsRow; // remainder = rightBlockWidth
-
-    m_paramPanelBounds = paramOuter.withHeight(paramContentHeight + 2 * panelPadding);
-    m_utilPanelBounds = utilOuter.withHeight(baseContentHeight + 2 * panelPadding); // both top-anchored to the same Y, independent heights
+    m_utilPanelBounds = panelsRow; // remainder = rightBlockWidth
 
     auto paramArea = m_paramPanelBounds.reduced(panelPadding);
     auto utilArea = m_utilPanelBounds.reduced(panelPadding);
 
-    // Parameter panel: aux-left / Width / aux-right in one row (their meaning depends
-    // on the active algorithm, see updateAuxKnobsForActiveAlgorithm()), each column
-    // vertically centred on its own (smaller, for the aux knobs) natural height within
-    // the row -- Width is the tallest of the three and so sets the row's own height.
-    auto knobRow = paramArea.removeFromTop(knobRowHeight);
-    auto knobRowCentred = knobRow.withSizeKeepingCentre(2 * auxKnobSize + knobSize + 2 * paramKnobGap, knobRow.getHeight());
-
-    auto auxLeftColumn = knobRowCentred.removeFromLeft(auxKnobSize);
-    knobRowCentred.removeFromLeft(paramKnobGap);
-    auto widthColumn = knobRowCentred.removeFromLeft(knobSize);
-    knobRowCentred.removeFromLeft(paramKnobGap);
-    auto auxRightColumn = knobRowCentred; // remainder
-
-    const int auxUnitHeight = auxLabelHeight + auxKnobSize + auxLabelHeight;
-    auto auxLeftStack = auxLeftColumn.withSizeKeepingCentre(auxKnobSize, auxUnitHeight);
-    m_auxLeftKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, auxKnobSize, auxLabelHeight);
-    m_auxLeftLabel.setBounds(auxLeftStack.removeFromTop(auxLabelHeight));
-    m_auxLeftKnob.setBounds(auxLeftStack.removeFromTop(auxKnobSize + auxLabelHeight));
-
-    m_widthKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, knobSize, textBoxHeight);
-    m_widthLabel.setBounds(widthColumn.removeFromTop(labelHeight));
-    m_widthKnob.setBounds(widthColumn.removeFromTop(knobSize + textBoxHeight));
-
-    auto auxRightStack = auxRightColumn.withSizeKeepingCentre(auxKnobSize, auxUnitHeight);
-    m_auxRightKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, auxKnobSize, auxLabelHeight);
-    m_auxRightLabel.setBounds(auxRightStack.removeFromTop(auxLabelHeight));
-    m_auxRightKnob.setBounds(auxRightStack.removeFromTop(auxKnobSize + auxLabelHeight));
-
-    paramArea.removeFromTop(rowGap);
-    // "Not mono-safe" badge (Phase 5 step 4): always reserved (empty text when the
-    // active algorithm is mono-safe).
-    m_monoSafeBadge.setBounds(paramArea.removeFromTop(badgeHeight));
-
-    // Multiband width's dedicated parameter grid (Phase 5 algorithm 2.7): below the
-    // badge, still inside the parameter panel, only occupying space when the active
-    // algorithm needs it -- see getRequiredContentHeight()/PluginEditor.cpp for how the
-    // window itself grows to fit this.
-    if (numMultiParams > 0)
+    // Parameter panel: the "not mono-safe" badge is a strip at the bottom (always
+    // reserved, empty text when the active algorithm is mono-safe); the playground
+    // gets everything above it -- the same bounds for every algorithm.
+    m_monoSafeBadge.setBounds(paramArea.removeFromBottom(badgeHeight));
+    paramArea.removeFromBottom(rowGap);
+    for (auto& playground : m_playgrounds)
     {
-        paramArea.removeFromTop(rowGap);
-        auto gridArea = paramArea.removeFromTop(multiGridHeight);
-        const int totalRowWidth = g_multiGridCols * multiTextBoxWidth + (g_multiGridCols - 1) * multiColGap;
-        auto gridCentred = gridArea.withSizeKeepingCentre(totalRowWidth, gridArea.getHeight());
-
-        for (int row = 0; row < multiRows; ++row)
-        {
-            auto rowArea = gridCentred.removeFromTop(multiKnobUnitHeight);
-            for (int col = 0; col < g_multiGridCols; ++col)
-            {
-                const int i = row * g_multiGridCols + col;
-                if (i >= numMultiParams)
-                    break;
-                auto cell = rowArea.removeFromLeft(multiTextBoxWidth);
-                if (col < g_multiGridCols - 1)
-                    rowArea.removeFromLeft(multiColGap);
-                m_multiKnobs[(size_t) i].setTextBoxStyle(juce::Slider::TextBoxBelow, false, multiTextBoxWidth, multiLabelHeight);
-                m_multiLabels[(size_t) i].setBounds(cell.removeFromTop(multiLabelHeight));
-                m_multiKnobs[(size_t) i].setBounds(cell.removeFromTop(multiKnobSize + multiLabelHeight));
-            }
-            if (row < multiRows - 1)
-                gridCentred.removeFromTop(multiRowGap);
-        }
+        playground->setBounds(paramArea);
+        playground->setScaleFactor(scale);
     }
 
     // Utilities panel (Phase 4 step 2, its own boxed card since Phase 6's GUI redesign
     // -- every utility acts on the final output signal, see UtilityProcessor.h) --
     // Rotation/Balance knobs, a caption, the toggle buttons, another caption, then the
     // Monitor selector, all sharing utilArea's own width. Vertically centred within
-    // utilArea's actual height (baseContentHeight, which can be taller than
-    // utilContentHeight itself if the parameter panel's own base row is the taller of
-    // the two) -- horizontally a no-op, since utilArea is already the right width.
+    // utilArea's actual height (contentHeight, which can be taller than
+    // utilContentHeight itself if the parameter panel is the taller of the two) --
+    // horizontally a no-op, since utilArea is already the right width.
     auto utilStack = utilArea.withSizeKeepingCentre(utilArea.getWidth(), utilContentHeight);
 
     auto utilKnobRow = utilStack.removeFromTop(utilLabelHeight + utilKnobSize + utilLabelHeight);

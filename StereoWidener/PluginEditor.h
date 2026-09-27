@@ -20,14 +20,11 @@ public:
     void resized() override;
 
 private:
-    // Resizes the window to fit whichever algorithm is now active (StereoWidenerGUI::
-    // getRequiredContentHeight()) -- wired to m_editor.onActiveAlgorithmChanged in the
-    // constructor, and also called once manually right after, since the GUI's own
-    // initial call (from its constructor) happens before that wiring exists yet. Most
-    // algorithms need the same, compact size; Multiband Width (Phase 5 algorithm 2.7)
-    // needs a taller window for its 6-parameter grid, so the window actually changes
-    // shape on selecting/leaving it -- see docs/algorithms (phase5 multiband write-up).
-    void updateWindowSizeForActiveAlgorithm();
+    // Sets the window's aspect ratio and size from StereoWidenerGUI::
+    // getRequiredContentHeight() plus the preset bar. Called once from the constructor:
+    // the content height is the same for every algorithm (see AlgorithmPlayground.h),
+    // so the window never changes shape on an algorithm switch.
+    void applyWindowSize();
 
     // Flips m_lookAndFeel's theme, persists the choice (GlobalSettings::
     // saveUseDayTheme(), immediately -- unlike the continuously-changing GUI scale

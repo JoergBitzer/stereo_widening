@@ -75,7 +75,7 @@ int main(int argc, char* argv[])
     const juce::File inputFile = juce::File::getCurrentWorkingDirectory().getChildFile(argv[1]);
     const juce::File outputFile = juce::File::getCurrentWorkingDirectory().getChildFile(argv[2]);
     const juce::String algorithmName(argv[3]);
-    const float width = (argc > 4 ? (float) std::atof(argv[4]) : 100.0f) * 0.01f;
+    const float widthPercent = argc > 4 ? (float) std::atof(argv[4]) : 100.0f;
     const float bassCutoffHz = argc > 5 ? (float) std::atof(argv[5]) : 150.0f;
     const float highShelfHz = argc > 6 ? (float) std::atof(argv[6]) : 8000.0f;
     const float combDelayMs = argc > 7 ? (float) std::atof(argv[7]) : 10.0f;
@@ -160,41 +160,52 @@ int main(int argc, char* argv[])
     algorithm->prepare(reader->sampleRate, blockSize);
     algorithm->reset();
 
-    StereoAlgorithmParams params;
-    params.width = width;
-    if (algorithmName == "comb")
+    // Same units as the plugin's parameters (see each algorithm's getParamSpecs()):
+    // percentages as 0-100, frequencies in Hz, times in ms.
+    AlgorithmParamValues values {};
+    if (algorithmName == "broadband")
     {
-        params.auxLeft = combDelayMs;
-        params.auxRight = combGainPercent * 0.01f;
+        values[MSWidthBroadband::kWidth] = widthPercent;
+    }
+    else if (algorithmName == "comb")
+    {
+        values[ComplementaryComb::kWidth] = widthPercent;
+        values[ComplementaryComb::kDelay] = combDelayMs;
+        values[ComplementaryComb::kGain] = combGainPercent;
     }
     else if (algorithmName == "allpass")
     {
-        params.auxLeft = allpassAmountPercent * 0.01f;
-        params.auxRight = allpassSpreadPercent * 0.01f;
+        values[AllpassDecorrelation::kWidth] = widthPercent;
+        values[AllpassDecorrelation::kAmount] = allpassAmountPercent;
+        values[AllpassDecorrelation::kSpread] = allpassSpreadPercent;
     }
     else if (algorithmName == "multiband")
     {
-        params.multi[MultibandWidth::kFreq1] = mbFreq1;
-        params.multi[MultibandWidth::kFreq2] = mbFreq2;
-        params.multi[MultibandWidth::kFreq3] = mbFreq3;
-        params.multi[MultibandWidth::kWidth2] = mbWidth2Percent * 0.01f;
-        params.multi[MultibandWidth::kWidth3] = mbWidth3Percent * 0.01f;
-        params.multi[MultibandWidth::kWidth4] = mbWidth4Percent * 0.01f;
+        values[MultibandWidth::kWidth] = widthPercent;
+        values[MultibandWidth::kFreq1] = mbFreq1;
+        values[MultibandWidth::kFreq2] = mbFreq2;
+        values[MultibandWidth::kFreq3] = mbFreq3;
+        values[MultibandWidth::kWidth2] = mbWidth2Percent;
+        values[MultibandWidth::kWidth3] = mbWidth3Percent;
+        values[MultibandWidth::kWidth4] = mbWidth4Percent;
     }
     else if (algorithmName == "earlyrefl")
     {
-        params.auxLeft = erAmountPercent * 0.01f;
-        params.auxRight = erRoomSizePercent * 0.01f;
+        values[EarlyReflections::kWidth] = widthPercent;
+        values[EarlyReflections::kAmount] = erAmountPercent;
+        values[EarlyReflections::kRoomSize] = erRoomSizePercent;
     }
     else if (algorithmName == "chorus")
     {
-        params.auxLeft = chorusAmountPercent * 0.01f;
-        params.auxRight = chorusDepthPercent * 0.01f;
+        values[ChorusDoubler::kWidth] = widthPercent;
+        values[ChorusDoubler::kAmount] = chorusAmountPercent;
+        values[ChorusDoubler::kDepth] = chorusDepthPercent;
     }
-    else
+    else // filtered
     {
-        params.auxLeft = bassCutoffHz;
-        params.auxRight = highShelfHz;
+        values[MSWidthFiltered::kWidth] = widthPercent;
+        values[MSWidthFiltered::kBassCutoff] = bassCutoffHz;
+        values[MSWidthFiltered::kHighShelf] = highShelfHz;
     }
 
     // block-sized processing, not one giant call, so MSWidthFiltered's per-sample IIR
@@ -204,7 +215,7 @@ int main(int argc, char* argv[])
     {
         const int thisBlockSize = std::min(blockSize, numSamples - start);
         juce::AudioBuffer<float> block(buffer.getArrayOfWritePointers(), 2, start, thisBlockSize);
-        algorithm->process(block, params);
+        algorithm->process(block, values);
     }
 
     outputFile.getParentDirectory().createDirectory();
@@ -223,27 +234,27 @@ int main(int argc, char* argv[])
     writer->writeFromAudioSampleBuffer(buffer, 0, numSamples);
 
     if (algorithmName == "comb")
-        std::cout << "wrote " << outputFile.getFullPathName() << " (comb, width=" << (width * 100.0f)
+        std::cout << "wrote " << outputFile.getFullPathName() << " (comb, width=" << widthPercent
                    << "%, delay=" << combDelayMs << " ms, gain=" << combGainPercent
                    << "%, crossover=" << combCrossoverHz << " Hz)\n";
     else if (algorithmName == "allpass")
-        std::cout << "wrote " << outputFile.getFullPathName() << " (allpass, width=" << (width * 100.0f)
+        std::cout << "wrote " << outputFile.getFullPathName() << " (allpass, width=" << widthPercent
                    << "%, amount=" << allpassAmountPercent << "%, spread=" << allpassSpreadPercent << "%)\n";
     else if (algorithmName == "multiband")
-        std::cout << "wrote " << outputFile.getFullPathName() << " (multiband, width=" << (width * 100.0f)
+        std::cout << "wrote " << outputFile.getFullPathName() << " (multiband, width=" << widthPercent
                    << "%, freqs=" << mbFreq1 << "/" << mbFreq2 << "/" << mbFreq3
                    << " Hz, widths=" << mbWidth2Percent << "/" << mbWidth3Percent << "/" << mbWidth4Percent << "%)\n";
     else if (algorithmName == "earlyrefl")
-        std::cout << "wrote " << outputFile.getFullPathName() << " (earlyrefl, width=" << (width * 100.0f)
+        std::cout << "wrote " << outputFile.getFullPathName() << " (earlyrefl, width=" << widthPercent
                    << "%, amount=" << erAmountPercent << "%, roomSize=" << erRoomSizePercent
                    << "%, preDelay=" << erPreDelayMs << " ms)\n";
     else if (algorithmName == "chorus")
-        std::cout << "wrote " << outputFile.getFullPathName() << " (chorus, width=" << (width * 100.0f)
+        std::cout << "wrote " << outputFile.getFullPathName() << " (chorus, width=" << widthPercent
                    << "%, amount=" << chorusAmountPercent << "%, depth=" << chorusDepthPercent
                    << "%, rate=" << chorusRateHz << " Hz)\n";
     else
         std::cout << "wrote " << outputFile.getFullPathName() << " (" << algorithmName
-                   << ", width=" << (width * 100.0f) << "%, bassCutoff=" << bassCutoffHz
+                   << ", width=" << widthPercent << "%, bassCutoff=" << bassCutoffHz
                    << " Hz, highShelf=" << highShelfHz << " Hz)\n";
     return 0;
 }

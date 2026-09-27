@@ -467,6 +467,12 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      being auditioned). The other two utility knobs (Rotation/Balance) were shrunk
      (48px -> 40px) to fit the row within the existing panel width. See
      [phase6_output_gain.md](docs/algorithms/phase6_output_gain.md).
+   - ✅ GUI playground, step 0 (v0.1.16), per [plan_changeGUI.md](plan_changeGUI.md):
+     each algorithm declares its own parameters (`getParamSpecs()`), one Width
+     parameter per algorithm, one fixed-size playground per algorithm (plain knobs for
+     now), so the window no longer resizes on an algorithm switch. DSP output verified
+     byte-identical before/after. See
+     [phase6_playground_step0.md](docs/algorithms/phase6_playground_step0.md).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.

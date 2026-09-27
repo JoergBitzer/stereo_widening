@@ -30,13 +30,9 @@
  * Mono-safe by construction: M' is never touched, so L'+R' = 2M always, regardless of
  * any width setting -- same guarantee as algorithm 2.4's comb.
  *
- * Six user-facing parameters (three crossover frequencies, three band widths) plus the
- * shared Width knob -- the one algorithm in this project that can't fit the "2 + Width"
- * convention every other algorithm uses (see phase5_comb.md), hence
- * StereoAlgorithm::getNumMultiParams()/getMultiParamInfo() and
- * StereoAlgorithmParams::multi (StereoAlgorithm.h) instead of the usual aux knobs, and
- * a dedicated grid area in StereoWidenerGUI instead of the usual two flanking knobs
- * (see docs/algorithms, phase5 multiband write-up).
+ * Parameters (getParamSpecs()): a master Width scaling all three widened bands, the
+ * three crossover frequencies, and the three band widths (bands 2-4; band 1 is always
+ * mono, see above).
  *
  * Reference: S. Linkwitz, "Active Crossover Networks for Noncoincident Drivers",
  * J. Audio Eng. Soc., 1976 (the LR4 crossover itself); B. Katz, "Mastering Audio: The
@@ -55,23 +51,33 @@ class MultibandWidth : public StereoAlgorithm
 public:
     void prepare(double sampleRate, int maxBlockSize) override;
     void reset() override;
-    void process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept override;
+    void process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept override;
+
+    // The crossover ranges overlap a little between neighbours on purpose: process()
+    // sorts and separates the three raw values defensively
+    // (updateFrequenciesIfNeeded()), and the GUI additionally stops each crossover at
+    // its neighbour while dragging, so independent per-parameter ranges are simpler
+    // than keeping three parameter ranges mutually exclusive.
+    enum ParamIndex { kWidth = 0, kFreq1, kFreq2, kFreq3, kWidth2, kWidth3, kWidth4 };
+    std::vector<AlgorithmParamSpec> getParamSpecs() const override
+    {
+        return {
+            AlgorithmParamSpec::width("multibandMasterWidth"),
+            AlgorithmParamSpec::logFrequency("multibandFreq1", "Low-Mid", 40.0f, 400.0f, 150.0f),
+            AlgorithmParamSpec::logFrequency("multibandFreq2", "Mid-High", 200.0f, 4000.0f, 1500.0f),
+            AlgorithmParamSpec::logFrequency("multibandFreq3", "High-Air", 1000.0f, 18000.0f, 6000.0f),
+            AlgorithmParamSpec::width("multibandWidth2", "Low-Mid"),
+            AlgorithmParamSpec::width("multibandWidth3", "Mid-High"),
+            AlgorithmParamSpec::width("multibandWidth4", "High")
+        };
+    }
 
     const char* getName() const noexcept override { return "Multiband Width"; }
     juce::String getDescription() const override;
-    AuxKnobInfo getAuxLeftInfo() const noexcept override { return {}; }
-    AuxKnobInfo getAuxRightInfo() const noexcept override { return {}; }
-    int getNumMultiParams() const noexcept override { return kNumMultiParams; }
-    AuxKnobInfo getMultiParamInfo(int index) const noexcept override;
     bool isMonoSafe() const noexcept override { return true; }
     int getLatencySamples() const noexcept override { return 0; }
 
     static constexpr float kFilterQ = 0.70710678f; // Butterworth, matches every other algorithm's filters
-    static constexpr int kNumMultiParams = 6;
-    // params.multi[] index order -- StereoWidenerGUI's grid shows them in this order
-    // (row 1: crossovers, row 2: widths), and StereoWidenerAudio::paramsFor() fills
-    // them in this order; keep both in sync with this enum.
-    enum MultiParamIndex { kFreq1 = 0, kFreq2, kFreq3, kWidth2, kWidth3, kWidth4 };
 
 private:
     // One LR4 (4th-order) lowpass or highpass: two identical cascaded 2nd-order

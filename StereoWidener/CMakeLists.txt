@@ -6,7 +6,7 @@
 
 set(TARGET_NAME StereoWidener)
 
-project(${TARGET_NAME} VERSION 0.1.15)
+project(${TARGET_NAME} VERSION 0.1.16)
 
 configure_file(Versioning.h.in Versioning.h)
 
@@ -36,6 +36,7 @@ target_sources(${TARGET_NAME}
         PluginLookAndFeel.cpp
         StereoWidener.cpp
         AlgorithmHelpPanel.cpp
+        AlgorithmPlayground.cpp
         GlobalSettings.cpp
         UtilityProcessor.cpp
         algorithms/MSWidthBroadband.cpp

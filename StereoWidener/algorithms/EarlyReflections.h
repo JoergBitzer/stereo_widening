@@ -49,10 +49,10 @@
  * every tap's read position discontinuously.
  *
  * Two user-facing parameters, per the project's "2 + Width" convention:
- * - Amount (StereoWidenerGUI's left aux knob): 0-100 %, defaults to 0 % -- an exact,
+ * - Amount: 0-100 %, defaults to 0 % -- an exact,
  *   algebraically neutral bypass (see phase5_comb.md's "Removing last-used state" for
  *   why every algorithm's default must be neutral).
- * - Room Size (right aux knob): 0-100 %, no neutral value of its own -- inert whenever
+ * - Room Size: 0-100 %, no neutral value of its own -- inert whenever
  *   Amount = 0, same reasoning as ComplementaryComb's Delay knob. Scales the spread of
  *   the reflection pattern from a small room (tight, early cluster) to a large room
  *   (wider spread, further into planing.md's suggested 5-40 ms window).
@@ -79,12 +79,20 @@ class EarlyReflections : public StereoAlgorithm
 public:
     void prepare(double sampleRate, int maxBlockSize) override;
     void reset() override;
-    void process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept override;
+    void process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept override;
+
+    enum ParamIndex { kWidth = 0, kAmount, kRoomSize };
+    std::vector<AlgorithmParamSpec> getParamSpecs() const override
+    {
+        return {
+            AlgorithmParamSpec::width("earlyReflWidth"),
+            AlgorithmParamSpec::linear("earlyReflAmount", "Amount", "%", 0.0f, 100.0f, 0.0f),
+            AlgorithmParamSpec::linear("earlyReflRoomSize", "Room Size", "%", 0.0f, 100.0f, 50.0f)
+        };
+    }
 
     const char* getName() const noexcept override { return "Early Reflections (Room Widening)"; }
     juce::String getDescription() const override;
-    AuxKnobInfo getAuxLeftInfo() const noexcept override { return { true, "Amount" }; }
-    AuxKnobInfo getAuxRightInfo() const noexcept override { return { true, "Room Size" }; }
     bool isMonoSafe() const noexcept override { return false; }
     int getLatencySamples() const noexcept override { return 0; }
 

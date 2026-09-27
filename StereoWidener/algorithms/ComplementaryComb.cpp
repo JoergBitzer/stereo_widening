@@ -33,9 +33,10 @@ void ComplementaryComb::updateCrossoverFilter() noexcept
     *crossoverFilter.coefficients = *juce::dsp::IIR::Coefficients<float>::makeHighPass(sampleRate, crossoverHz, kFilterQ);
 }
 
-void ComplementaryComb::process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept
+void ComplementaryComb::process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept
 {
-    const float targetDelaySamples = params.auxLeft * 0.001f * (float) sampleRate;
+    const float width = values[kWidth] * 0.01f; // % -> 0..2
+    const float targetDelaySamples = values[kDelay] * 0.001f * (float) sampleRate;
     if (!delayInitialized)
     {
         smoothedDelaySamples.setCurrentAndTargetValue(targetDelaySamples); // first block: snap, no glide-in from 0
@@ -49,7 +50,7 @@ void ComplementaryComb::process(juce::AudioBuffer<float>& buffer, const StereoAl
     auto* left = buffer.getWritePointer(0);
     auto* right = buffer.getWritePointer(1);
     const int numSamples = buffer.getNumSamples();
-    const float gain = params.auxRight; // 0..1, see StereoWidenerAudio::paramsFor()
+    const float gain = values[kGain] * 0.01f; // % -> 0..1
 
     for (int i = 0; i < numSamples; ++i)
     {
@@ -67,7 +68,7 @@ void ComplementaryComb::process(juce::AudioBuffer<float>& buffer, const StereoAl
         const float delayedMid = delayLine.popSample(0);
         const float delayedFiltered = crossoverFilter.processSample(delayedMid);
 
-        const float sOut = params.width * (s + gain * delayedFiltered);
+        const float sOut = width * (s + gain * delayedFiltered);
         left[i] = m + sOut;
         right[i] = m - sOut;
     }

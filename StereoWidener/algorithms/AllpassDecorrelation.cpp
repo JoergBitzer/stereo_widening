@@ -49,9 +49,10 @@ void AllpassDecorrelation::updateCascades(float spreadOctaves) noexcept
     }
 }
 
-void AllpassDecorrelation::process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept
+void AllpassDecorrelation::process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept
 {
-    const float spreadOctaves = params.auxRight * kMaxSpreadOctaves; // auxRight is 0..1, see StereoWidenerAudio::paramsFor()
+    const float width = values[kWidth] * 0.01f; // % -> 0..2
+    const float spreadOctaves = (values[kSpread] * 0.01f) * kMaxSpreadOctaves; // % -> 0..1 -> octaves
     if (hasChanged(spreadOctaves, lastSpreadOctaves))
     {
         updateCascades(spreadOctaves);
@@ -61,7 +62,7 @@ void AllpassDecorrelation::process(juce::AudioBuffer<float>& buffer, const Stere
     auto* left = buffer.getWritePointer(0);
     auto* right = buffer.getWritePointer(1);
     const int numSamples = buffer.getNumSamples();
-    const float amount = params.auxLeft; // 0..1, see StereoWidenerAudio::paramsFor()
+    const float amount = values[kAmount] * 0.01f; // % -> 0..1
 
     for (int i = 0; i < numSamples; ++i)
     {
@@ -78,7 +79,7 @@ void AllpassDecorrelation::process(juce::AudioBuffer<float>& buffer, const Stere
         const float rOut = right[i] + amount * (y2 - mid);
 
         const float midOut = 0.5f * (lOut + rOut);
-        const float sideOut = params.width * 0.5f * (lOut - rOut);
+        const float sideOut = width * 0.5f * (lOut - rOut);
         left[i] = midOut + sideOut;
         right[i] = midOut - sideOut;
     }

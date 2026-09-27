@@ -179,7 +179,10 @@ Playground:
 
 ## 5. Rollout (each step its own branch, merged when verified)
 
-**Step 0 -- infrastructure, no visual change yet.**
+**Step 0 -- infrastructure, no visual change yet.** ✅ Done in v0.1.16, see
+[phase6_playground_step0.md](docs/algorithms/phase6_playground_step0.md). Deviation:
+the per-algorithm Width (7.1, decided after this was written) was already introduced
+here, since each algorithm's spec list had to be designed now anyway.
 `AlgorithmParamSpec`/`getParamSpecs()` and `values[]` in the DSP interface (all 7
 algorithms migrated mechanically, same parameters and IDs as today), the
 `AlgorithmPlayground` base class, the switching logic in `StereoWidenerGUI`, the

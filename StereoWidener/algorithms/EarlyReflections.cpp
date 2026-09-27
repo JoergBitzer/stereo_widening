@@ -58,9 +58,10 @@ void EarlyReflections::updateTapTargets(float roomSize) noexcept
     delayInitialized = true;
 }
 
-void EarlyReflections::process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept
+void EarlyReflections::process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept
 {
-    const float roomSize = params.auxRight; // 0..1, see StereoWidenerAudio::paramsFor()
+    const float width = values[kWidth] * 0.01f; // % -> 0..2
+    const float roomSize = values[kRoomSize] * 0.01f; // % -> 0..1
     if (!delayInitialized || hasChanged(roomSize, lastRoomSize))
     {
         updateTapTargets(roomSize);
@@ -70,8 +71,8 @@ void EarlyReflections::process(juce::AudioBuffer<float>& buffer, const StereoAlg
     auto* left = buffer.getWritePointer(0);
     auto* right = buffer.getWritePointer(1);
     const int numSamples = buffer.getNumSamples();
-    const float amount = params.auxLeft; // 0..1, see StereoWidenerAudio::paramsFor()
-    const float gain = params.width * amount;
+    const float amount = values[kAmount] * 0.01f; // % -> 0..1
+    const float gain = width * amount;
 
     for (int i = 0; i < numSamples; ++i)
     {

@@ -12,8 +12,8 @@
  * MSWidthFiltered.h for the "bass mono" alternative that keeps low frequencies
  * centred, which exists specifically to exercise the algorithm-switch crossfade
  * (StereoWidenerAudio::processSynchronBlock) against a second, audibly different mode.
- * Stateless (no filters, no memory), so prepare()/reset() have nothing to do. Uses
- * neither aux knob.
+ * Stateless (no filters, no memory), so prepare()/reset() have nothing to do. Its
+ * only parameter is Width.
  *
  * Reference: R. Streicher and F. A. Everest, "The New Stereo Soundbook", 3rd ed.,
  * Audio Engineering Associates, 2006 -- the M/S width technique implemented here is
@@ -31,12 +31,16 @@ class MSWidthBroadband : public StereoAlgorithm
 public:
     void prepare(double sampleRate, int maxBlockSize) override { juce::ignoreUnused(sampleRate, maxBlockSize); }
     void reset() override {}
-    void process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept override;
+    void process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept override;
+
+    enum ParamIndex { kWidth = 0 };
+    std::vector<AlgorithmParamSpec> getParamSpecs() const override
+    {
+        return { AlgorithmParamSpec::width("broadbandWidth") };
+    }
 
     const char* getName() const noexcept override { return "M/S Width (Broadband)"; }
     juce::String getDescription() const override;
-    AuxKnobInfo getAuxLeftInfo() const noexcept override { return {}; }
-    AuxKnobInfo getAuxRightInfo() const noexcept override { return {}; }
     bool isMonoSafe() const noexcept override { return true; }
     int getLatencySamples() const noexcept override { return 0; }
 };
