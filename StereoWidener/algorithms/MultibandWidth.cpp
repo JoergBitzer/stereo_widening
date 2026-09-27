@@ -10,18 +10,17 @@ namespace
     }
 
     // Defensive safety net, independent of whatever ordering the GUI enforces on
-    // manual knob drags (StereoWidenerGUI clamps each crossover knob against its
-    // neighbours' current values on drag, but a DAW can still automate the three
-    // crossover parameters directly, bypassing that): sorts the three raw values and
-    // keeps them at least minRatio apart, so the filter coefficients built from them
-    // are always valid (0 < f1 < f2 < f3) no matter what values actually arrive.
+    // manual drags (the playground stops each crossover at its neighbours, but a DAW
+    // can still automate the three crossover parameters directly, bypassing that):
+    // sorts the three raw values and keeps them at least kMinCrossoverRatio apart, so
+    // the filter coefficients built from them are always valid (0 < f1 < f2 < f3) no
+    // matter what values actually arrive.
     void sortAndSeparate(float& f1, float& f2, float& f3) noexcept
     {
         std::array<float, 3> f { f1, f2, f3 };
         std::sort(f.begin(), f.end());
-        constexpr float minRatio = 1.05f; // >= 5 % apart
-        f[1] = juce::jmax(f[1], f[0] * minRatio);
-        f[2] = juce::jmax(f[2], f[1] * minRatio);
+        f[1] = juce::jmax(f[1], f[0] * MultibandWidth::kMinCrossoverRatio);
+        f[2] = juce::jmax(f[2], f[1] * MultibandWidth::kMinCrossoverRatio);
         f1 = f[0]; f2 = f[1]; f3 = f[2];
     }
 }
@@ -56,8 +55,7 @@ void MultibandWidth::process(juce::AudioBuffer<float>& buffer, const AlgorithmPa
 {
     updateFrequenciesIfNeeded(values[kFreq1], values[kFreq2], values[kFreq3]);
 
-    const float width = values[kWidth] * 0.01f; // % -> 0..2, likewise below
-    const float width2 = values[kWidth2] * 0.01f;
+    const float width2 = values[kWidth2] * 0.01f; // % -> 0..2
     const float width3 = values[kWidth3] * 0.01f;
     const float width4 = values[kWidth4] * 0.01f;
 
@@ -77,7 +75,7 @@ void MultibandWidth::process(juce::AudioBuffer<float>& buffer, const AlgorithmPa
         juce::ignoreUnused(s1); // band 1 forced mono -- deliberately excluded below
 
         const float midOut = m1 + m2 + m3 + m4;
-        const float sideOut = width * (width2 * s2 + width3 * s3 + width4 * s4);
+        const float sideOut = width2 * s2 + width3 * s3 + width4 * s4;
 
         left[i] = midOut + sideOut;
         right[i] = midOut - sideOut;
@@ -88,11 +86,14 @@ juce::String MultibandWidth::getDescription() const
 {
     return "Multiband width: 4 bands, 3 crossovers.\n\n"
            "The signal is split into 4 frequency bands by 3 Linkwitz-Riley 4th-order "
-           "crossovers (Low-Mid, Mid-High, High-Air), and each band above the first "
-           "gets its own M/S width control -- the lowest band's width is always 0 "
-           "(\"bass mono\"), not a parameter: low frequencies translate poorly to mono "
-           "playback if left wide and carry most of a mix's energy, so this is built "
-           "in rather than left to the user to remember.\n\n"
+           "crossovers, and each band above the first gets its own M/S width (0 % = "
+           "mono, 100 % = unchanged, 200 % = double the side signal) -- the lowest "
+           "band is always mono (\"bass mono\"), not a parameter: low frequencies "
+           "translate poorly to mono playback if left wide and carry most of a mix's "
+           "energy, so this is built in rather than left to the user to remember.\n\n"
+           "In the display, each band's bar height is its width (dashed line: 100 %). "
+           "Drag a band up or down to change its width, drag the lines between bands "
+           "to move the crossovers; double-click resets.\n\n"
            "Reconstructing a multi-way crossover exactly (flat magnitude) needs care: "
            "naively summing the bands back together leaves audible colouration, "
            "because each band picked up a different amount of the crossovers' own "

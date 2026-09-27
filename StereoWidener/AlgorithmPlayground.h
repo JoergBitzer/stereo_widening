@@ -26,7 +26,8 @@
 class PlaygroundKnob : public juce::Component
 {
 public:
-    PlaygroundKnob(juce::AudioProcessorValueTreeState& apvts, const AlgorithmParamSpec& spec);
+    /** label defaults to the parameter's name; pass a shorter one where space is tight. */
+    PlaygroundKnob(juce::AudioProcessorValueTreeState& apvts, const AlgorithmParamSpec& spec, const juce::String& label = {});
 
     /** Knob diameter, label/value-box height, and value-box width (may be wider than
      *  the knob, e.g. to fit "6000 Hz" under a small knob). All in pixels, already
@@ -89,9 +90,9 @@ private:
     std::vector<std::unique_ptr<juce::ParameterAttachment>> m_watchers;
 };
 
-/** One PlaygroundKnob per parameter. Up to three parameters: the first (the
- *  algorithm's Width) as a large knob in the middle, the others flanking it. More than
- *  three: a centred grid of small knobs. */
+/** One PlaygroundKnob per parameter, for algorithms without a dedicated playground
+ *  yet (up to three parameters): the first (the algorithm's Width) as a large knob in
+ *  the middle, the others flanking it. */
 class KnobsPlayground : public AlgorithmPlayground
 {
 public:
@@ -103,9 +104,6 @@ protected:
     PlaygroundKnob& getKnob(int index) noexcept { return *m_knobs[(size_t) index]; }
 
 private:
-    void layoutAroundMainKnob();
-    void layoutGrid();
-
     std::vector<std::unique_ptr<PlaygroundKnob>> m_knobs;
 };
 

@@ -26,7 +26,8 @@
  * combCrossoverHz default (not a user-facing knob in the plugin itself).
  * allpassAmountPercent/allpassSpreadPercent only matter for "allpass" (see
  * AllpassDecorrelation.h). mbFreq1/2/3 and mbWidth2/3/4Percent only matter for
- * "multiband" (see MultibandWidth.h); band 1's width is always 0, not a parameter.
+ * "multiband" (see MultibandWidth.h); band 1's width is always 0, not a parameter,
+ * and width_percent is ignored for "multiband" (it has no overall Width since v0.1.20).
  * erAmountPercent/erRoomSizePercent/erPreDelayMs only matter for "earlyrefl" (see
  * EarlyReflections.h); erPreDelayMs mirrors GlobalSettings' own default (not a
  * user-facing knob in the plugin itself). chorusAmountPercent/chorusDepthPercent/
@@ -184,7 +185,6 @@ int main(int argc, char* argv[])
     }
     else if (algorithmName == "multiband")
     {
-        values[MultibandWidth::kWidth] = widthPercent;
         values[MultibandWidth::kFreq1] = mbFreq1;
         values[MultibandWidth::kFreq2] = mbFreq2;
         values[MultibandWidth::kFreq3] = mbFreq3;

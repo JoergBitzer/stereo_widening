@@ -29,17 +29,17 @@ FilteredPlayground::FilteredPlayground(juce::AudioProcessorValueTreeState& apvts
 
 void FilteredPlayground::resized()
 {
-    const int textBoxWidth = scaled(g_gridKnobTextBoxWidth);
+    const int textBoxWidth = scaled(g_smallKnobTextBoxWidth);
     for (auto& knob : m_knobs)
-        knob->setKnobLayout(scaled(g_gridKnobSize), scaled(g_gridKnobLabelHeight), textBoxWidth);
+        knob->setKnobLayout(scaled(g_smallKnobSize), scaled(g_smallKnobLabelHeight), textBoxWidth);
     m_graph.setScaleFactor(m_scale);
 
     // Graph across the full width on top, the four knobs in one row below.
     auto area = getLocalBounds();
     const int count = (int) m_knobs.size();
-    const int colGap = scaled(g_gridKnobColGap);
+    const int colGap = scaled(g_smallKnobColGap);
     auto knobRow = area.removeFromBottom(m_knobs.front()->getPreferredHeight());
-    area.removeFromBottom(scaled(g_gridKnobRowGap));
+    area.removeFromBottom(scaled(g_smallKnobRowGap));
     m_graph.setBounds(area);
 
     knobRow = knobRow.withSizeKeepingCentre(count * textBoxWidth + (count - 1) * colGap, knobRow.getHeight());

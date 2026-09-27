@@ -67,6 +67,11 @@ private:
     void drawButtonBackground(juce::Graphics& g, juce::Button& button, const juce::Colour& backgroundColour,
                                bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
 
+    // JUCE's slider value box always uses a 15 px font, however small the box, so
+    // e.g. "1500 Hz" was cut off ("1500 ...") in the compact knobs' boxes. Sized to the
+    // box height instead (at most 15 px, so larger boxes look as before).
+    juce::Label* createSliderTextBox(juce::Slider& slider) override;
+
     Theme m_theme;
     juce::Colour m_knobDiscColour;
     juce::Colour m_knobHandleColour;  // the "red handle" -- same hue in both themes, see file header

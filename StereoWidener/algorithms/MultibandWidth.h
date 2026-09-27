@@ -30,10 +30,12 @@
  * Mono-safe by construction: M' is never touched, so L'+R' = 2M always, regardless of
  * any width setting -- same guarantee as algorithm 2.4's comb.
  *
- * Parameters (getParamSpecs()): a master Width scaling all three widened bands, the
- * three crossover frequencies, and the three band widths (bands 2-4; band 1 is always
- * mono, see above).
- *
+ * Parameters (getParamSpecs()): the three crossover frequencies and the widths of
+ * bands 2-4 (0-200 %, 100 % = unchanged). Band 1 is always mono, see above. There is
+ * no overall Width: until v0.1.20 a master Width scaled all three band widths on top,
+ * which made "how wide is this band" depend on two knobs -- removed (at its default of
+ * 100 % it had no effect, so default processing is unchanged).
+
  * Reference: S. Linkwitz, "Active Crossover Networks for Noncoincident Drivers",
  * J. Audio Eng. Soc., 1976 (the LR4 crossover itself); B. Katz, "Mastering Audio: The
  * Art and the Science", 3rd ed., Focal Press, 2015, ch. 3 (multiband width in
@@ -58,19 +60,22 @@ public:
     // (updateFrequenciesIfNeeded()), and the GUI additionally stops each crossover at
     // its neighbour while dragging, so independent per-parameter ranges are simpler
     // than keeping three parameter ranges mutually exclusive.
-    enum ParamIndex { kWidth = 0, kFreq1, kFreq2, kFreq3, kWidth2, kWidth3, kWidth4 };
+    enum ParamIndex { kFreq1 = 0, kFreq2, kFreq3, kWidth2, kWidth3, kWidth4 };
     std::vector<AlgorithmParamSpec> getParamSpecs() const override
     {
         return {
-            AlgorithmParamSpec::width("multibandMasterWidth"),
-            AlgorithmParamSpec::logFrequency("multibandFreq1", "Low-Mid", 40.0f, 400.0f, 150.0f),
-            AlgorithmParamSpec::logFrequency("multibandFreq2", "Mid-High", 200.0f, 4000.0f, 1500.0f),
-            AlgorithmParamSpec::logFrequency("multibandFreq3", "High-Air", 1000.0f, 18000.0f, 6000.0f),
-            AlgorithmParamSpec::width("multibandWidth2", "Low-Mid"),
-            AlgorithmParamSpec::width("multibandWidth3", "Mid-High"),
-            AlgorithmParamSpec::width("multibandWidth4", "High")
+            AlgorithmParamSpec::logFrequency("multibandFreq1", "Crossover 1", 40.0f, 400.0f, 150.0f),
+            AlgorithmParamSpec::logFrequency("multibandFreq2", "Crossover 2", 200.0f, 4000.0f, 1500.0f),
+            AlgorithmParamSpec::logFrequency("multibandFreq3", "Crossover 3", 1000.0f, 18000.0f, 6000.0f),
+            AlgorithmParamSpec::width("multibandWidth2", "Band 2 Width"),
+            AlgorithmParamSpec::width("multibandWidth3", "Band 3 Width"),
+            AlgorithmParamSpec::width("multibandWidth4", "Band 4 Width")
         };
     }
+
+    // Adjacent crossovers always stay at least this ratio apart (5 %): enforced by
+    // process() on whatever values arrive, and by the GUI while dragging.
+    static constexpr float kMinCrossoverRatio = 1.05f;
 
     const char* getName() const noexcept override { return "Multiband Width"; }
     juce::String getDescription() const override;

@@ -94,14 +94,19 @@ const int g_auxKnobSize(64);              // the flanking knobs
 const int g_auxKnobLabelHeight(16);
 const int g_paramKnobGap(20);             // horizontal gap between the knobs in that row
 
-// KnobsPlayground, more than three parameters: a centred grid of small knobs, up to
-// g_gridMaxColumns per row. Two rows (2*68 + 8 = 144 px) fit g_playgroundHeight.
-const int g_gridMaxColumns(4);
-const int g_gridKnobSize(40);
-const int g_gridKnobTextBoxWidth(60);     // wider than the knob itself: fits "6000 Hz"
-const int g_gridKnobLabelHeight(14);
-const int g_gridKnobColGap(10);
-const int g_gridKnobRowGap(8);
+// Small knobs, e.g. below a playground's display (FilteredPlayground).
+const int g_smallKnobSize(40);
+const int g_smallKnobTextBoxWidth(60);    // wider than the knob itself: fits "6000 Hz"
+const int g_smallKnobLabelHeight(14);
+const int g_smallKnobColGap(10);
+const int g_smallKnobRowGap(8);           // gap between a display and the knob row below it
+
+// Compact knobs, for a row of six below a display (MultibandPlayground).
+const int g_compactKnobSize(30);
+const int g_compactKnobTextBoxWidth(44);
+const int g_compactKnobLabelHeight(13);
+const int g_compactKnobGap(3);            // between knobs of one group
+const int g_compactKnobGroupGap(13);      // between groups
 
 // Algorithm selector row: centred within the left two-thirds (g_rightBlockWidth),
 // below the meter row (only approximately below the input meter + goniometer

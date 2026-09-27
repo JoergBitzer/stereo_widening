@@ -153,3 +153,10 @@ void StereoWidenerLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::But
     g.setColour(backgroundColour.brighter(0.3f));
     g.drawRoundedRectangle(button.getLocalBounds().toFloat().reduced(0.5f, 0.5f), 6.0f, 1.0f);
 }
+
+juce::Label* StereoWidenerLookAndFeel::createSliderTextBox(juce::Slider& slider)
+{
+    auto* label = LookAndFeel_V4::createSliderTextBox(slider);
+    label->setFont(juce::Font(juce::FontOptions(juce::jmin(15.0f, 0.85f * (float) slider.getTextBoxHeight()))));
+    return label;
+}

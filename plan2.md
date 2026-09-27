@@ -486,6 +486,10 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      from the settings file to a real parameter. Display verified against the measured
      DSP response (within 0.06 dB). See
      [phase6_playground_filtered.md](docs/algorithms/phase6_playground_filtered.md).
+   - ✅ GUI playground 3, Multiband Width (v0.1.21): band-split display (bands as bars
+     whose height is their width, draggable crossovers, band 1 always mono) plus
+     compact knobs; overall Width removed. See
+     [phase6_playground_multiband.md](docs/algorithms/phase6_playground_multiband.md).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.
