@@ -12,8 +12,8 @@ ChorusPlayground::ChorusPlayground(juce::AudioProcessorValueTreeState& apvts, co
         m_knobs.push_back(std::make_unique<PlaygroundKnob>(apvts, spec));
         addAndMakeVisible(*m_knobs.back());
     }
-    m_view = std::make_unique<DelayModulationView>(getParameter(specs[CD::kWidth].id), getParameter(specs[CD::kAmount].id),
-                                                   getParameter(specs[CD::kDepth].id), getParameter(specs[CD::kRate].id));
+    m_view = std::make_unique<DelayModulationView>(getParameter(specs[CD::kAmount].id), getParameter(specs[CD::kDepth].id),
+                                                   getParameter(specs[CD::kRate].id));
     addAndMakeVisible(*m_view);
 }
 

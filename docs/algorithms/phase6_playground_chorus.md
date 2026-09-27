@@ -12,7 +12,8 @@ delay lines, draggable, plus Rate as a new parameter.
   sinusoidally a quarter cycle apart; R is 3 ms longer on average (the fixed L/R
   separation that keeps the channels different even at Depth 0). Depth sets how far
   they swing (up to +-10 ms), Rate how many cycles fit into the window. The delay axis
-  covers 4-30 ms (the full range, 5-28 ms). When Width x Amount is 0 the curves fade
+  covers 4-30 ms (the full range, 5-28 ms). When Amount is 0 the curves fade (until v0.1.26: Width x Amount, see
+  [phase6_consistent_width.md](phase6_consistent_width.md))
   and a note says the effect is off.
   - Drag up/down for **Depth** (the curves' peaks follow the mouse), left/right for
     **Rate** (multiplicative: across the full width x8, so slow and fast rates are

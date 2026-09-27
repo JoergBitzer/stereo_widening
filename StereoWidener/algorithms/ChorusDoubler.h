@@ -23,8 +23,15 @@
  *                 + Depth*kMaxDepthMs*sin(2*pi*rate*t + kStereoPhaseOffsetRadians)
  *     Y_L[n] = M[n - delayL(n)] (fractional/interpolated read) - M[n]
  *     Y_R[n] = M[n - delayR(n)] (fractional/interpolated read) - M[n]
- *     L' = L + Width*Amount*Y_L
- *     R' = R + Width*Amount*Y_R
+ *     L1 = L + Amount*Y_L,   R1 = R + Amount*Y_R
+ *     M' = (L1 + R1)/2,      S' = Width*(L1 - R1)/2
+ *     L' = M' + S',          R' = M' - S'
+ *
+ * Width is applied last, as a plain M/S width on the result -- the same as every
+ * other algorithm (0 % = mono output, 100 % = unchanged, 200 % = extra wide), and the
+ * same pattern as AllpassDecorrelation. Until v0.1.26 Width instead multiplied the
+ * added effect (L' = L + Width*Amount*Y_L), i.e. it was just a second Amount; at
+ * Width 100 % both give the same output.
  *
  * Same structural pattern as 2.5/2.12 (add directly to L/R) rather than 2.4's comb
  * (S' = S + gain*...): two different, continuously time-varying delay patterns added
@@ -66,7 +73,7 @@
  * increment, the phase itself stays continuous.
  *
  * Parameters (getParamSpecs()):
- * - Width: scales the added effect, like every algorithm's Width.
+ * - Width: M/S width of the output, like every algorithm's Width (see above).
  * - Amount: 0-100 %, defaults to 0 % -- an exact, algebraically neutral bypass.
  * - Depth: 0-100 %, scales the LFO's modulation excursion. No neutral value of its
  *   own -- inert whenever Amount = 0.

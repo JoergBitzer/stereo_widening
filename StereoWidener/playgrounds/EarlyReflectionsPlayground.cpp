@@ -12,8 +12,8 @@ EarlyReflectionsPlayground::EarlyReflectionsPlayground(juce::AudioProcessorValue
         m_knobs.push_back(std::make_unique<PlaygroundKnob>(apvts, spec));
         addAndMakeVisible(*m_knobs.back());
     }
-    m_echogram = std::make_unique<EchogramView>(getParameter(specs[ER::kWidth].id), getParameter(specs[ER::kAmount].id),
-                                                getParameter(specs[ER::kRoomSize].id), getParameter(specs[ER::kPreDelay].id));
+    m_echogram = std::make_unique<EchogramView>(getParameter(specs[ER::kAmount].id), getParameter(specs[ER::kRoomSize].id),
+                                                getParameter(specs[ER::kPreDelay].id));
     addAndMakeVisible(*m_echogram);
 }
 

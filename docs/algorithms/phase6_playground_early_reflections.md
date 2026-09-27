@@ -22,6 +22,9 @@ pattern, draggable, plus Pre-delay as a new parameter.
     else for **Amount**. Hover shows the value, double-click resets.
 - **Knobs** (below): Width, Amount, Room Size, Pre-delay.
 
+(Since v0.1.26 the bar heights depend on Amount only; Width became a plain M/S width
+on the output, see [phase6_consistent_width.md](phase6_consistent_width.md).)
+
 ## New parameter: Pre-delay
 
 `earlyReflPreDelay`, 0-20 ms, default 5 ms (planing.md's reflection window starts

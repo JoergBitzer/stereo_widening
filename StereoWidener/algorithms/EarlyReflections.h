@@ -16,8 +16,15 @@
  *
  *     Y_L = sum_k gain[k] * M[n - delayL[k]]
  *     Y_R = sum_k gain[k] * M[n - delayR[k]]
- *     L' = L + Width * Amount * Y_L
- *     R' = R + Width * Amount * Y_R
+ *     L1 = L + Amount * Y_L,   R1 = R + Amount * Y_R
+ *     M' = (L1 + R1) / 2,      S' = Width * (L1 - R1) / 2
+ *     L' = M' + S',            R' = M' - S'
+ *
+ * Width is applied last, as a plain M/S width on the result -- the same as every
+ * other algorithm (0 % = mono output, 100 % = unchanged, 200 % = extra wide), and the
+ * same pattern as AllpassDecorrelation. Until v0.1.26 Width instead multiplied the
+ * added reflections (L' = L + Width * Amount * Y_L), i.e. it was just a second Amount;
+ * at Width 100 % both give the same output.
  *
  * Adding a DIFFERENT reflection pattern to L than to R means L'+R' generally does NOT
  * equal L+R once Amount > 0 -- planing.md's own "o" (partial) mono-compatibility
@@ -49,7 +56,7 @@
  * every tap's read position discontinuously.
  *
  * Parameters (getParamSpecs()):
- * - Width: scales the added reflections, like every algorithm's Width.
+ * - Width: M/S width of the output, like every algorithm's Width (see above).
  * - Amount: 0-100 %, defaults to 0 % -- an exact, algebraically neutral bypass.
  * - Room Size: 0-100 %, no neutral value of its own -- inert whenever Amount = 0.
  *   Scales the spread of the reflection pattern from a small room (tight, early
@@ -101,7 +108,7 @@ public:
         return preDelayMs + (left ? kLeftFractions : kRightFractions)[(size_t) k] * spreadMs;
     }
 
-    /** Level of reflection k relative to the direct sound, before Width x Amount. */
+    /** Level of reflection k relative to the direct sound, before Amount. */
     static float tapGain(int k) noexcept { return kBaseGain * std::pow(kGainDecay, (float) k); }
 
     const char* getName() const noexcept override { return "Early Reflections (Room Widening)"; }

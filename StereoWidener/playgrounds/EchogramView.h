@@ -23,8 +23,8 @@
 class EchogramView : public juce::Component
 {
 public:
-    EchogramView(juce::RangedAudioParameter& width, juce::RangedAudioParameter& amount,
-                 juce::RangedAudioParameter& roomSize, juce::RangedAudioParameter& preDelay);
+    EchogramView(juce::RangedAudioParameter& amount, juce::RangedAudioParameter& roomSize,
+                 juce::RangedAudioParameter& preDelay);
 
     void setScaleFactor(float scale) { m_scale = scale; repaint(); }
 
@@ -53,11 +53,10 @@ private:
     juce::RangedAudioParameter* parameterFor(Target target) const;
     juce::ParameterAttachment* attachmentFor(Target target) const;
 
-    juce::RangedAudioParameter& m_width;
     juce::RangedAudioParameter& m_amount;
     juce::RangedAudioParameter& m_roomSize;
     juce::RangedAudioParameter& m_preDelay;
-    std::unique_ptr<juce::ParameterAttachment> m_widthAttachment, m_amountAttachment, m_roomSizeAttachment, m_preDelayAttachment;
+    std::unique_ptr<juce::ParameterAttachment> m_amountAttachment, m_roomSizeAttachment, m_preDelayAttachment;
     float m_scale = 1.0f;
 
     Target m_hovered = Target::None;
