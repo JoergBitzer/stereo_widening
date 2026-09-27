@@ -6,7 +6,7 @@
 
 set(TARGET_NAME StereoWidener)
 
-project(${TARGET_NAME} VERSION 0.1.24)
+project(${TARGET_NAME} VERSION 0.1.25)
 
 configure_file(Versioning.h.in Versioning.h)
 
@@ -41,6 +41,8 @@ target_sources(${TARGET_NAME}
         playgrounds/CombPlayground.cpp
         playgrounds/EarlyReflectionsPlayground.cpp
         playgrounds/EchogramView.cpp
+        playgrounds/ChorusPlayground.cpp
+        playgrounds/DelayModulationView.cpp
         playgrounds/FrequencyGraph.cpp
         playgrounds/BandSplitView.cpp
         playgrounds/MultibandPlayground.cpp

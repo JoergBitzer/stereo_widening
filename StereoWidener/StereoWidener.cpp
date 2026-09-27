@@ -17,8 +17,6 @@ StereoWidenerAudio::StereoWidenerAudio(StereoWidenerAudioProcessor* processor)
 
     // user-configurable defaults (plan2.md Phase 4, "Global settings file"), previously
     // fixed compiled-in constants -- see GlobalSettings.h
-    if (auto* chorus = dynamic_cast<ChorusDoubler*>(m_algorithms[6].get()))
-        chorus->setRateHz(m_globalSettings.getChorusRateHz());
 }
 
 AlgorithmParamValues StereoWidenerAudio::valuesFor(int algorithmIndex) const noexcept

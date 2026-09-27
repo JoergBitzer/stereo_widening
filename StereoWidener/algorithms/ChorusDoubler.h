@@ -62,21 +62,18 @@
  * excursion fed into setDelay() every sample, so an abrupt Depth change would
  * otherwise step the delay line's target position discontinuously. Amount is a plain
  * output-gain multiplier, matching AllpassDecorrelation/EarlyReflections' precedent of
- * not smoothing that kind of parameter. Rate is a GlobalSettings default, not smoothed
- * (not user-adjustable during play, like ComplementaryComb's crossoverHz).
+ * not smoothing that kind of parameter. Rate needs no smoothing: it only sets the phase
+ * increment, the phase itself stays continuous.
  *
- * Two user-facing parameters, per the project's "2 + Width" convention:
- * - Amount: 0-100 %, defaults to 0 % -- an exact,
- *   algebraically neutral bypass (see phase5_comb.md's "Removing last-used state").
- * - Depth: 0-100 %, scales the LFO's modulation excursion. No neutral
- *   value of its own -- inert whenever Amount = 0, same reasoning as comb's Delay/
- *   allpass's Spread/early reflections' Room Size defaults.
- * - Rate (Hz): NOT a user-facing parameter -- a GlobalSettings default (like comb's
- *   crossover frequency, early reflections' pre-delay), kept deliberately slow/
- *   "Dimension D"-like by design: a fast rate turns this into an obvious vibrato/
- *   warble, a different, arguably worse-sounding effect for a width tool. Exposing it
- *   live risks users dialling in that worse-sounding regime, so it is fixed rather
- *   than a third knob. See setRateHz().
+ * Parameters (getParamSpecs()):
+ * - Width: scales the added effect, like every algorithm's Width.
+ * - Amount: 0-100 %, defaults to 0 % -- an exact, algebraically neutral bypass.
+ * - Depth: 0-100 %, scales the LFO's modulation excursion. No neutral value of its
+ *   own -- inert whenever Amount = 0.
+ * - Rate: 0.05-2 Hz, default 0.3 Hz. (Until v0.1.24 a fixed value from the global
+ *   settings file.) Deliberately capped at 2 Hz: the slow, "Dimension D"-like range is
+ *   the point; faster rates turn this into an obvious vibrato/warble, a different,
+ *   arguably worse-sounding effect for a width tool.
  *
  * Reference: the "Dimension D" / stereo chorus family described in planing.md 2.11;
  * the underlying "modulated delay line" chorus technique is standard (e.g. Dattorro,
@@ -96,24 +93,30 @@ public:
     void reset() override;
     void process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept override;
 
-    enum ParamIndex { kWidth = 0, kAmount, kDepth };
+    enum ParamIndex { kWidth = 0, kAmount, kDepth, kRate };
     std::vector<AlgorithmParamSpec> getParamSpecs() const override
     {
         return {
             AlgorithmParamSpec::width("chorusWidth"),
             AlgorithmParamSpec::linear("chorusAmount", "Amount", "%", 0.0f, 100.0f, 0.0f),
-            AlgorithmParamSpec::linear("chorusDepth", "Depth", "%", 0.0f, 100.0f, 50.0f)
+            AlgorithmParamSpec::linear("chorusDepth", "Depth", "%", 0.0f, 100.0f, 50.0f),
+            AlgorithmParamSpec::linear("chorusRate", "Rate", "Hz", 0.05f, 2.0f, 0.3f, 2)
         };
+    }
+
+    /** Delay time of one channel's modulated delay line in ms, at LFO phase
+     *  phaseRadians; depth is 0..1. The formula process() uses (there in samples).
+     *  Pure math for the GUI's display. */
+    static float delayMs(bool left, float depth, float phaseRadians) noexcept
+    {
+        return left ? kBaseDelayMs + depth * kMaxDepthMs * std::sin(phaseRadians)
+                    : kBaseDelayMs + kStereoOffsetMs + depth * kMaxDepthMs * std::sin(phaseRadians + kStereoPhaseOffsetRadians);
     }
 
     const char* getName() const noexcept override { return "Chorus Doubler (Dimension D)"; }
     juce::String getDescription() const override;
     bool isMonoSafe() const noexcept override { return false; }
     int getLatencySamples() const noexcept override { return 0; }
-
-    /** User-configurable default (GlobalSettings, Phase 4): the LFO rate in Hz. Not
-     *  itself a user-facing parameter -- see the file header for why. */
-    void setRateHz(float hz) noexcept { rateHz = hz; }
 
     static constexpr float kBaseDelayMs = 15.0f;
     static constexpr float kStereoOffsetMs = 3.0f;
@@ -124,7 +127,6 @@ public:
 
 private:
     double sampleRate = 48000.0;
-    float rateHz = 0.3f;
     float phase = 0.0f; // radians, wrapped to [0, 2*pi) every sample -- see process()
 
     juce::SmoothedValue<float> smoothedDepth;

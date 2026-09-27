@@ -503,6 +503,12 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      vertical drag for Amount; Pre-delay moved from the settings file to a real
      parameter. Display verified against an impulse render (exact). See
      [phase6_playground_early_reflections.md](docs/algorithms/phase6_playground_early_reflections.md).
+   - ✅ GUI playground 6, Chorus Doubler (v0.1.25): both channels' modulated delay
+     times over 4 s, drag up/down for Depth and left/right for Rate; Rate moved from
+     the settings file to a real parameter (0.05-2 Hz) -- the settings file now holds
+     no processing settings. Display verified against an impulse-train render (within
+     0.05 ms). See
+     [phase6_playground_chorus.md](docs/algorithms/phase6_playground_chorus.md).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.

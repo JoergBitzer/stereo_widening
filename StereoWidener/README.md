@@ -124,15 +124,17 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     LFO-modulated delay lines, one per channel, held a quarter-cycle apart -- the
     classic modulated-delay chorus/"Dimension D" effect, also creating real width
     from mono input like Complementary Comb, Allpass Decorrelation and Early
-    Reflections. The left knob sets **Amount** (0-100 %, defaults to 0 % -- an exact
-    bypass), the right knob sets **Depth** (0-100 %, how much the delay time swings
-    around its centre). The LFO rate is not a parameter; it is read from the global
-    settings file, kept deliberately slow so the effect stays lush rather than turning
-    into an obvious vibrato/warble. **Not mono-safe** -- more so than Allpass
+    Reflections. Controls: **Width**, **Amount** (0-100 %, defaults to 0 % -- an
+    exact bypass), **Depth** (0-100 %, how much the delay time swings around its
+    centre) and **Rate** (0.05-2 Hz, default 0.3 Hz; capped at 2 Hz so the effect stays
+    lush rather than turning into an obvious vibrato/warble; until v0.1.24 a fixed
+    value in the settings file). The display shows both channels' delay times over
+    4 s; drag up/down for Depth, left/right for Rate. **Not mono-safe** -- more so than Allpass
     Decorrelation or Early Reflections, since the delay difference between L and R is
     itself constantly sweeping ("flanging"), not fixed. See
     [phase5_chorus.md](../docs/algorithms/phase5_chorus.md) for the algorithm and its
-    verification.
+    verification, [phase6_playground_chorus.md](../docs/algorithms/phase6_playground_chorus.md)
+    for the display.
 
   Presets saved before v0.1.16 load without their Width setting (each algorithm now has
   its own Width parameter; the old shared one is gone).
@@ -180,11 +182,15 @@ See [../docs/algorithms/phase4_settings.md](../docs/algorithms/phase4_settings.m
 its correction note about `lastUsedState`, removed later -- see below).
 `~/.config/StereoWidener/settings.json` (created automatically on first run) stores
 user-wide preferences that aren't part of a DAW project's own saved state -- a project's
-saved parameter values and GUI size always take priority over these once they exist:
+saved parameter values and GUI size always take priority over these once they exist.
+Since v0.1.25 it holds no processing settings at all any more (the shelf gain, comb
+crossover, early-reflection pre-delay and chorus rate it used to hold are all
+parameters now), only the GUI size, the theme (`useDayTheme`) and the meter ballistics:
 
 ```json
 {
   "guiScaleFactor": 1.0,
+  "useDayTheme": false,
   "meterIntegrationTimeS": 0.3,
   "meterPeakHoldTimeS": 1.5,
   "meterPeakDecayDbPerS": 20.0

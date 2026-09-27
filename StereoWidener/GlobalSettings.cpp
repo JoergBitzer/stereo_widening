@@ -32,8 +32,6 @@ void GlobalSettings::load()
             meterPeakHoldTimeS = (float) (double) obj->getProperty("meterPeakHoldTimeS");
         if (obj->hasProperty("meterPeakDecayDbPerS"))
             meterPeakDecayDbPerS = (float) (double) obj->getProperty("meterPeakDecayDbPerS");
-        if (obj->hasProperty("chorusRateHz"))
-            chorusRateHz = (float) (double) obj->getProperty("chorusRateHz");
         if (obj->hasProperty("useDayTheme"))
             useDayTheme = (bool) obj->getProperty("useDayTheme");
     }
@@ -60,7 +58,6 @@ void GlobalSettings::write(const juce::File& file) const
     obj->setProperty("meterIntegrationTimeS", (double) meterIntegrationTimeS);
     obj->setProperty("meterPeakHoldTimeS", (double) meterPeakHoldTimeS);
     obj->setProperty("meterPeakDecayDbPerS", (double) meterPeakDecayDbPerS);
-    obj->setProperty("chorusRateHz", (double) chorusRateHz);
     obj->setProperty("useDayTheme", useDayTheme);
     const juce::var root(obj);
 
