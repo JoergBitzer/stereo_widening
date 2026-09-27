@@ -46,11 +46,6 @@ public:
      *  instances are not watched/reloaded live -- see the file header). */
     GlobalSettings();
 
-    /** LFO rate (Hz) for ChorusDoubler's modulated delay lines -- not a user-facing
-     *  knob, deliberately kept slow/"Dimension D"-like by design (a fast rate turns
-     *  this into an obvious vibrato/warble, see ChorusDoubler.h). Default 0.3 Hz. */
-    float getChorusRateHz() const noexcept { return chorusRateHz; }
-
     /** Default GUI scale factor for a brand new instance (StereoWidenerAudioProcessor's
      *  m_pluginScaleFactor before any project state is restored). Default 1.0. */
     float getGuiScaleFactor() const noexcept { return guiScaleFactor; }
@@ -91,6 +86,5 @@ private:
     float meterIntegrationTimeS = 0.3f;  // matches StereoMeterState::prepare()'s own defaults
     float meterPeakHoldTimeS = 1.5f;
     float meterPeakDecayDbPerS = 20.0f;
-    float chorusRateHz = 0.3f;
     bool useDayTheme = false;
 };

@@ -46,7 +46,7 @@ void ChorusDoubler::process(juce::AudioBuffer<float>& buffer, const AlgorithmPar
     const float samplesPerMs = 0.001f * (float) sampleRate;
     const float baseSamples = kBaseDelayMs * samplesPerMs;
     const float stereoOffsetSamples = kStereoOffsetMs * samplesPerMs;
-    const float phaseIncrement = juce::MathConstants<float>::twoPi * rateHz / (float) sampleRate;
+    const float phaseIncrement = juce::MathConstants<float>::twoPi * values[kRate] / (float) sampleRate;
 
     for (int i = 0; i < numSamples; ++i)
     {
@@ -94,9 +94,12 @@ juce::String ChorusDoubler::getDescription() const
            "from mono input like Complementary Comb, Allpass Decorrelation and Early "
            "Reflections.\n\n"
            "Depth controls how much the delay time swings around its centre; Amount "
-           "controls how much of the effect is blended in. The LFO rate is a global "
-           "setting, kept deliberately slow so the effect stays lush rather than "
+           "controls how much of the effect is blended in, Rate how fast the delay "
+           "times swing -- limited to 2 Hz, so the effect stays lush rather than "
            "turning into an obvious vibrato/warble.\n\n"
+           "The display shows both channels' delay times over 4 seconds: L (red) and "
+           "R (blue) swing a quarter cycle apart, R 3 ms longer on average. Drag up/down "
+           "for Depth, left/right for Rate; the curves fade when Amount is 0.\n\n"
            "Unlike Complementary Comb, this technique is NOT mono-compatible, and "
            "more so than Allpass Decorrelation or Early Reflections: because the "
            "delay difference between L and R is itself constantly sweeping, the mono "

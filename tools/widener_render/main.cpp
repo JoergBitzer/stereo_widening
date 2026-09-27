@@ -29,8 +29,7 @@
  * and width_percent is ignored for "multiband" (it has no overall Width since v0.1.20).
  * erAmountPercent/erRoomSizePercent/erPreDelayMs only matter for "earlyrefl" (see
  * EarlyReflections.h). chorusAmountPercent/chorusDepthPercent/
- * chorusRateHz only matter for "chorus" (see ChorusDoubler.h); chorusRateHz mirrors
- * GlobalSettings' own default (not a user-facing knob in the plugin itself).
+ * chorusRateHz only matter for "chorus" (see ChorusDoubler.h).
  *
  * python/evaluate_widener_plugin.py calls this once per (signal, setting) pair, then
  * runs python/stereo_eval's report.evaluate() on the resulting (input, output) file
@@ -151,8 +150,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    if (auto* chorus = dynamic_cast<ChorusDoubler*>(algorithm.get()))
-        chorus->setRateHz(chorusRateHz);
 
     constexpr int blockSize = 512;
     algorithm->prepare(reader->sampleRate, blockSize);
@@ -199,6 +196,7 @@ int main(int argc, char* argv[])
         values[ChorusDoubler::kWidth] = widthPercent;
         values[ChorusDoubler::kAmount] = chorusAmountPercent;
         values[ChorusDoubler::kDepth] = chorusDepthPercent;
+        values[ChorusDoubler::kRate] = chorusRateHz;
     }
     else // filtered
     {

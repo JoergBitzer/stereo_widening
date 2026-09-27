@@ -210,6 +210,7 @@ settle the visual language; then the ones that need `FrequencyGraph`; then the r
 5. Early Reflections -- moves Pre-delay out of settings.
    ✅ Done in v0.1.24, see [phase6_playground_early_reflections.md](docs/algorithms/phase6_playground_early_reflections.md).
 6. Chorus Doubler -- moves Rate out of settings.
+   ✅ Done in v0.1.25, see [phase6_playground_chorus.md](docs/algorithms/phase6_playground_chorus.md).
 7. Allpass Decorrelation.
 
 Each step: new playground, any new parameters, the `GlobalSettings` cleanup for that
