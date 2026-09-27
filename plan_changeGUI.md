@@ -196,7 +196,8 @@ resizing. `tools/widener_render` is updated for the new interface in the same st
 settle the visual language; then the ones that need `FrequencyGraph`; then the rest):
 
 1. M/S Width (Broadband) -- smallest possible playground, sets the visual style.
-   ✅ Done in v0.1.18, see [phase6_playground_broadband.md](docs/algorithms/phase6_playground_broadband.md).
+   ✅ Done in v0.1.18; simplified in v0.1.20 to only the Width knob ("this should show
+   how easy it is"), see [phase6_playground_broadband.md](docs/algorithms/phase6_playground_broadband.md).
 2. M/S Width (Filtered) -- builds `FrequencyGraph`; moves High Shelf Gain out of
    settings.
    ✅ Done in v0.1.19, see [phase6_playground_filtered.md](docs/algorithms/phase6_playground_filtered.md).

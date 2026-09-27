@@ -1,67 +1,39 @@
-# Playground 1: M/S Width (Broadband) (v0.1.18)
+# Playground 1: M/S Width (Broadband) (v0.1.18, simplified in v0.1.20)
 
-Step 1 of [plan_changeGUI.md](../../plan_changeGUI.md). Broadband has one control,
-Width, so its playground pairs the large Width knob with a picture of what Width does
-to the stereo image.
+Step 1 of [plan_changeGUI.md](../../plan_changeGUI.md).
 
-![Width 0 %, 100 %, 200 % (Night) and 140 % (Day)](img/playground_broadband.png)
+**Current state (v0.1.20):** the playground is just the Width knob, large and centred
+(the plain `KnobsPlayground` layout for a single parameter). Per explicit request:
+"only the width knob in the middle is enough. This should show how easy it is." The
+simplest algorithm gets the simplest playground -- one knob.
 
-## The picture
+![Broadband: only the Width knob](img/playground_broadband_knob.png)
 
-A top-down view: the listener at the bottom, loudspeakers L and R at +-30 degrees
-(dashed lines). The red wedge spans the directions from which sources panned hard left
-or right are heard at the current Width:
+**History:** v0.1.18 added a top-down stereo-image picture next to the knob (a wedge
+showing where hard-panned sources are heard, from the stereophonic tangent law, plus
+the side gain in dB). It was removed again in v0.1.20, together with its helper
+functions in `MSWidthBroadband` and the matching paragraph in the help text.
 
-- 0 %: a single line in the centre -- everything is mono.
-- 100 %: the wedge reaches the loudspeakers -- unchanged.
-- above 100 %: the wedge reaches beyond the loudspeakers.
-
-Below it, two readouts: the side signal's gain in dB, and the angle of hard-panned
-sources.
-
-The angle comes from the stereophonic tangent law, tan(phi)/tan(phi0) =
-(L'-R')/(L'+R'). For an input panned hard left, M = S = L/2, so after widening
-L' = L(1+w)/2 and R' = L(1-w)/2, and the law gives tan(phi) = w * tan(30 degrees).
-Above w = 1, R' becomes negative (antiphase), which is what places the image beyond
-the loudspeaker. Reference: V. Pulkki, "Virtual Sound Source Positioning Using Vector
-Base Amplitude Panning", J. Audio Eng. Soc. 45(6), 1997. The same explanation was added
-to the algorithm's "?" help text.
-
-| Width | Side gain | Hard-panned source |
-|---|---|---|
-| 0 % | -inf dB | 0 degrees (mono) |
-| 50 % | -6.0 dB | 16.1 degrees |
-| 100 % | 0.0 dB | 30.0 degrees |
-| 140 % | +2.9 dB | 38.9 degrees |
-| 200 % | +6.0 dB | 49.1 degrees |
-
-The formulas live in the DSP class as pure functions
-(`MSWidthBroadband::sideGainDb()`, `hardPannedSourceAngleDeg()`), so the display and
-the processing share one definition and the algorithm stays GUI-free.
-
-## Building blocks added (reused by later playgrounds)
+The building blocks added in v0.1.18 stay, since the Filtered playground uses them:
 
 - `AlgorithmPlayground::watchParameter()`: follows a parameter on the GUI thread
   (including host automation) via `juce::ParameterAttachment`, for live graphics.
-- `playgrounds/PlaygroundStyle.h`: shared colours for playground displays, taken from
-  the current theme. Display panels use the knobs' fill colour (like the meter
-  displays); on the Day theme's mid-light grey the text is darkened (about 6:1
-  contrast instead of 3:1).
+- `playgrounds/PlaygroundStyle.h`: shared, theme-based colours for playground
+  displays (on the Day theme's mid-light grey the text is darkened for about 6:1
+  contrast).
 
-## Verification
+## Verification (v0.1.20)
 
-- Offline GUI render (throwaway snapshot tool) at Width 0/100/200 % (Night) and 140 %
-  (Day); the displayed angles and gains match the table, which was computed
-  independently: [python/results/playground_broadband/console.txt](../../python/results/playground_broadband/console.txt).
-- `pluginval --strictness-level 10`: 3/3 SUCCESS, zero JUCE assertions.
-- DSP unchanged (only pure helper functions were added to the algorithm).
+- Offline GUI render: the Width knob alone, centred in the card.
+- `pluginval --strictness-level 10`, see the Multiband write-up
+  ([phase6_playground_multiband.md](phase6_playground_multiband.md)), which was
+  verified on the same build.
+- DSP unchanged.
 
-## Files
+## Files (v0.1.20)
 
-- `StereoWidener/playgrounds/BroadbandPlayground.h/.cpp` (new): `StereoImageView`,
-  `BroadbandPlayground`.
-- `StereoWidener/playgrounds/PlaygroundStyle.h` (new).
-- `StereoWidener/AlgorithmPlayground.h/.cpp`: base class gets the APVTS,
-  `getParameter()`, `watchParameter()`; factory creates `BroadbandPlayground`.
-- `StereoWidener/algorithms/MSWidthBroadband.h/.cpp`: math helpers, help text.
-- `StereoWidener/CMakeLists.txt`: new source; version 0.1.17 -> 0.1.18.
+- `StereoWidener/playgrounds/BroadbandPlayground.h/.cpp`: removed.
+- `StereoWidener/AlgorithmPlayground.cpp`: Broadband uses `KnobsPlayground` again.
+- `StereoWidener/algorithms/MSWidthBroadband.h/.cpp`: picture helpers and their help
+  text removed.
+- `StereoWidener/README.md`, `StereoWidener/CMakeLists.txt` (version 0.1.19 -> 0.1.20).
