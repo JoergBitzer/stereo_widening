@@ -226,12 +226,16 @@ algorithm, a doc in `docs/algorithms/`, `plan2.md` entry, version bump, README u
    algorithm (and matches "each algorithm has its own playground"). My
    recommendation: one width parameter per algorithm, since presets don't need to
    stay compatible anyway and it removes the last shared "special" control.
+   Answer: "I agree, one width parameter per algorithm."
+
 2. **Multiband band 1:** keep it fixed mono (today's DSP, "bass mono" is the point of
    the algorithm) or give it its own width like bands 2-4? Recommendation: keep it
    mono, clearly labelled, to avoid adding a control that mostly breaks mono
    compatibility.
+   Answer: "I agree, keep band 1 mono."
 3. **Step order** in section 5 -- fine as proposed, or do you want Multiband earlier
    since it motivated the change?
+   Answer: "No, I think the order is fine as proposed. We can change it later if we want to."
 
 ## 8. Your review of the first draft (verbatim)
 
