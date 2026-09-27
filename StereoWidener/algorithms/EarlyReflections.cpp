@@ -21,7 +21,7 @@ void EarlyReflections::prepare(double newSampleRate, int maxBlockSize)
     {
         leftSmoothedDelaySamples[(size_t) k].reset(sampleRate, (double) kDelaySmoothingSeconds);
         rightSmoothedDelaySamples[(size_t) k].reset(sampleRate, (double) kDelaySmoothingSeconds);
-        gains[(size_t) k] = kBaseGain * std::pow(kGainDecay, (float) k);
+        gains[(size_t) k] = tapGain(k);
     }
 
     lastRoomSize = -1.0f;
@@ -34,15 +34,14 @@ void EarlyReflections::reset()
     delayInitialized = false; // same reasoning as in prepare(): snap cleanly, don't glide in
 }
 
-void EarlyReflections::updateTapTargets(float roomSize) noexcept
+void EarlyReflections::updateTapTargets(float roomSize, float preDelayMs) noexcept
 {
-    const float spreadMs = kRoomMinSpreadMs + roomSize * (kRoomMaxSpreadMs - kRoomMinSpreadMs);
     const float samplesPerMs = 0.001f * (float) sampleRate;
 
     for (int k = 0; k < kNumReflections; ++k)
     {
-        const float leftDelaySamples = (preDelayMs + kLeftFractions[(size_t) k] * spreadMs) * samplesPerMs;
-        const float rightDelaySamples = (preDelayMs + kRightFractions[(size_t) k] * spreadMs) * samplesPerMs;
+        const float leftDelaySamples = tapTimeMs(k, true, roomSize, preDelayMs) * samplesPerMs;
+        const float rightDelaySamples = tapTimeMs(k, false, roomSize, preDelayMs) * samplesPerMs;
 
         if (!delayInitialized)
         {
@@ -62,10 +61,12 @@ void EarlyReflections::process(juce::AudioBuffer<float>& buffer, const Algorithm
 {
     const float width = values[kWidth] * 0.01f; // % -> 0..2
     const float roomSize = values[kRoomSize] * 0.01f; // % -> 0..1
-    if (!delayInitialized || hasChanged(roomSize, lastRoomSize))
+    const float preDelayMs = values[kPreDelay];
+    if (!delayInitialized || hasChanged(roomSize, lastRoomSize) || hasChanged(preDelayMs, lastPreDelayMs))
     {
-        updateTapTargets(roomSize);
+        updateTapTargets(roomSize, preDelayMs);
         lastRoomSize = roomSize;
+        lastPreDelayMs = preDelayMs;
     }
 
     auto* left = buffer.getWritePointer(0);
@@ -129,8 +130,14 @@ juce::String EarlyReflections::getDescription() const
            "Allpass Decorrelation.\n\n"
            "Room Size controls how spread out the reflections are (small room: a "
            "tight early cluster; large room: spread further out, up to about 40 ms). "
-           "Amount controls how much is added; the pre-delay before the first "
-           "reflection is a global setting, not a knob.\n\n"
+           "Amount controls how much is added; Pre-delay sets the time before the "
+           "first reflection.\n\n"
+           "The display is an echogram: the direct sound at 0 ms, L's reflections "
+           "above the time axis (red), R's below it (blue), each bar's height its "
+           "level in dB relative to the direct sound (faint lines at -10 and -20 dB) -- "
+           "the different pattern per channel is the width. Drag the "
+           "Pre-delay and room-end lines sideways, drag up/down elsewhere for "
+           "Amount.\n\n"
            "Unlike Complementary Comb, this technique is NOT mono-compatible: because "
            "L and R get genuinely different reflection patterns, the mono sum L+R is "
            "coloured once Amount is above 0 -- a real trade-off of this technique, not "

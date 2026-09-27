@@ -46,11 +46,6 @@ public:
      *  instances are not watched/reloaded live -- see the file header). */
     GlobalSettings();
 
-    /** Pre-delay (ms) before EarlyReflections' first reflection tap -- planing.md
-     *  2.12's own suggested reflection window starts around 5 ms, not (yet) a
-     *  user-facing knob. Default 5.0 ms. */
-    float getEarlyReflectionsPreDelayMs() const noexcept { return earlyReflectionsPreDelayMs; }
-
     /** LFO rate (Hz) for ChorusDoubler's modulated delay lines -- not a user-facing
      *  knob, deliberately kept slow/"Dimension D"-like by design (a fast rate turns
      *  this into an obvious vibrato/warble, see ChorusDoubler.h). Default 0.3 Hz. */
@@ -96,7 +91,6 @@ private:
     float meterIntegrationTimeS = 0.3f;  // matches StereoMeterState::prepare()'s own defaults
     float meterPeakHoldTimeS = 1.5f;
     float meterPeakDecayDbPerS = 20.0f;
-    float earlyReflectionsPreDelayMs = 5.0f;
     float chorusRateHz = 0.3f;
     bool useDayTheme = false;
 };

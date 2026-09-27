@@ -6,6 +6,8 @@
 #include "playgrounds/FilteredPlayground.h"
 #include "algorithms/ComplementaryComb.h"
 #include "playgrounds/CombPlayground.h"
+#include "algorithms/EarlyReflections.h"
+#include "playgrounds/EarlyReflectionsPlayground.h"
 
 PlaygroundKnob::PlaygroundKnob(juce::AudioProcessorValueTreeState& apvts, const AlgorithmParamSpec& spec, const juce::String& label)
 {
@@ -78,6 +80,8 @@ std::unique_ptr<AlgorithmPlayground> createPlayground(juce::AudioProcessorValueT
         return std::make_unique<FilteredPlayground>(apvts, algorithm);
     if (dynamic_cast<const ComplementaryComb*>(&algorithm) != nullptr)
         return std::make_unique<CombPlayground>(apvts, algorithm);
+    if (dynamic_cast<const EarlyReflections*>(&algorithm) != nullptr)
+        return std::make_unique<EarlyReflectionsPlayground>(apvts, algorithm);
     if (dynamic_cast<const MultibandWidth*>(&algorithm) != nullptr)
         return std::make_unique<MultibandPlayground>(apvts, algorithm);
     return std::make_unique<KnobsPlayground>(apvts, algorithm);

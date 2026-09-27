@@ -105,16 +105,21 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     the mid signal are added to each channel, using a DIFFERENT set of delay times for
     L than for R -- mimics the early reflections a real room adds before its late
     reverb tail arrives (apparent source width), and also creates real width from
-    dual-mono input, like Complementary Comb and Allpass Decorrelation. The left knob
-    sets **Amount** (0-100 %, defaults to 0 % -- an exact bypass), the right knob sets
-    **Room Size** (0-100 %, how spread out the reflections are: small room = tight
-    cluster, large room = spread further out). The pre-delay before the first
-    reflection (default 5 ms) and the number of reflections (5) are not parameters;
-    the former is read from the global settings file, the latter is fixed. **Not
-    mono-safe**, same reasoning and warning badge as Allpass Decorrelation. See
+    dual-mono input, like Complementary Comb and Allpass Decorrelation. Controls:
+    **Width**, **Amount** (0-100 %, defaults to 0 % -- an exact bypass), **Room Size**
+    (0-100 %, how spread out the reflections are: small room = tight cluster, large
+    room = spread further out) and **Pre-delay** (0-20 ms, default 5 ms, the time
+    before the first reflection; until v0.1.23 a fixed value in the settings file).
+    The number of reflections (5 per channel) is fixed. The display is an echogram:
+    the direct sound at 0 ms, L's reflections above the time axis, R's below, bar
+    height = level in dB; drag the Pre-delay and room-end lines sideways, drag up/down
+    elsewhere for Amount. **Not mono-safe**, same reasoning and warning badge as
+    Allpass Decorrelation. See
     [phase5_early_reflections.md](../docs/algorithms/phase5_early_reflections.md) for
     the algorithm (including a `juce::dsp::DelayLine` read-cursor bug found and fixed
-    during cross-checking) and its verification.
+    during cross-checking) and its verification,
+    [phase6_playground_early_reflections.md](../docs/algorithms/phase6_playground_early_reflections.md)
+    for the display.
   - *Chorus Doubler (Dimension D)*: the mid signal is fed through two independently
     LFO-modulated delay lines, one per channel, held a quarter-cycle apart -- the
     classic modulated-delay chorus/"Dimension D" effect, also creating real width
