@@ -473,6 +473,10 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      now), so the window no longer resizes on an algorithm switch. DSP output verified
      byte-identical before/after. See
      [phase6_playground_step0.md](docs/algorithms/phase6_playground_step0.md).
+   - ✅ Fixed truncated Utilities labels and unreadable value boxes in the Day theme
+     (v0.1.17): the value boxes kept JUCE's default colours because the look-and-feel
+     was set before the editor's children were added. See
+     [phase6_label_contrast_fix.md](docs/algorithms/phase6_label_contrast_fix.md).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.

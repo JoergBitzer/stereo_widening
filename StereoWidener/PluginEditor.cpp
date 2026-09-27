@@ -63,8 +63,6 @@ StereoWidenerAudioProcessorEditor::StereoWidenerAudioProcessorEditor (StereoWide
         m_processorRef (p), m_presetGUI(p.m_presets), m_editor(p,*p.m_parameterVTS)
 #endif
 {
-    setLookAndFeel(&m_lookAndFeel);
-
     setResizable(true,true);
     applyWindowSize();
 
@@ -86,6 +84,13 @@ StereoWidenerAudioProcessorEditor::StereoWidenerAudioProcessorEditor (StereoWide
 
     // from here your algo editor ---------
     addAndMakeVisible(m_editor);
+
+    // Last, after every child has been added: setLookAndFeel() notifies only the
+    // components that are children at that moment, and a Slider builds its value box
+    // from the look-and-feel's colours only when notified. Set earlier, the value boxes
+    // kept JUCE's default dark-scheme colours (white text) until the first theme
+    // toggle -- unreadable on the Day theme's light background.
+    setLookAndFeel(&m_lookAndFeel);
 }
 
 StereoWidenerAudioProcessorEditor::~StereoWidenerAudioProcessorEditor()

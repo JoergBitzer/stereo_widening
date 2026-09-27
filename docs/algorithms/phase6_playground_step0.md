@@ -70,7 +70,8 @@ Console output: [python/results/playground_step0/console.txt](../../python/resul
 Noticed during the GUI check, not caused by this change and left for separate fixes:
 at scale 1.0 the Utilities knob labels truncate ("Rota...", "Bala...") since the
 knobs shrank to 40 px in v0.1.15; in the Day theme the knobs' value boxes have low
-text contrast.
+text contrast. Both fixed in v0.1.17, see
+[phase6_label_contrast_fix.md](phase6_label_contrast_fix.md).
 
 ## Files
 

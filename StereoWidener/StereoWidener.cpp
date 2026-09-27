@@ -602,17 +602,17 @@ void StereoWidenerGUI::resized()
     utilKnobsCentred.removeFromLeft(utilKnobGap);
     auto gainArea = utilKnobsCentred;
 
-    m_rotationKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
-    m_rotationLabel.setBounds(rotationArea.removeFromTop(utilLabelHeight));
-    m_rotationKnob.setBounds(rotationArea);
-
-    m_balanceKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
-    m_balanceLabel.setBounds(balanceArea.removeFromTop(utilLabelHeight));
-    m_balanceKnob.setBounds(balanceArea);
-
-    m_gainKnob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
-    m_gainLabel.setBounds(gainArea.removeFromTop(utilLabelHeight));
-    m_gainKnob.setBounds(gainArea);
+    // Each label spans its knob plus the gap (half on either side), not just the 40 px
+    // knob -- "Rotation"/"Balance" don't fit in 40 px and were truncated to "Rota...".
+    const auto placeUtilKnob = [&](juce::Rectangle<int> area, juce::Label& label, juce::Slider& knob)
+    {
+        knob.setTextBoxStyle(juce::Slider::TextBoxBelow, false, utilKnobSize, utilLabelHeight);
+        label.setBounds(area.removeFromTop(utilLabelHeight).expanded(utilKnobGap / 2, 0));
+        knob.setBounds(area);
+    };
+    placeUtilKnob(rotationArea, m_rotationLabel, m_rotationKnob);
+    placeUtilKnob(balanceArea, m_balanceLabel, m_balanceKnob);
+    placeUtilKnob(gainArea, m_gainLabel, m_gainKnob);
     utilStack.removeFromTop(rowGap);
 
     m_toggleCaption.setBounds(utilStack.removeFromTop(utilCaptionHeight));
