@@ -1,5 +1,6 @@
 #include "MSWidthFiltered.h"
 #include <cmath>
+#include <complex>
 
 namespace
 {
@@ -28,30 +29,55 @@ void MSWidthFiltered::reset()
     sideHighShelf.reset();
 }
 
-void MSWidthFiltered::updateFiltersIfNeeded(float bassCutoffHz, float highShelfHz) noexcept
+void MSWidthFiltered::updateFiltersIfNeeded(float bassCutoffHz, float highShelfHz, float shelfGainDb) noexcept
 {
     if (hasChanged(bassCutoffHz, lastBassCutoffHz))
     {
         bassCutoffBypassed = bassCutoffHz < kBassCutoffOffThreshold;
         if (!bassCutoffBypassed)
-            *sideHighpass.coefficients = *juce::dsp::IIR::Coefficients<float>::makeHighPass(sampleRate, bassCutoffHz, kFilterQ);
+            *sideHighpass.coefficients = juce::dsp::IIR::ArrayCoefficients<float>::makeHighPass(sampleRate, bassCutoffHz, kFilterQ);
         lastBassCutoffHz = bassCutoffHz;
     }
-    if (hasChanged(highShelfHz, lastHighShelfHz))
+    if (hasChanged(highShelfHz, lastHighShelfHz) || hasChanged(shelfGainDb, lastShelfGainDb))
     {
         highShelfBypassed = highShelfHz > kHighShelfOffThreshold;
         if (!highShelfBypassed)
-        {
-            const float gainFactor = juce::Decibels::decibelsToGain(highShelfGainDb);
-            *sideHighShelf.coefficients = *juce::dsp::IIR::Coefficients<float>::makeHighShelf(sampleRate, highShelfHz, kFilterQ, gainFactor);
-        }
+            *sideHighShelf.coefficients = juce::dsp::IIR::ArrayCoefficients<float>::makeHighShelf(
+                sampleRate, highShelfHz, kFilterQ, juce::Decibels::decibelsToGain(shelfGainDb));
         lastHighShelfHz = highShelfHz;
+        lastShelfGainDb = shelfGainDb;
     }
+}
+
+namespace
+{
+    // |H(e^jw)| of one biquad, coefficients in JUCE's {b0, b1, b2, a0, a1, a2} order.
+    double biquadMagnitude(const std::array<float, 6>& c, double frequencyHz, double sampleRate) noexcept
+    {
+        const std::complex<double> z1 = std::polar(1.0, -juce::MathConstants<double>::twoPi * frequencyHz / sampleRate);
+        const std::complex<double> z2 = z1 * z1;
+        const auto numerator = (double) c[0] + (double) c[1] * z1 + (double) c[2] * z2;
+        const auto denominator = (double) c[3] + (double) c[4] * z1 + (double) c[5] * z2;
+        return std::abs(numerator / denominator);
+    }
+}
+
+float MSWidthFiltered::sideGainDb(float frequencyHz, const AlgorithmParamValues& values, double sampleRate) noexcept
+{
+    double gain = values[kWidth] * 0.01;
+    if (values[kBassCutoff] >= kBassCutoffOffThreshold)
+        gain *= biquadMagnitude(juce::dsp::IIR::ArrayCoefficients<float>::makeHighPass(sampleRate, values[kBassCutoff], kFilterQ),
+                                frequencyHz, sampleRate);
+    if (values[kHighShelf] <= kHighShelfOffThreshold)
+        gain *= biquadMagnitude(juce::dsp::IIR::ArrayCoefficients<float>::makeHighShelf(sampleRate, values[kHighShelf], kFilterQ,
+                                    juce::Decibels::decibelsToGain(values[kShelfGain])),
+                                frequencyHz, sampleRate);
+    return juce::Decibels::gainToDecibels((float) gain, -100.0f);
 }
 
 void MSWidthFiltered::process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept
 {
-    updateFiltersIfNeeded(values[kBassCutoff], values[kHighShelf]);
+    updateFiltersIfNeeded(values[kBassCutoff], values[kHighShelf], values[kShelfGain]);
     const float width = values[kWidth] * 0.01f; // % -> 0..2
 
     auto* left = buffer.getWritePointer(0);
@@ -81,11 +107,13 @@ juce::String MSWidthFiltered::getDescription() const
            "it is forced into the mid signal (i.e. mono) regardless of the Width "
            "setting -- low frequencies translate poorly to mono playback if left wide "
            "and carry most of a mix's energy. A high shelf at the High Shelf frequency "
-           "(currently " + juce::String(highShelfGainDb, 1) + " dB, configurable in "
-           "the global settings file -- see GlobalSettings.h) then restores some "
-           "high-frequency \"air\" to the widened side signal. Either stage can be "
-           "switched off entirely: turn Bass Cutoff below 40 Hz, or High Shelf above "
-           "16 kHz.\n\n"
+           "(Shelf Gain, default +3 dB) then restores some high-frequency \"air\" to "
+           "the widened side signal. Either stage can be switched off entirely: turn "
+           "Bass Cutoff below 40 Hz, or High Shelf above 16 kHz.\n\n"
+           "The graph shows the gain the side signal gets at each frequency (Width and "
+           "both filters combined); the mid signal always passes unchanged (0 dB line). "
+           "Drag the two points to set the cutoff and shelf frequencies; drag the shelf "
+           "point up or down to change its gain.\n\n"
            "Source: B. Katz, \"Mastering Audio: The Art and the Science\", 3rd ed., "
            "Focal Press, 2015, ch. 3 (\"Mono Compatibility and M-S Processing\").";
 }

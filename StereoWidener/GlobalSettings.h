@@ -46,9 +46,6 @@ public:
      *  instances are not watched/reloaded live -- see the file header). */
     GlobalSettings();
 
-    /** Gain (dB) of MSWidthFiltered's side-channel high shelf. Default 3.0 dB. */
-    float getHighShelfGainDb() const noexcept { return highShelfGainDb; }
-
     /** High-pass corner (Hz) applied to ComplementaryComb's delayed contribution before
      *  it is added to the side signal -- planing.md 2.4's own suggested improvement
      *  ("apply only above ~300 Hz"), not a user-facing knob (see the user's "minimise
@@ -101,7 +98,6 @@ private:
     void load();
     void write(const juce::File& file) const;
 
-    float highShelfGainDb = 3.0f; // matches the previous hardcoded MSWidthFiltered::kHighShelfGainDb
     float guiScaleFactor = 1.0f;
     float meterIntegrationTimeS = 0.3f;  // matches StereoMeterState::prepare()'s own defaults
     float meterPeakHoldTimeS = 1.5f;

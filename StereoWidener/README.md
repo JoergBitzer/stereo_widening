@@ -55,13 +55,15 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     heard at the current width and the side signal's gain.
   - *M/S Width (Filtered / Bass Mono)*: the same control, but the side signal is
     high-pass filtered first, so bass content is forced mono and only the highs get
-    widened, then high-shelved to restore some "air". The left knob sets the **Bass
+    widened, then high-shelved to restore some "air". Controls: **Width**, **Bass
     Cutoff** (40-500 Hz, turn below 40 Hz for "Off" -- bypasses the high-pass entirely,
     and is the default: double-clicking the knob resets to Off, not to some fixed
-    cutoff), the right knob sets the **High Shelf** frequency (1000-16000 Hz, turn above
-    16 kHz for "Off" -- bypasses the shelf entirely, and is likewise the default). The
-    shelf's gain (default 3 dB) is not a parameter; it's read from the global settings
-    file, see below.
+    cutoff), **High Shelf** frequency (1000-16000 Hz, turn above 16 kHz for "Off" --
+    bypasses the shelf entirely, and is likewise the default) and **Shelf Gain** (-6 to
+    +6 dB, default +3 dB; until v0.1.18 a fixed value in the settings file). The graph
+    above the knobs shows the gain the side signal gets at each frequency; drag its two
+    points to set the cutoff and shelf frequencies, drag the shelf point up/down for
+    its gain, double-click a point to reset it.
   - *Complementary Comb (Pseudo-Stereo)*: a delayed, gained copy of the mid signal is
     added to the side signal (Lauridsen/Schroeder pseudo-stereo) -- unlike the two M/S
     algorithms above, this one creates real width even from dual-mono input. The left
@@ -171,7 +173,6 @@ saved parameter values and GUI size always take priority over these once they ex
 
 ```json
 {
-  "highShelfGainDb": 3.0,
   "guiScaleFactor": 1.0,
   "meterIntegrationTimeS": 0.3,
   "meterPeakHoldTimeS": 1.5,
