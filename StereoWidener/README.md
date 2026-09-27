@@ -65,14 +65,17 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     its gain, double-click a point to reset it.
   - *Complementary Comb (Pseudo-Stereo)*: a delayed, gained copy of the mid signal is
     added to the side signal (Lauridsen/Schroeder pseudo-stereo) -- unlike the two M/S
-    algorithms above, this one creates real width even from dual-mono input. The left
-    knob sets **Delay** (5-20 ms), the right knob sets **Gain** (0-100 %, defaults to
-    0 % -- no effect until dialled in, same "neutral by default" reasoning as Bass
-    Cutoff/High Shelf above). The crossover frequency above which the delayed signal is
-    added (default 300 Hz, keeping bass content out of the effect) is not a parameter;
-    it's read from the global settings file, see below. See
+    algorithms above, this one creates real width even from dual-mono input. Controls:
+    **Width**, **Delay** (5-20 ms), **Gain** (0-100 %, defaults to 0 % -- no effect
+    until dialled in, same "neutral by default" reasoning as Bass Cutoff/High Shelf
+    above) and **Crossover** (50-2000 Hz, default 300 Hz: the delayed signal is only
+    added above it, keeping bass content out of the effect; until v0.1.22 a fixed value
+    in the settings file). The graph shows what happens to a centred (mono) input on a
+    linear 0-2 kHz axis: L gets peaks where R gets notches, 1/Delay apart; drag the
+    vertical line to move the crossover. See
     [phase5_comb.md](../docs/algorithms/phase5_comb.md) for the algorithm and its
-    verification.
+    verification, [phase6_playground_comb.md](../docs/algorithms/phase6_playground_comb.md)
+    for the display.
   - *Allpass Decorrelation*: the mid signal is filtered through two different allpass
     cascades and blended into each channel, decorrelating L/R without altering either
     channel's own magnitude spectrum -- also creates real width from dual-mono input,
@@ -179,8 +182,7 @@ saved parameter values and GUI size always take priority over these once they ex
   "guiScaleFactor": 1.0,
   "meterIntegrationTimeS": 0.3,
   "meterPeakHoldTimeS": 1.5,
-  "meterPeakDecayDbPerS": 20.0,
-  "combCrossoverHz": 300.0
+  "meterPeakDecayDbPerS": 20.0
 }
 ```
 

@@ -18,7 +18,7 @@
 
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
-#include "LogFrequencyAxis.h"
+#include "FrequencyAxis.h"
 
 class BandSplitView : public juce::Component
 {
@@ -57,7 +57,7 @@ private:
     };
 
     juce::Rectangle<float> getPlotArea() const;
-    LogFrequencyAxis getAxis() const { return { getPlotArea() }; }
+    FrequencyAxis getAxis() const { return FrequencyAxis::log(getPlotArea()); }
     float getFontSize() const;
     float getBarTop() const;               // y of a 200 % bar
     float yForWidth(float percent) const;

@@ -17,8 +17,6 @@ StereoWidenerAudio::StereoWidenerAudio(StereoWidenerAudioProcessor* processor)
 
     // user-configurable defaults (plan2.md Phase 4, "Global settings file"), previously
     // fixed compiled-in constants -- see GlobalSettings.h
-    if (auto* comb = dynamic_cast<ComplementaryComb*>(m_algorithms[2].get()))
-        comb->setCrossoverHz(m_globalSettings.getCombCrossoverHz());
     if (auto* earlyRefl = dynamic_cast<EarlyReflections*>(m_algorithms[5].get()))
         earlyRefl->setPreDelayMs(m_globalSettings.getEarlyReflectionsPreDelayMs());
     if (auto* chorus = dynamic_cast<ChorusDoubler*>(m_algorithms[6].get()))

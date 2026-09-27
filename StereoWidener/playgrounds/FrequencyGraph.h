@@ -1,12 +1,13 @@
 /**
  * @file FrequencyGraph.h
  * @brief Reusable frequency-response display for the playgrounds (plan_changeGUI.md,
- *        section 3.3): log frequency axis 20 Hz-20 kHz, dB axis, one curve, and
- *        draggable points bound to frequency (and optionally gain) parameters.
+ *        section 3.3): log frequency axis 20 Hz-20 kHz, dB axis, one or two curves,
+ *        draggable points on the first curve bound to frequency (and optionally gain)
+ *        parameters, and draggable vertical frequency markers.
  *
  * Dragging a point sideways sets its frequency parameter; if it also has a gain
- * parameter, dragging up/down changes that gain by the dB moved. Double-click resets
- * the point's parameters to their defaults. Drags are sent as host gestures
+ * parameter, dragging up/down changes that gain by the dB moved. A marker is dragged
+ * sideways; the region below its frequency is shaded. Double-click resets to defaults. Drags are sent as host gestures
  * (juce::ParameterAttachment), so automation recording and undo work as with a knob.
  *
  * (c) J. Bitzer, Jade HS, MIT license
@@ -14,23 +15,35 @@
 
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
-#include "LogFrequencyAxis.h"
+#include "FrequencyAxis.h"
 
 class FrequencyGraph : public juce::Component
 {
 public:
     FrequencyGraph(float minDb, float maxDb);
 
-    /** Gain in dB to draw at a frequency; called for every pixel column on repaint. */
-    void setCurve(std::function<float(float frequencyHz)> gainDbAt) { m_curve = std::move(gainDbAt); repaint(); }
+    /** Adds a curve: gain in dB at a frequency. The first curve is drawn in the accent
+     *  colour (optionally filled down to the bottom), the second in the secondary
+     *  colour; the name is shown top left in the curve's colour. */
+    void addCurve(const juce::String& name, std::function<float(float frequencyHz)> gainDbAt, bool fillBelow = false);
 
-    /** Name of the curve (top left, curve colour) and a labelled horizontal reference
-     *  line (e.g. the unchanged mid signal at 0 dB). */
-    void setCurveName(const juce::String& name) { m_curveName = name; repaint(); }
+    /** Like addCurve(), for curves too detailed to sample once per pixel (e.g. comb
+     *  teeth crowding together on the log axis): returns the curve's lowest and highest
+     *  gain in dB over [loHz, hiHz], one pixel column; dense regions draw as a band. */
+    void addCurveRange(const juce::String& name, std::function<juce::Range<float>(float loHz, float hiHz)> gainDbRange);
+
+    /** A labelled horizontal reference line (e.g. the unchanged mid signal at 0 dB). */
     void setReferenceLine(float db, const juce::String& name) { m_referenceDb = db; m_referenceName = name; repaint(); }
 
-    /** A draggable point on the curve at frequencyParam's value. */
+    /** A draggable point on the first curve at frequencyParam's value. */
     void addHandle(juce::RangedAudioParameter& frequencyParam, juce::RangedAudioParameter* gainParam = nullptr);
+
+    /** A draggable vertical line at frequencyParam's value, labelled name, with the
+     *  frequencies below it shaded (e.g. a crossover below which an effect is off). */
+    void addMarker(juce::RangedAudioParameter& frequencyParam, const juce::String& name);
+
+    /** Linear frequency axis from 0 to maxHz instead of the default log 20 Hz-20 kHz. */
+    void setLinearAxis(float maxHz) { m_linearMaxHz = maxHz; repaint(); }
 
     void setScaleFactor(float scale) { m_scale = scale; repaint(); }
 
@@ -43,16 +56,31 @@ public:
     void mouseDoubleClick(const juce::MouseEvent& e) override;
 
 private:
+    struct Curve
+    {
+        juce::String name;
+        std::function<juce::Range<float>(float, float)> gainDbRange;
+        bool fillBelow = false;
+    };
+
     struct Handle
     {
         juce::RangedAudioParameter* frequency = nullptr;
         juce::RangedAudioParameter* gain = nullptr;
         std::unique_ptr<juce::ParameterAttachment> frequencyAttachment;
         std::unique_ptr<juce::ParameterAttachment> gainAttachment;
+        bool isMarker = false;
+        juce::String name; // markers only
     };
 
+    void addHandleImpl(std::unique_ptr<Handle> handle);
+    void drawCurve(juce::Graphics& g, const Curve& curve, juce::Colour colour) const;
+
     juce::Rectangle<float> getPlotArea() const;
-    LogFrequencyAxis getAxis() const { return { getPlotArea() }; }
+    FrequencyAxis getAxis() const
+    {
+        return m_linearMaxHz > 0.0f ? FrequencyAxis::linear(getPlotArea(), m_linearMaxHz) : FrequencyAxis::log(getPlotArea());
+    }
     float yForDb(float db) const;
     float pixelsPerDb() const;
     juce::Point<float> getHandlePosition(const Handle& handle) const;
@@ -60,8 +88,8 @@ private:
     void setHovered(int index);
 
     float m_minDb, m_maxDb;
-    std::function<float(float)> m_curve;
-    juce::String m_curveName;
+    float m_linearMaxHz = 0.0f; // 0: log axis
+    std::vector<Curve> m_curves;
     float m_referenceDb = 0.0f;
     juce::String m_referenceName;
     std::vector<std::unique_ptr<Handle>> m_handles;

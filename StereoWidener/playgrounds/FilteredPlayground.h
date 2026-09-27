@@ -17,10 +17,6 @@ public:
     FilteredPlayground(juce::AudioProcessorValueTreeState& apvts, const StereoAlgorithm& algorithm);
     void resized() override;
 
-    // The GUI doesn't know the host's sample rate; the displayed response is computed
-    // at 48 kHz (differences to other rates only show close to Nyquist).
-    static constexpr double kDisplaySampleRate = 48000.0;
-
 private:
     FrequencyGraph m_graph;
     std::vector<std::unique_ptr<PlaygroundKnob>> m_knobs; // in MSWidthFiltered::ParamIndex order

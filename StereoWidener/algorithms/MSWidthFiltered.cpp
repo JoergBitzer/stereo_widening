@@ -1,6 +1,6 @@
 #include "MSWidthFiltered.h"
 #include <cmath>
-#include <complex>
+#include "BiquadResponse.h"
 
 namespace
 {
@@ -49,29 +49,16 @@ void MSWidthFiltered::updateFiltersIfNeeded(float bassCutoffHz, float highShelfH
     }
 }
 
-namespace
-{
-    // |H(e^jw)| of one biquad, coefficients in JUCE's {b0, b1, b2, a0, a1, a2} order.
-    double biquadMagnitude(const std::array<float, 6>& c, double frequencyHz, double sampleRate) noexcept
-    {
-        const std::complex<double> z1 = std::polar(1.0, -juce::MathConstants<double>::twoPi * frequencyHz / sampleRate);
-        const std::complex<double> z2 = z1 * z1;
-        const auto numerator = (double) c[0] + (double) c[1] * z1 + (double) c[2] * z2;
-        const auto denominator = (double) c[3] + (double) c[4] * z1 + (double) c[5] * z2;
-        return std::abs(numerator / denominator);
-    }
-}
-
 float MSWidthFiltered::sideGainDb(float frequencyHz, const AlgorithmParamValues& values, double sampleRate) noexcept
 {
     double gain = values[kWidth] * 0.01;
     if (values[kBassCutoff] >= kBassCutoffOffThreshold)
-        gain *= biquadMagnitude(juce::dsp::IIR::ArrayCoefficients<float>::makeHighPass(sampleRate, values[kBassCutoff], kFilterQ),
-                                frequencyHz, sampleRate);
+        gain *= std::abs(biquadResponse(juce::dsp::IIR::ArrayCoefficients<float>::makeHighPass(sampleRate, values[kBassCutoff], kFilterQ),
+                                frequencyHz, sampleRate));
     if (values[kHighShelf] <= kHighShelfOffThreshold)
-        gain *= biquadMagnitude(juce::dsp::IIR::ArrayCoefficients<float>::makeHighShelf(sampleRate, values[kHighShelf], kFilterQ,
+        gain *= std::abs(biquadResponse(juce::dsp::IIR::ArrayCoefficients<float>::makeHighShelf(sampleRate, values[kHighShelf], kFilterQ,
                                     juce::Decibels::decibelsToGain(values[kShelfGain])),
-                                frequencyHz, sampleRate);
+                                frequencyHz, sampleRate));
     return juce::Decibels::gainToDecibels((float) gain, -100.0f);
 }
 

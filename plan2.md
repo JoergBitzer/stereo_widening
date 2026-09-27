@@ -493,6 +493,11 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      neighbours), Frequency/Width captions; also fixed a knob-limit recursion that
      pluginval's fuzzing exposed. See
      [phase6_playground_multiband.md](docs/algorithms/phase6_playground_multiband.md).
+   - ✅ GUI playground 4, Complementary Comb (v0.1.23): L and R responses to a mono
+     input on a linear 0-2 kHz axis (complementary combs), crossover as a draggable
+     marker; Crossover moved from the settings file to a real parameter. Display
+     verified against the measured DSP (within 0.06 dB). See
+     [phase6_playground_comb.md](docs/algorithms/phase6_playground_comb.md).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.

@@ -12,9 +12,8 @@ FilteredPlayground::FilteredPlayground(juce::AudioProcessorValueTreeState& apvts
         addAndMakeVisible(*m_knobs.back());
     }
 
-    m_graph.setCurveName("Side gain");
+    m_graph.addCurve("Side gain", [this](float hz) { return MSWidthFiltered::sideGainDb(hz, m_values, kDisplaySampleRate); }, true);
     m_graph.setReferenceLine(0.0f, "Mid: 0 dB");
-    m_graph.setCurve([this](float hz) { return MSWidthFiltered::sideGainDb(hz, m_values, kDisplaySampleRate); });
     m_graph.addHandle(getParameter(specs[MSWidthFiltered::kBassCutoff].id));
     m_graph.addHandle(getParameter(specs[MSWidthFiltered::kHighShelf].id), &getParameter(specs[MSWidthFiltered::kShelfGain].id));
     addAndMakeVisible(m_graph);

@@ -46,15 +46,9 @@ public:
      *  instances are not watched/reloaded live -- see the file header). */
     GlobalSettings();
 
-    /** High-pass corner (Hz) applied to ComplementaryComb's delayed contribution before
-     *  it is added to the side signal -- planing.md 2.4's own suggested improvement
-     *  ("apply only above ~300 Hz"), not a user-facing knob (see the user's "minimise
-     *  to 2 + Width" request, phase5 docs). Default 300.0 Hz. */
-    float getCombCrossoverHz() const noexcept { return combCrossoverHz; }
-
     /** Pre-delay (ms) before EarlyReflections' first reflection tap -- planing.md
-     *  2.12's own suggested reflection window starts around 5 ms, not a user-facing
-     *  knob (same "2 + Width" reasoning as combCrossoverHz above). Default 5.0 ms. */
+     *  2.12's own suggested reflection window starts around 5 ms, not (yet) a
+     *  user-facing knob. Default 5.0 ms. */
     float getEarlyReflectionsPreDelayMs() const noexcept { return earlyReflectionsPreDelayMs; }
 
     /** LFO rate (Hz) for ChorusDoubler's modulated delay lines -- not a user-facing
@@ -102,7 +96,6 @@ private:
     float meterIntegrationTimeS = 0.3f;  // matches StereoMeterState::prepare()'s own defaults
     float meterPeakHoldTimeS = 1.5f;
     float meterPeakDecayDbPerS = 20.0f;
-    float combCrossoverHz = 300.0f; // matches planing.md 2.4's own suggested value
     float earlyReflectionsPreDelayMs = 5.0f;
     float chorusRateHz = 0.3f;
     bool useDayTheme = false;

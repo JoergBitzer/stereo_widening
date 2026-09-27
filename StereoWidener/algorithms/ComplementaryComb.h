@@ -22,10 +22,10 @@
  * per-octave correlation plot shows "out" tracking "in" closely below the crossover and
  * dropping above it.
  *
- * Parameters (getParamSpecs()): Width, Delay and Gain. Width scales the whole
- * resulting S', exactly like MSWidthBroadband/MSWidthFiltered, so every algorithm
- * shares the same "how much effect" feel. The crossover frequency is still a
- * GlobalSettings default (Phase 4), not yet a parameter -- see setCrossoverHz().
+ * Parameters (getParamSpecs()): Width, Delay, Gain and Crossover. Width scales the
+ * whole resulting S', exactly like MSWidthBroadband/MSWidthFiltered, so every
+ * algorithm shares the same "how much effect" feel. (Until v0.1.23 the crossover was a
+ * fixed default from the global settings file, not a parameter.)
  *
  * Unlike MSWidthBroadband/MSWidthFiltered, this algorithm creates real width from
  * dual-mono input (verified in python/evaluate_comb.py: speech_dry_answers, which M/S
@@ -63,27 +63,31 @@ public:
 
     // Ranges from planing.md 2.4: "D ~= 5-20 ms and g ~= 0.3-0.7". Gain is widened to
     // the full 0-100 %; 0 % is neutral (same output as MSWidthBroadband), so Delay just
-    // starts at a representative mid-range value.
-    enum ParamIndex { kWidth = 0, kDelay, kGain };
+    // starts at a representative mid-range value. Crossover defaults to planing.md's
+    // own "~300 Hz".
+    enum ParamIndex { kWidth = 0, kDelay, kGain, kCrossover };
     std::vector<AlgorithmParamSpec> getParamSpecs() const override
     {
         return {
             AlgorithmParamSpec::width("combWidth"),
             AlgorithmParamSpec::linear("combDelay", "Delay", "ms", 5.0f, 20.0f, 10.0f, 1),
-            AlgorithmParamSpec::linear("combGain", "Gain", "%", 0.0f, 100.0f, 0.0f)
+            AlgorithmParamSpec::linear("combGain", "Gain", "%", 0.0f, 100.0f, 0.0f),
+            AlgorithmParamSpec::logFrequency("combCrossover", "Crossover", 50.0f, 2000.0f, 300.0f)
         };
     }
+
+    /** How a mono (centred) input comes out of L and R, as gain in dB at frequencyHz.
+     *  With S = 0: L' = M (1 + a), R' = M (1 - a), where a = Width * Gain *
+     *  HighPass(f) * e^(-j 2 pi f Delay) -- two complementary combs: where one channel
+     *  has a peak, the other has a notch, and they sum back to 2M. Below the crossover
+     *  a -> 0 and both are flat. Pure math for the GUI's display; -100 dB = -inf. */
+    static void monoInputGainDb(float frequencyHz, const AlgorithmParamValues& values, double sampleRate,
+                                float& leftDb, float& rightDb) noexcept;
 
     const char* getName() const noexcept override { return "Complementary Comb (Pseudo-Stereo)"; }
     juce::String getDescription() const override;
     bool isMonoSafe() const noexcept override { return true; }
     int getLatencySamples() const noexcept override { return 0; } // the delay only feeds S, it is not an output-wide latency
-
-    /** User-configurable default (GlobalSettings, Phase 4): the delayed contribution
-     *  added to S is high-pass filtered above this frequency first, so low frequencies
-     *  (the most audible as "phasiness") are excluded -- planing.md's own suggested
-     *  improvement, see the file header. Not itself a user-facing parameter. */
-    void setCrossoverHz(float hz) noexcept;
 
     static constexpr float kFilterQ = 0.70710678f; // Butterworth (maximally flat)
     // a bit past the Delay parameter's own max (20 ms, getParamSpecs()), so the delay line never needs to grow after prepare()
@@ -94,10 +98,10 @@ public:
     static constexpr float kDelaySmoothingSeconds = 0.02f;
 
 private:
-    void updateCrossoverFilter() noexcept;
+    void updateCrossoverIfNeeded(float crossoverHz) noexcept;
 
     double sampleRate = 48000.0;
-    float crossoverHz = 300.0f;
+    float lastCrossoverHz = -1.0f;
 
     juce::dsp::DelayLine<float, juce::dsp::DelayLineInterpolationTypes::Linear> delayLine { 4096 };
     juce::dsp::IIR::Filter<float> crossoverFilter;
