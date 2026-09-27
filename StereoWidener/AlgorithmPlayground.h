@@ -11,7 +11,7 @@
  *
  * KnobsPlayground is the plain "one knob per parameter" version every algorithm starts
  * with; algorithms get their own dedicated playground classes (with graphics suited to
- * what they do) one at a time, see plan_changeGUI.md section 5.
+ * what they do, in playgrounds/) one at a time, see plan_changeGUI.md section 5.
  *
  * (c) J. Bitzer, Jade HS, MIT license
  */
@@ -53,6 +53,8 @@ private:
 class AlgorithmPlayground : public juce::Component
 {
 public:
+    explicit AlgorithmPlayground(juce::AudioProcessorValueTreeState& apvts) : m_apvts(apvts) {}
+
     /** The GUI's current zoom (window width / g_minGuiSize_x); playgrounds scale their
      *  own fixed pixel sizes (PluginSettings.h) by it. */
     void setScaleFactor(float scale)
@@ -64,7 +66,27 @@ public:
 protected:
     int scaled(int px) const noexcept { return juce::roundToInt((float) px * m_scale); }
 
+    juce::RangedAudioParameter& getParameter(const juce::String& id) const
+    {
+        auto* param = m_apvts.getParameter(id);
+        jassert(param != nullptr);
+        return *param;
+    }
+
+    /** Calls onChange with the parameter's value (in its own units) right away and
+     *  again after every change, including host automation -- always on the message
+     *  thread, so it may repaint directly. For live graphics that follow a parameter. */
+    void watchParameter(const juce::String& id, std::function<void(float)> onChange)
+    {
+        m_watchers.push_back(std::make_unique<juce::ParameterAttachment>(getParameter(id), std::move(onChange)));
+        m_watchers.back()->sendInitialUpdate();
+    }
+
+    juce::AudioProcessorValueTreeState& m_apvts;
     float m_scale = 1.0f;
+
+private:
+    std::vector<std::unique_ptr<juce::ParameterAttachment>> m_watchers;
 };
 
 /** One PlaygroundKnob per parameter. Up to three parameters: the first (the

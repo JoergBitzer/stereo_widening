@@ -51,7 +51,8 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
   clicks. Click the "?" button next to the selector for an explanation of the active
   algorithm, with a citation to a written source.
   - *M/S Width (Broadband)*: plain M/S width control across the whole spectrum. Width
-    is its only control.
+    is its only control; the picture next to it shows where hard-panned sources are
+    heard at the current width and the side signal's gain.
   - *M/S Width (Filtered / Bass Mono)*: the same control, but the side signal is
     high-pass filtered first, so bass content is forced mono and only the highs get
     widened, then high-shelved to restore some "air". The left knob sets the **Bass

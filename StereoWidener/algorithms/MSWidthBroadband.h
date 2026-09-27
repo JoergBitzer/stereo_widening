@@ -18,7 +18,9 @@
  * Reference: R. Streicher and F. A. Everest, "The New Stereo Soundbook", 3rd ed.,
  * Audio Engineering Associates, 2006 -- the M/S width technique implemented here is
  * standard mastering/mixing practice, covered in ch. 2 ("Microphone Technique") and
- * ch. 9 ("Stereo Enhancement and Manipulation").
+ * ch. 9 ("Stereo Enhancement and Manipulation"). Tangent law (see
+ * hardPannedSourceAngleDeg()): V. Pulkki, "Virtual Sound Source Positioning Using
+ * Vector Base Amplitude Panning", J. Audio Eng. Soc. 45(6), 1997.
  *
  * (c) J. Bitzer, Jade HS, MIT license
  */
@@ -38,6 +40,28 @@ public:
     {
         return { AlgorithmParamSpec::width("broadbandWidth") };
     }
+
+    // Pure math for the GUI's playground (no GUI dependency).
+
+    /** Side-signal gain in dB for widthPercent; -100 dB stands for -inf (0 % = mono). */
+    static float sideGainDb(float widthPercent) noexcept
+    {
+        return juce::Decibels::gainToDecibels(widthPercent * 0.01f, -100.0f);
+    }
+
+    /** Where a hard-panned source (e.g. L only) is heard after widening, in degrees from
+     *  the centre, for loudspeakers at +-kSpeakerAngleDeg. For an L-only input, M = S
+     *  = L/2, so L' = L(1+w)/2 and R' = L(1-w)/2; the stereophonic tangent law,
+     *  tan(phi) / tan(phi0) = (L'-R') / (L'+R'), then gives tan(phi) = w * tan(phi0).
+     *  w = 1 keeps the source at the loudspeaker; w > 1 moves it beyond (R' is then in
+     *  antiphase). */
+    static float hardPannedSourceAngleDeg(float widthPercent) noexcept
+    {
+        const float speakerRad = juce::degreesToRadians(kSpeakerAngleDeg);
+        return juce::radiansToDegrees(std::atan(widthPercent * 0.01f * std::tan(speakerRad)));
+    }
+
+    static constexpr float kSpeakerAngleDeg = 30.0f; // standard stereo triangle
 
     const char* getName() const noexcept override { return "M/S Width (Broadband)"; }
     juce::String getDescription() const override;

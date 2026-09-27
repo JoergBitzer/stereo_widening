@@ -1,6 +1,8 @@
 #include "AlgorithmPlayground.h"
 #include "PluginSettings.h"
 #include "algorithms/MultibandWidth.h"
+#include "algorithms/MSWidthBroadband.h"
+#include "playgrounds/BroadbandPlayground.h"
 
 PlaygroundKnob::PlaygroundKnob(juce::AudioProcessorValueTreeState& apvts, const AlgorithmParamSpec& spec)
 {
@@ -28,6 +30,7 @@ void PlaygroundKnob::resized()
 }
 
 KnobsPlayground::KnobsPlayground(juce::AudioProcessorValueTreeState& apvts, const StereoAlgorithm& algorithm)
+    : AlgorithmPlayground(apvts)
 {
     for (const auto& spec : algorithm.getParamSpecs())
     {
@@ -142,6 +145,8 @@ namespace
 std::unique_ptr<AlgorithmPlayground> createPlayground(juce::AudioProcessorValueTreeState& apvts,
                                                       const StereoAlgorithm& algorithm)
 {
+    if (dynamic_cast<const MSWidthBroadband*>(&algorithm) != nullptr)
+        return std::make_unique<BroadbandPlayground>(apvts, algorithm);
     if (dynamic_cast<const MultibandWidth*>(&algorithm) != nullptr)
         return std::make_unique<MultibandKnobsPlayground>(apvts, algorithm);
     return std::make_unique<KnobsPlayground>(apvts, algorithm);
