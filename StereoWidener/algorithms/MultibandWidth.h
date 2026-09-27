@@ -55,24 +55,27 @@ public:
     void reset() override;
     void process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept override;
 
-    // The crossover ranges overlap a little between neighbours on purpose: process()
-    // sorts and separates the three raw values defensively
-    // (updateFrequenciesIfNeeded()), and the GUI additionally stops each crossover at
-    // its neighbour while dragging, so independent per-parameter ranges are simpler
-    // than keeping three parameter ranges mutually exclusive.
+    // All three crossovers share one range and are limited only by each other: each
+    // stays at least kMinCrossoverRatio above its lower and below its upper neighbour
+    // (the GUI enforces this while dragging, process() on whatever values arrive). So a
+    // band's edges can go anywhere between its neighbours' -- until v0.1.22 each
+    // crossover had its own fixed range (40-400, 200-4000, 1000-18000 Hz), which e.g.
+    // kept band 4 from ever starting below 1 kHz.
     enum ParamIndex { kFreq1 = 0, kFreq2, kFreq3, kWidth2, kWidth3, kWidth4 };
     std::vector<AlgorithmParamSpec> getParamSpecs() const override
     {
         return {
-            AlgorithmParamSpec::logFrequency("multibandFreq1", "Crossover 1", 40.0f, 400.0f, 150.0f),
-            AlgorithmParamSpec::logFrequency("multibandFreq2", "Crossover 2", 200.0f, 4000.0f, 1500.0f),
-            AlgorithmParamSpec::logFrequency("multibandFreq3", "Crossover 3", 1000.0f, 18000.0f, 6000.0f),
+            AlgorithmParamSpec::logFrequency("multibandFreq1", "Crossover 1", kMinCrossoverHz, kMaxCrossoverHz, 150.0f),
+            AlgorithmParamSpec::logFrequency("multibandFreq2", "Crossover 2", kMinCrossoverHz, kMaxCrossoverHz, 1500.0f),
+            AlgorithmParamSpec::logFrequency("multibandFreq3", "Crossover 3", kMinCrossoverHz, kMaxCrossoverHz, 6000.0f),
             AlgorithmParamSpec::width("multibandWidth2", "Band 2 Width"),
             AlgorithmParamSpec::width("multibandWidth3", "Band 3 Width"),
             AlgorithmParamSpec::width("multibandWidth4", "Band 4 Width")
         };
     }
 
+    static constexpr float kMinCrossoverHz = 40.0f;
+    static constexpr float kMaxCrossoverHz = 18000.0f; // process() also stays below 0.45 x sample rate
     // Adjacent crossovers always stay at least this ratio apart (5 %): enforced by
     // process() on whatever values arrive, and by the GUI while dragging.
     static constexpr float kMinCrossoverRatio = 1.05f;

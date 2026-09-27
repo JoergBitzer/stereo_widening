@@ -57,13 +57,18 @@ BandSplitView::Target BandSplitView::findTarget(juce::Point<float> position) con
     if (!getPlotArea().contains(position))
         return {};
 
-    // Crossover lines first (grab within a few pixels), nearest wins.
+    // Crossover lines first, nearest wins. Grabbed within a few pixels -- but at most
+    // 30 % of the narrower band beside the line, so the middle of even a very narrow
+    // band stays grabbable for its width.
+    const auto edges = getBandEdges();
     Target target;
-    float bestDistance = 5.0f * m_scale;
+    float bestDistance = std::numeric_limits<float>::max();
     for (int i = 0; i < kNumCrossovers; ++i)
     {
-        const float distance = std::abs(position.x - getCrossoverX(i));
-        if (distance <= bestDistance)
+        const float narrowerBand = juce::jmin(edges[(size_t) i + 1] - edges[(size_t) i], edges[(size_t) i + 2] - edges[(size_t) i + 1]);
+        const float grabDistance = juce::jmin(5.0f * m_scale, 0.3f * narrowerBand);
+        const float distance = std::abs(position.x - edges[(size_t) i + 1]);
+        if (distance <= grabDistance && distance < bestDistance)
         {
             target = { Target::Kind::Crossover, i };
             bestDistance = distance;
@@ -72,7 +77,6 @@ BandSplitView::Target BandSplitView::findTarget(juce::Point<float> position) con
     if (target.kind != Target::Kind::None)
         return target;
 
-    const auto edges = getBandEdges();
     for (int band = 1; band < kNumBands; ++band) // band 0 is always mono, nothing to drag
         if (position.x >= edges[(size_t) band] && position.x < edges[(size_t) band + 1])
             return { Target::Kind::Band, band };

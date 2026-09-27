@@ -488,7 +488,10 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      [phase6_playground_filtered.md](docs/algorithms/phase6_playground_filtered.md).
    - ✅ GUI playground 3, Multiband Width (v0.1.21): band-split display (bands as bars
      whose height is their width, draggable crossovers, band 1 always mono) plus
-     compact knobs; overall Width removed. See
+     compact knobs; overall Width removed. Review fixes in v0.1.22: knob handles scale
+     with knob size, all crossovers share 40 Hz-18 kHz (limited only by their
+     neighbours), Frequency/Width captions; also fixed a knob-limit recursion that
+     pluginval's fuzzing exposed. See
      [phase6_playground_multiband.md](docs/algorithms/phase6_playground_multiband.md).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.

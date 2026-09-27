@@ -12,15 +12,24 @@ namespace
     // Defensive safety net, independent of whatever ordering the GUI enforces on
     // manual drags (the playground stops each crossover at its neighbours, but a DAW
     // can still automate the three crossover parameters directly, bypassing that):
-    // sorts the three raw values and keeps them at least kMinCrossoverRatio apart, so
-    // the filter coefficients built from them are always valid (0 < f1 < f2 < f3) no
-    // matter what values actually arrive.
-    void sortAndSeparate(float& f1, float& f2, float& f3) noexcept
+    // sorts the three raw values, keeps them within [kMinCrossoverHz, maxHz] and at
+    // least kMinCrossoverRatio apart, so the filter coefficients built from them are
+    // always valid (0 < f1 < f2 < f3 < Nyquist) no matter what values actually arrive.
+    void sortAndSeparate(float& f1, float& f2, float& f3, float maxHz) noexcept
     {
+        constexpr float ratio = MultibandWidth::kMinCrossoverRatio;
         std::array<float, 3> f { f1, f2, f3 };
         std::sort(f.begin(), f.end());
-        f[1] = juce::jmax(f[1], f[0] * MultibandWidth::kMinCrossoverRatio);
-        f[2] = juce::jmax(f[2], f[1] * MultibandWidth::kMinCrossoverRatio);
+        for (auto& hz : f)
+            hz = juce::jlimit(MultibandWidth::kMinCrossoverHz, maxHz, hz);
+        f[1] = juce::jmax(f[1], f[0] * ratio); // push apart upwards ...
+        f[2] = juce::jmax(f[2], f[1] * ratio);
+        if (f[2] > maxHz)                      // ... and back down if that went past the top
+        {
+            f[2] = maxHz;
+            f[1] = juce::jmin(f[1], f[2] / ratio);
+            f[0] = juce::jmin(f[0], f[1] / ratio);
+        }
         f1 = f[0]; f2 = f[1]; f3 = f[2];
     }
 }
@@ -45,7 +54,7 @@ void MultibandWidth::updateFrequenciesIfNeeded(float freq1, float freq2, float f
     if (!hasChanged(freq1, lastFreq1) && !hasChanged(freq2, lastFreq2) && !hasChanged(freq3, lastFreq3))
         return;
 
-    sortAndSeparate(freq1, freq2, freq3);
+    sortAndSeparate(freq1, freq2, freq3, juce::jmin(kMaxCrossoverHz, 0.45f * (float) sampleRate));
     midSplitter.setFrequencies(sampleRate, freq1, freq2, freq3);
     sideSplitter.setFrequencies(sampleRate, freq1, freq2, freq3);
     lastFreq1 = freq1; lastFreq2 = freq2; lastFreq3 = freq3;

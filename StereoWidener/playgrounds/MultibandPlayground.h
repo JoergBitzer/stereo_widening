@@ -1,8 +1,9 @@
 /**
  * @file MultibandPlayground.h
  * @brief Playground for MultibandWidth: the band-split element (BandSplitView) above a
- *        row of compact knobs for exact values -- the three splits (crossovers) and
- *        the widths of bands 2-4. No overall Width: each band has its own.
+ *        row of compact knobs for exact values, in two captioned groups -- Frequency
+ *        (the three splits/crossovers) and Width (bands 2-4). No overall Width: each
+ *        band has its own.
  *
  * (c) J. Bitzer, Jade HS, MIT license
  */
@@ -18,8 +19,10 @@ public:
     void resized() override;
 
 private:
-    void keepCrossoverKnobBetweenNeighbours(int index);
+    void limitCrossoverKnobs();
 
     std::unique_ptr<BandSplitView> m_bandSplit;
+    juce::Label m_frequencyCaption;
+    juce::Label m_widthCaption;
     std::vector<std::unique_ptr<PlaygroundKnob>> m_knobs; // in MultibandWidth::ParamIndex order
 };

@@ -33,6 +33,11 @@ public:
 
     void setScaleFactor(float scale) { m_scale = scale; repaint(); }
 
+    /** hz, limited to at least minCrossoverRatio above crossover index-1 and below
+     *  crossover index+1 (current values). If the neighbours are themselves closer
+     *  than that, the lower limit wins -- one clamp, no back-and-forth. */
+    float limitCrossover(int index, float hz) const;
+
     void paint(juce::Graphics& g) override;
     void mouseMove(const juce::MouseEvent& e) override;
     void mouseExit(const juce::MouseEvent& e) override;
@@ -61,7 +66,6 @@ private:
     std::array<float, kNumBands + 1> getBandEdges() const;
     Target findTarget(juce::Point<float> position) const;
     void setHovered(Target target);
-    float limitCrossover(int index, float hz) const; // keeps crossover index between its neighbours
     juce::ParameterAttachment& attachmentFor(Target target);
     juce::RangedAudioParameter& parameterFor(Target target);
 
