@@ -41,7 +41,6 @@ void ChorusDoubler::process(juce::AudioBuffer<float>& buffer, const AlgorithmPar
     auto* right = buffer.getWritePointer(1);
     const int numSamples = buffer.getNumSamples();
     const float amount = values[kAmount] * 0.01f; // % -> 0..1
-    const float gain = width * amount;
 
     const float samplesPerMs = 0.001f * (float) sampleRate;
     const float baseSamples = kBaseDelayMs * samplesPerMs;
@@ -76,8 +75,14 @@ void ChorusDoubler::process(juce::AudioBuffer<float>& buffer, const AlgorithmPar
         delayLineR.pushSample(0, m);
         const float yR = delayLineR.popSample(0) - m;
 
-        left[i] = left[i] + gain * yL;
-        right[i] = right[i] + gain * yR;
+        // Amount blends the effect in; Width is then a plain M/S width on the result,
+        // like every other algorithm's (see the file header).
+        const float lOut = left[i] + amount * yL;
+        const float rOut = right[i] + amount * yR;
+        const float midOut = 0.5f * (lOut + rOut);
+        const float sideOut = width * 0.5f * (lOut - rOut);
+        left[i] = midOut + sideOut;
+        right[i] = midOut - sideOut;
 
         phase += phaseIncrement;
         if (phase >= juce::MathConstants<float>::twoPi)
@@ -96,7 +101,9 @@ juce::String ChorusDoubler::getDescription() const
            "Depth controls how much the delay time swings around its centre; Amount "
            "controls how much of the effect is blended in, Rate how fast the delay "
            "times swing -- limited to 2 Hz, so the effect stays lush rather than "
-           "turning into an obvious vibrato/warble.\n\n"
+           "turning into an obvious vibrato/warble. Width works as in every "
+           "algorithm, on the result: 0 % = mono, 100 % = unchanged, 200 % = extra "
+           "wide.\n\n"
            "The display shows both channels' delay times over 4 seconds: L (red) and "
            "R (blue) swing a quarter cycle apart, R 3 ms longer on average. Drag up/down "
            "for Depth, left/right for Rate; the curves fade when Amount is 0.\n\n"

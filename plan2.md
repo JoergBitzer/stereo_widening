@@ -509,6 +509,11 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      no processing settings. Display verified against an impulse-train render (within
      0.05 ms). See
      [phase6_playground_chorus.md](docs/algorithms/phase6_playground_chorus.md).
+   - ✅ Consistent Width (v0.1.26): in Early Reflections and Chorus Doubler, Width was
+     just a second Amount (it scaled the added effect); now it's a plain M/S width on
+     the output like in every other algorithm (0 % = mono, 100 % = unchanged, 200 % =
+     extra wide). Output at 100 % unchanged within float rounding. See
+     [phase6_consistent_width.md](docs/algorithms/phase6_consistent_width.md).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.

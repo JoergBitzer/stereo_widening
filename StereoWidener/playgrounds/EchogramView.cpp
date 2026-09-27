@@ -5,12 +5,11 @@
 
 using namespace ParameterValues;
 
-EchogramView::EchogramView(juce::RangedAudioParameter& width, juce::RangedAudioParameter& amount,
-                           juce::RangedAudioParameter& roomSize, juce::RangedAudioParameter& preDelay)
-    : m_width(width), m_amount(amount), m_roomSize(roomSize), m_preDelay(preDelay)
+EchogramView::EchogramView(juce::RangedAudioParameter& amount, juce::RangedAudioParameter& roomSize,
+                           juce::RangedAudioParameter& preDelay)
+    : m_amount(amount), m_roomSize(roomSize), m_preDelay(preDelay)
 {
     const auto repaintOnChange = [this](float) { repaint(); };
-    m_widthAttachment = std::make_unique<juce::ParameterAttachment>(m_width, repaintOnChange);
     m_amountAttachment = std::make_unique<juce::ParameterAttachment>(m_amount, repaintOnChange);
     m_roomSizeAttachment = std::make_unique<juce::ParameterAttachment>(m_roomSize, repaintOnChange);
     m_preDelayAttachment = std::make_unique<juce::ParameterAttachment>(m_preDelay, repaintOnChange);
@@ -107,7 +106,7 @@ void EchogramView::paint(juce::Graphics& g)
     const float preDelayMs = current(m_preDelay);
     const float roomEndMs = getRoomEndMs();
     const float roomSize = current(m_roomSize) * 0.01f;
-    const float level = current(m_width) * 0.01f * current(m_amount) * 0.01f;
+    const float level = current(m_amount) * 0.01f; // Width doesn't change the reflections' level, only the output's M/S width
 
     // Time grid every 10 ms, labelled below the plot.
     for (float ms = 10.0f; ms < kMaxTimeMs; ms += 10.0f)

@@ -73,7 +73,6 @@ void EarlyReflections::process(juce::AudioBuffer<float>& buffer, const Algorithm
     auto* right = buffer.getWritePointer(1);
     const int numSamples = buffer.getNumSamples();
     const float amount = values[kAmount] * 0.01f; // % -> 0..1
-    const float gain = width * amount;
 
     for (int i = 0; i < numSamples; ++i)
     {
@@ -113,8 +112,14 @@ void EarlyReflections::process(juce::AudioBuffer<float>& buffer, const Algorithm
             reflR += gains[(size_t) k] * midDelayLine.popSample(0, -1.0f, isLastTapThisSample);
         }
 
-        left[i] = left[i] + gain * reflL;
-        right[i] = right[i] + gain * reflR;
+        // Amount blends the reflections in; Width is then a plain M/S width on the
+        // result, like every other algorithm's (see the file header).
+        const float lOut = left[i] + amount * reflL;
+        const float rOut = right[i] + amount * reflR;
+        const float midOut = 0.5f * (lOut + rOut);
+        const float sideOut = width * 0.5f * (lOut - rOut);
+        left[i] = midOut + sideOut;
+        right[i] = midOut - sideOut;
     }
 }
 
@@ -131,7 +136,8 @@ juce::String EarlyReflections::getDescription() const
            "Room Size controls how spread out the reflections are (small room: a "
            "tight early cluster; large room: spread further out, up to about 40 ms). "
            "Amount controls how much is added; Pre-delay sets the time before the "
-           "first reflection.\n\n"
+           "first reflection. Width works as in every algorithm, on the result: "
+           "0 % = mono, 100 % = unchanged, 200 % = extra wide.\n\n"
            "The display is an echogram: the direct sound at 0 ms, L's reflections "
            "above the time axis (red), R's below it (blue), each bar's height its "
            "level in dB relative to the direct sound (faint lines at -10 and -20 dB) -- "

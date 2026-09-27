@@ -5,12 +5,11 @@
 
 using namespace ParameterValues;
 
-DelayModulationView::DelayModulationView(juce::RangedAudioParameter& width, juce::RangedAudioParameter& amount,
-                                         juce::RangedAudioParameter& depth, juce::RangedAudioParameter& rate)
-    : m_width(width), m_amount(amount), m_depth(depth), m_rate(rate)
+DelayModulationView::DelayModulationView(juce::RangedAudioParameter& amount, juce::RangedAudioParameter& depth,
+                                         juce::RangedAudioParameter& rate)
+    : m_amount(amount), m_depth(depth), m_rate(rate)
 {
     const auto repaintOnChange = [this](float) { repaint(); };
-    m_widthAttachment = std::make_unique<juce::ParameterAttachment>(m_width, repaintOnChange);
     m_amountAttachment = std::make_unique<juce::ParameterAttachment>(m_amount, repaintOnChange);
     m_depthAttachment = std::make_unique<juce::ParameterAttachment>(m_depth, repaintOnChange);
     m_rateAttachment = std::make_unique<juce::ParameterAttachment>(m_rate, repaintOnChange);
@@ -69,7 +68,7 @@ void DelayModulationView::paint(juce::Graphics& g)
     // The two delay times over the window; faded when no effect is added.
     const float depth = current(m_depth) * 0.01f;
     const float rateHz = current(m_rate);
-    const bool active = current(m_width) * current(m_amount) > 0.0f;
+    const bool active = current(m_amount) > 0.0f;
     for (bool left : { false, true }) // R first, so L is on top
     {
         const auto yAt = [&](float x)
