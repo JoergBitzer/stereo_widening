@@ -514,6 +514,12 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      the output like in every other algorithm (0 % = mono, 100 % = unchanged, 200 % =
      extra wide). Output at 100 % unchanged within float rounding. See
      [phase6_consistent_width.md](docs/algorithms/phase6_consistent_width.md).
+   - ✅ GUI playground 7, Allpass Decorrelation (v0.1.27): gain of L, R and the mono
+     sum for a mono input, with the allpass stages' frequencies marked; drag
+     left/right for Spread, up/down for Amount. Display verified against the measured
+     DSP (within 0.02 dB). With this, every algorithm has its own playground
+     ([plan_changeGUI.md](plan_changeGUI.md) complete). See
+     [phase6_playground_allpass.md](docs/algorithms/phase6_playground_allpass.md).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.

@@ -63,6 +63,24 @@ public:
         };
     }
 
+    // Pure math for the GUI's display (no GUI dependency), the same designs process()
+    // uses.
+
+    /** Centre frequency of allpass stage (0..kNumStages-1) of the left (cascade 1,
+     *  fixed) or right (cascade 2, shifted up by spreadOctaves) channel. */
+    static float stageFrequencyHz(int stage, bool left, float spreadOctaves, double sampleRate) noexcept
+    {
+        const float hz = left ? kBaseFreqsHz[stage] : kBaseFreqsHz[stage] * std::pow(2.0f, spreadOctaves);
+        return juce::jmin(hz, 0.45f * (float) sampleRate); // stay clear of Nyquist
+    }
+
+    /** How a mono (centred) input comes out of L, R and the mono sum (L+R)/2, as gain
+     *  in dB at frequencyHz -- with S = 0: L1 = M (1 + Amount (H1 - 1)), R1 likewise
+     *  with H2, then Width on the result. Each cascade alone is magnitude-flat; the
+     *  colouration comes from blending it with the dry signal. -100 dB = -inf. */
+    static void monoInputGainDb(float frequencyHz, const AlgorithmParamValues& values, double sampleRate,
+                                float& leftDb, float& rightDb, float& monoDb) noexcept;
+
     const char* getName() const noexcept override { return "Allpass Decorrelation"; }
     juce::String getDescription() const override;
     bool isMonoSafe() const noexcept override { return false; }

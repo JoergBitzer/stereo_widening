@@ -10,6 +10,8 @@
 #include "playgrounds/EarlyReflectionsPlayground.h"
 #include "algorithms/ChorusDoubler.h"
 #include "playgrounds/ChorusPlayground.h"
+#include "algorithms/AllpassDecorrelation.h"
+#include "playgrounds/AllpassPlayground.h"
 
 PlaygroundKnob::PlaygroundKnob(juce::AudioProcessorValueTreeState& apvts, const AlgorithmParamSpec& spec, const juce::String& label)
 {
@@ -86,6 +88,8 @@ std::unique_ptr<AlgorithmPlayground> createPlayground(juce::AudioProcessorValueT
         return std::make_unique<EarlyReflectionsPlayground>(apvts, algorithm);
     if (dynamic_cast<const ChorusDoubler*>(&algorithm) != nullptr)
         return std::make_unique<ChorusPlayground>(apvts, algorithm);
+    if (dynamic_cast<const AllpassDecorrelation*>(&algorithm) != nullptr)
+        return std::make_unique<AllpassPlayground>(apvts, algorithm);
     if (dynamic_cast<const MultibandWidth*>(&algorithm) != nullptr)
         return std::make_unique<MultibandPlayground>(apvts, algorithm);
     return std::make_unique<KnobsPlayground>(apvts, algorithm);

@@ -24,7 +24,8 @@ public:
 
     /** Adds a curve: gain in dB at a frequency. The first curve is drawn in the accent
      *  colour (optionally filled down to the bottom), the second in the secondary
-     *  colour; the name is shown top left in the curve's colour. */
+     *  colour, a third in the text colour; the name is shown top left in the curve's
+     *  colour. */
     void addCurve(const juce::String& name, std::function<float(float frequencyHz)> gainDbAt, bool fillBelow = false);
 
     /** Like addCurve(), for curves too detailed to sample once per pixel (e.g. comb
@@ -41,6 +42,18 @@ public:
     /** A draggable vertical line at frequencyParam's value, labelled name, with the
      *  frequencies below it shaded (e.g. a crossover below which an effect is off). */
     void addMarker(juce::RangedAudioParameter& frequencyParam, const juce::String& name);
+
+    /** Frequency marks (e.g. filter stages): a faint vertical line each, with a small
+     *  triangle at the top (topEdge) or bottom edge, in the first or second curve's
+     *  colour. frequenciesHz is called on every repaint. */
+    void addFrequencyMarks(std::function<std::vector<float>()> frequenciesHz, bool secondaryColour, bool topEdge);
+
+    /** Dragging anywhere that isn't a point or marker changes up to two parameters,
+     *  relative to where the drag started: a drag across the whole width changes
+     *  horizontal by horizontalRange, across the whole height (upwards) vertical by
+     *  verticalRange. Double-click there resets both. Either may be nullptr. */
+    void setFreeDrag(juce::RangedAudioParameter* horizontal, float horizontalRange,
+                     juce::RangedAudioParameter* vertical, float verticalRange);
 
     /** Linear frequency axis from 0 to maxHz instead of the default log 20 Hz-20 kHz. */
     void setLinearAxis(float maxHz) { m_linearMaxHz = maxHz; repaint(); }
@@ -73,6 +86,23 @@ private:
         juce::String name; // markers only
     };
 
+    struct FrequencyMarks
+    {
+        std::function<std::vector<float>()> frequenciesHz;
+        bool secondaryColour = false;
+        bool topEdge = false;
+    };
+
+    struct FreeDragAxis
+    {
+        juce::RangedAudioParameter* parameter = nullptr;
+        float range = 0.0f;
+        std::unique_ptr<juce::ParameterAttachment> attachment;
+        float startValue = 0.0f;
+    };
+
+    static constexpr int kFreeDrag = -2; // m_hovered/m_dragged value for a free drag
+
     void addHandleImpl(std::unique_ptr<Handle> handle);
     void drawCurve(juce::Graphics& g, const Curve& curve, juce::Colour colour) const;
 
@@ -89,6 +119,8 @@ private:
 
     float m_minDb, m_maxDb;
     float m_linearMaxHz = 0.0f; // 0: log axis
+    std::vector<FrequencyMarks> m_frequencyMarks;
+    FreeDragAxis m_freeHorizontal, m_freeVertical;
     std::vector<Curve> m_curves;
     float m_referenceDb = 0.0f;
     juce::String m_referenceName;

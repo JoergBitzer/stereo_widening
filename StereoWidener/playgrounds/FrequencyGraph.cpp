@@ -1,5 +1,6 @@
 #include "FrequencyGraph.h"
 #include "ParameterValues.h"
+#include <tuple>
 
 using namespace ParameterValues;
 
@@ -24,6 +25,25 @@ void FrequencyGraph::addCurveRange(const juce::String& name, std::function<juce:
 {
     m_curves.push_back({ name, std::move(gainDbRange), false });
     repaint();
+}
+
+void FrequencyGraph::addFrequencyMarks(std::function<std::vector<float>()> frequenciesHz, bool secondaryColour, bool topEdge)
+{
+    m_frequencyMarks.push_back({ std::move(frequenciesHz), secondaryColour, topEdge });
+    repaint();
+}
+
+void FrequencyGraph::setFreeDrag(juce::RangedAudioParameter* horizontal, float horizontalRange,
+                                 juce::RangedAudioParameter* vertical, float verticalRange)
+{
+    for (auto [axis, parameter, range] : { std::tuple { &m_freeHorizontal, horizontal, horizontalRange },
+                                           std::tuple { &m_freeVertical, vertical, verticalRange } })
+    {
+        axis->parameter = parameter;
+        axis->range = range;
+        axis->attachment = parameter != nullptr
+            ? std::make_unique<juce::ParameterAttachment>(*parameter, [this](float) { repaint(); }) : nullptr;
+    }
 }
 
 void FrequencyGraph::addHandleImpl(std::unique_ptr<Handle> handle)
@@ -171,8 +191,31 @@ void FrequencyGraph::paint(juce::Graphics& g)
     g.setColour(style.text.withAlpha(0.5f));
     g.drawHorizontalLine(juce::roundToInt(referenceY), plot.getX(), plot.getRight());
 
+    // Frequency marks: faint vertical lines, a triangle at their edge.
+    for (const auto& marks : m_frequencyMarks)
+    {
+        const auto colour = marks.secondaryColour ? style.secondary : style.accent;
+        const float size = 5.0f * m_scale;
+        for (float hz : marks.frequenciesHz())
+        {
+            const float x = axis.xForFrequency(hz);
+            const float dashes[] = { 2.0f * m_scale, 3.0f * m_scale };
+            g.setColour(colour.withAlpha(0.45f));
+            g.drawDashedLine(juce::Line<float>(x, plot.getY(), x, plot.getBottom()), dashes, 2, 1.0f * m_scale);
+            juce::Path triangle;
+            const float edge = marks.topEdge ? plot.getY() : plot.getBottom();
+            const float tip = marks.topEdge ? edge + size : edge - size;
+            triangle.addTriangle(x - size * 0.7f, edge, x + size * 0.7f, edge, x, tip);
+            g.setColour(colour);
+            g.fillPath(triangle);
+        }
+    }
+
     // The second curve first, so the first (accent) one is on top.
-    const auto colourOf = [&](size_t index) { return index == 0 ? style.accent : style.secondary; };
+    const auto colourOf = [&](size_t index)
+    {
+        return index == 0 ? style.accent : index == 1 ? style.secondary : style.text.withAlpha(0.8f);
+    };
     for (size_t i = m_curves.size(); i-- > 0;)
         drawCurve(g, m_curves[i], colourOf(i));
 
@@ -217,6 +260,21 @@ void FrequencyGraph::paint(juce::Graphics& g)
         if (m_handles[i]->isMarker && m_handles[i]->name.isNotEmpty() && (int) i != m_hovered && (int) i != m_dragged)
             drawTag(m_handles[i]->name, style.text, getHandlePosition(*m_handles[i]).x + 4.0f * m_scale, plot.getBottom() - 2.4f * fontSize);
 
+    if (m_dragged == kFreeDrag || (m_dragged < 0 && m_hovered == kFreeDrag))
+    {
+        juce::String text;
+        for (const auto* axisParam : { &m_freeHorizontal, &m_freeVertical })
+            if (axisParam->parameter != nullptr)
+                text << (text.isEmpty() ? "" : ", ") << axisParam->parameter->getName(32) << " " << axisParam->parameter->getCurrentValueAsText();
+        const float width = (float) juce::GlyphArrangement::getStringWidthInt(g.getCurrentFont(), text) + 8.0f * m_scale;
+        auto box = juce::Rectangle<float>(width, fontSize + 4.0f * m_scale)
+                       .withCentre({ plot.getCentreX(), plot.getBottom() - 1.6f * fontSize });
+        g.setColour(style.background.withAlpha(0.9f));
+        g.fillRoundedRectangle(box, 3.0f * m_scale);
+        g.setColour(style.text);
+        g.drawText(text, box, juce::Justification::centred);
+    }
+
     const int labelled = m_dragged >= 0 ? m_dragged : m_hovered;
     if (labelled >= 0)
     {
@@ -248,16 +306,19 @@ void FrequencyGraph::setHovered(int index)
     {
         m_hovered = index;
         const bool marker = index >= 0 && m_handles[(size_t) index]->isMarker;
-        setMouseCursor(index < 0 ? juce::MouseCursor::NormalCursor
-                     : marker    ? juce::MouseCursor::LeftRightResizeCursor
-                                 : juce::MouseCursor::PointingHandCursor);
+        setMouseCursor(index == kFreeDrag ? juce::MouseCursor::UpDownLeftRightResizeCursor
+                     : index < 0          ? juce::MouseCursor::NormalCursor
+                     : marker             ? juce::MouseCursor::LeftRightResizeCursor
+                                          : juce::MouseCursor::PointingHandCursor);
         repaint();
     }
 }
 
 void FrequencyGraph::mouseMove(const juce::MouseEvent& e)
 {
-    setHovered(findHandleAt(e.position));
+    const int handle = findHandleAt(e.position);
+    const bool freeDrag = m_freeHorizontal.parameter != nullptr || m_freeVertical.parameter != nullptr;
+    setHovered(handle < 0 && freeDrag && getPlotArea().contains(e.position) ? kFreeDrag : handle);
 }
 
 void FrequencyGraph::mouseExit(const juce::MouseEvent&)
@@ -268,6 +329,18 @@ void FrequencyGraph::mouseExit(const juce::MouseEvent&)
 void FrequencyGraph::mouseDown(const juce::MouseEvent& e)
 {
     m_dragged = findHandleAt(e.position);
+    if (m_dragged < 0 && (m_freeHorizontal.parameter != nullptr || m_freeVertical.parameter != nullptr))
+    {
+        m_dragged = kFreeDrag;
+        for (auto* axis : { &m_freeHorizontal, &m_freeVertical })
+            if (axis->parameter != nullptr)
+            {
+                axis->startValue = current(*axis->parameter);
+                axis->attachment->beginGesture();
+            }
+        repaint();
+        return;
+    }
     if (m_dragged < 0)
         return;
     auto& handle = *m_handles[(size_t) m_dragged];
@@ -283,6 +356,17 @@ void FrequencyGraph::mouseDown(const juce::MouseEvent& e)
 
 void FrequencyGraph::mouseDrag(const juce::MouseEvent& e)
 {
+    if (m_dragged == kFreeDrag)
+    {
+        const auto plot = getPlotArea();
+        if (m_freeHorizontal.parameter != nullptr)
+            m_freeHorizontal.attachment->setValueAsPartOfGesture(clampToRange(*m_freeHorizontal.parameter,
+                m_freeHorizontal.startValue + (float) e.getDistanceFromDragStartX() / plot.getWidth() * m_freeHorizontal.range));
+        if (m_freeVertical.parameter != nullptr)
+            m_freeVertical.attachment->setValueAsPartOfGesture(clampToRange(*m_freeVertical.parameter,
+                m_freeVertical.startValue - (float) e.getDistanceFromDragStartY() / plot.getHeight() * m_freeVertical.range));
+        return;
+    }
     if (m_dragged < 0)
         return;
     auto& handle = *m_handles[(size_t) m_dragged];
@@ -296,6 +380,15 @@ void FrequencyGraph::mouseDrag(const juce::MouseEvent& e)
 
 void FrequencyGraph::mouseUp(const juce::MouseEvent&)
 {
+    if (m_dragged == kFreeDrag)
+    {
+        for (auto* axis : { &m_freeHorizontal, &m_freeVertical })
+            if (axis->parameter != nullptr)
+                axis->attachment->endGesture();
+        m_dragged = -1;
+        repaint();
+        return;
+    }
     if (m_dragged < 0)
         return;
     auto& handle = *m_handles[(size_t) m_dragged];
@@ -310,7 +403,12 @@ void FrequencyGraph::mouseDoubleClick(const juce::MouseEvent& e)
 {
     const int index = findHandleAt(e.position);
     if (index < 0)
+    {
+        for (auto* axis : { &m_freeHorizontal, &m_freeVertical })
+            if (axis->parameter != nullptr && getPlotArea().contains(e.position))
+                axis->attachment->setValueAsCompleteGesture(defaultValue(*axis->parameter));
         return;
+    }
     auto& handle = *m_handles[(size_t) index];
     handle.frequencyAttachment->setValueAsCompleteGesture(defaultValue(*handle.frequency));
     if (handle.gain != nullptr)
