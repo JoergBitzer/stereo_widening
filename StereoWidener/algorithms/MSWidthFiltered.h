@@ -13,13 +13,11 @@
  *     playback and carry most of a mix's energy, so collapsing them to the centre is
  *     usually inaudible as a width change but avoids phase-cancellation problems on
  *     mono sum.
- *  2. A high shelf at the High Shelf frequency (kHighShelf), boosting the side signal
- *     above that frequency by highShelfGainDb (default 3 dB, see setHighShelfGainDb()).
- *     This restores some of the high-frequency "air"/openness that step 1 and the
- *     width control together tend to reduce perceptually. The gain is still a
- *     user-configurable default from GlobalSettings (StereoWidener/GlobalSettings.h),
- *     set once by StereoWidenerAudio's constructor -- not yet an automatable parameter
- *     (planned, see plan_changeGUI.md).
+ *  2. A high shelf at the High Shelf frequency (kHighShelf), changing the side
+ *     signal above that frequency by Shelf Gain (kShelfGain, -6..+6 dB, default
+ *     +3 dB). A boost restores some of the high-frequency "air"/openness that step 1
+ *     and the width control together tend to reduce perceptually. (Until v0.1.18 the
+ *     gain was a fixed default from the global settings file, not a parameter.)
  *
  * Both frequency parameters have an "off" zone past their normal range, a common
  * pattern for a cutoff control: dragging Bass Cutoff below kBassCutoffOffThreshold
@@ -60,7 +58,7 @@ public:
     void reset() override;
     void process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept override;
 
-    enum ParamIndex { kWidth = 0, kBassCutoff, kHighShelf };
+    enum ParamIndex { kWidth = 0, kBassCutoff, kHighShelf, kShelfGain };
     std::vector<AlgorithmParamSpec> getParamSpecs() const override
     {
         // Both frequency controls default to Off, so the algorithm starts out identical
@@ -70,23 +68,20 @@ public:
             AlgorithmParamSpec::linear("bassCutoff", "Bass Cutoff", "Hz", 30.0f, 500.0f, 30.0f)
                 .withOffBelow(kBassCutoffOffThreshold),
             AlgorithmParamSpec::logFrequency("highShelfFreq", "High Shelf", 1000.0f, 16500.0f, 16500.0f)
-                .withOffAbove(kHighShelfOffThreshold)
+                .withOffAbove(kHighShelfOffThreshold),
+            AlgorithmParamSpec::linear("highShelfGain", "Shelf Gain", "dB", -6.0f, 6.0f, 3.0f, 1)
         };
     }
+
+    /** Gain in dB that the side signal gets at frequencyHz for the given parameter
+     *  values: Width plus both filter stages, from the same filter designs process()
+     *  uses. Pure math for the GUI's response display; -100 dB stands for -inf. */
+    static float sideGainDb(float frequencyHz, const AlgorithmParamValues& values, double sampleRate) noexcept;
 
     const char* getName() const noexcept override { return "M/S Width (Filtered / Bass Mono)"; }
     juce::String getDescription() const override;
     bool isMonoSafe() const noexcept override { return true; }
     int getLatencySamples() const noexcept override { return 0; }
-
-    /** User-configurable default (GlobalSettings, Phase 4), not an automatable
-     *  parameter -- see the file header. Safe to call at any time, including after
-     *  processing has started; takes effect on the next process() call. */
-    void setHighShelfGainDb(float gainDb) noexcept
-    {
-        highShelfGainDb = gainDb;
-        lastHighShelfHz = -1.0f; // force updateFiltersIfNeeded() to recompute with the new gain
-    }
 
     static constexpr float kFilterQ = 0.70710678f;  // Butterworth (maximally flat)
 
@@ -97,12 +92,12 @@ public:
     static constexpr float kHighShelfOffThreshold = 16000.0f;
 
 private:
-    void updateFiltersIfNeeded(float bassCutoffHz, float highShelfHz) noexcept;
+    void updateFiltersIfNeeded(float bassCutoffHz, float highShelfHz, float shelfGainDb) noexcept;
 
     double sampleRate = 48000.0;
-    float highShelfGainDb = 3.0f; // compiled-in fallback; see setHighShelfGainDb() and GlobalSettings
     float lastBassCutoffHz = -1.0f;
     float lastHighShelfHz = -1.0f;
+    float lastShelfGainDb = 0.0f;
     bool bassCutoffBypassed = false;
     bool highShelfBypassed = false;
 

@@ -24,8 +24,6 @@ void GlobalSettings::load()
     const juce::var parsed = juce::JSON::parse(file);
     if (auto* obj = parsed.getDynamicObject())
     {
-        if (obj->hasProperty("highShelfGainDb"))
-            highShelfGainDb = (float) (double) obj->getProperty("highShelfGainDb");
         if (obj->hasProperty("guiScaleFactor"))
             guiScaleFactor = (float) (double) obj->getProperty("guiScaleFactor");
         if (obj->hasProperty("meterIntegrationTimeS"))
@@ -62,7 +60,6 @@ void GlobalSettings::saveUseDayTheme(bool newUseDayTheme)
 void GlobalSettings::write(const juce::File& file) const
 {
     auto* obj = new juce::DynamicObject();
-    obj->setProperty("highShelfGainDb", (double) highShelfGainDb);
     obj->setProperty("guiScaleFactor", (double) guiScaleFactor);
     obj->setProperty("meterIntegrationTimeS", (double) meterIntegrationTimeS);
     obj->setProperty("meterPeakHoldTimeS", (double) meterPeakHoldTimeS);

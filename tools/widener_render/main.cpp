@@ -14,12 +14,14 @@
  *                       [mbWidth2Percent=100] [mbWidth3Percent=100] [mbWidth4Percent=100]
  *                       [erAmountPercent=50] [erRoomSizePercent=50] [erPreDelayMs=5]
  *                       [chorusAmountPercent=50] [chorusDepthPercent=50] [chorusRateHz=0.3]
+ *                       [highShelfGainDb=3]
  *
  * width_percent: 0-200, matching the plugin's Width parameter (0 = mono, 100 = unity,
  * 200 = double the side signal). bassCutoffHz/highShelfHz only matter for "filtered";
  * pass a value in their "Off" zone (e.g. bassCutoffHz below 40, or highShelfHz above
  * 16000) to bypass that stage, same as turning the corresponding knob to Off in the
- * plugin (see MSWidthFiltered.h). combDelayMs/combGainPercent/combCrossoverHz only
+ * plugin (see MSWidthFiltered.h); highShelfGainDb (last, added later) sets the
+ * shelf's gain. combDelayMs/combGainPercent/combCrossoverHz only
  * matter for "comb" (see ComplementaryComb.h); combCrossoverHz mirrors GlobalSettings'
  * combCrossoverHz default (not a user-facing knob in the plugin itself).
  * allpassAmountPercent/allpassSpreadPercent only matter for "allpass" (see
@@ -95,6 +97,7 @@ int main(int argc, char* argv[])
     const float chorusAmountPercent = argc > 21 ? (float) std::atof(argv[21]) : 50.0f;
     const float chorusDepthPercent = argc > 22 ? (float) std::atof(argv[22]) : 50.0f;
     const float chorusRateHz = argc > 23 ? (float) std::atof(argv[23]) : 0.3f;
+    const float highShelfGainDb = argc > 24 ? (float) std::atof(argv[24]) : 3.0f;
 
     juce::AudioFormatManager formatManager;
     formatManager.registerBasicFormats();
@@ -206,6 +209,7 @@ int main(int argc, char* argv[])
         values[MSWidthFiltered::kWidth] = widthPercent;
         values[MSWidthFiltered::kBassCutoff] = bassCutoffHz;
         values[MSWidthFiltered::kHighShelf] = highShelfHz;
+        values[MSWidthFiltered::kShelfGain] = highShelfGainDb;
     }
 
     // block-sized processing, not one giant call, so MSWidthFiltered's per-sample IIR
