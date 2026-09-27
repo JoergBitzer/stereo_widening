@@ -1,5 +1,6 @@
 #include "AllpassDecorrelation.h"
 #include <cmath>
+#include "BiquadResponse.h"
 
 namespace
 {
@@ -32,21 +33,36 @@ void AllpassDecorrelation::reset()
 
 void AllpassDecorrelation::updateCascades(float spreadOctaves) noexcept
 {
-    // Clamped below Nyquist with margin, same reasoning as the Python reference
-    // (algorithms/allpass_decorrelation.py): the RBJ cookbook allpass formula
-    // (juce::dsp::IIR::Coefficients::makeAllPass uses the same one) is only valid
-    // below Nyquist, and a large Spread could otherwise push a high base frequency
-    // (8000 Hz) above it.
-    const float nyquistMarginHz = 0.45f * (float) sampleRate;
-    const float shiftFactor = std::pow(2.0f, spreadOctaves);
-
     for (int i = 0; i < kNumStages; ++i)
     {
-        const float freq1 = juce::jmin(kBaseFreqsHz[i], nyquistMarginHz);
-        const float freq2 = juce::jmin(kBaseFreqsHz[i] * shiftFactor, nyquistMarginHz);
-        *cascade1[(size_t) i].coefficients = *juce::dsp::IIR::Coefficients<float>::makeAllPass(sampleRate, freq1, kFilterQ);
-        *cascade2[(size_t) i].coefficients = *juce::dsp::IIR::Coefficients<float>::makeAllPass(sampleRate, freq2, kFilterQ);
+        *cascade1[(size_t) i].coefficients = juce::dsp::IIR::ArrayCoefficients<float>::makeAllPass(
+            sampleRate, stageFrequencyHz(i, true, spreadOctaves, sampleRate), kFilterQ);
+        *cascade2[(size_t) i].coefficients = juce::dsp::IIR::ArrayCoefficients<float>::makeAllPass(
+            sampleRate, stageFrequencyHz(i, false, spreadOctaves, sampleRate), kFilterQ);
     }
+}
+
+void AllpassDecorrelation::monoInputGainDb(float frequencyHz, const AlgorithmParamValues& values, double sampleRate,
+                                           float& leftDb, float& rightDb, float& monoDb) noexcept
+{
+    const float spreadOctaves = (values[kSpread] * 0.01f) * kMaxSpreadOctaves;
+    std::complex<double> h1 = 1.0, h2 = 1.0;
+    for (int i = 0; i < kNumStages; ++i)
+    {
+        h1 *= biquadResponse(juce::dsp::IIR::ArrayCoefficients<float>::makeAllPass(
+                  sampleRate, stageFrequencyHz(i, true, spreadOctaves, sampleRate), kFilterQ), frequencyHz, sampleRate);
+        h2 *= biquadResponse(juce::dsp::IIR::ArrayCoefficients<float>::makeAllPass(
+                  sampleRate, stageFrequencyHz(i, false, spreadOctaves, sampleRate), kFilterQ), frequencyHz, sampleRate);
+    }
+    const double amount = values[kAmount] * 0.01, width = values[kWidth] * 0.01;
+    const auto l1 = 1.0 + amount * (h1 - 1.0);
+    const auto r1 = 1.0 + amount * (h2 - 1.0);
+    const auto mid = 0.5 * (l1 + r1);
+    const auto side = width * 0.5 * (l1 - r1);
+    const auto toDb = [](std::complex<double> h) { return juce::Decibels::gainToDecibels((float) std::abs(h), -100.0f); };
+    leftDb = toDb(mid + side);
+    rightDb = toDb(mid - side);
+    monoDb = toDb(mid);
 }
 
 void AllpassDecorrelation::process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept
@@ -94,6 +110,10 @@ juce::String AllpassDecorrelation::getDescription() const
            "decorrelated copy: L' = L + Amount*(Y1-M), R' = R + Amount*(Y2-M). Spread "
            "controls how far apart the two cascades' frequencies sit -- 0 makes them "
            "identical (no decorrelation).\n\n"
+           "The graph shows what happens to a centred (mono) input: the gain of L "
+           "(red), R (blue) and the mono sum L+R (grey). The markers along the bottom "
+           "are the four allpass stages' frequencies, L's fixed and R's shifted up by "
+           "Spread. Drag left/right for Spread, up/down for Amount.\n\n"
            "Unlike Complementary Comb, this technique is NOT mono-compatible: because "
            "the mid signal itself changes, the mono sum L'+R' is coloured once Amount "
            "is above 0 -- a real trade-off of this technique, not a bug. Check your "

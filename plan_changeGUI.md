@@ -212,6 +212,8 @@ settle the visual language; then the ones that need `FrequencyGraph`; then the r
 6. Chorus Doubler -- moves Rate out of settings.
    ✅ Done in v0.1.25, see [phase6_playground_chorus.md](docs/algorithms/phase6_playground_chorus.md).
 7. Allpass Decorrelation.
+   ✅ Done in v0.1.27, see [phase6_playground_allpass.md](docs/algorithms/phase6_playground_allpass.md).
+   All seven playgrounds are done.
 
 Each step: new playground, any new parameters, the `GlobalSettings` cleanup for that
 algorithm, a doc in `docs/algorithms/`, `plan2.md` entry, version bump, README update.

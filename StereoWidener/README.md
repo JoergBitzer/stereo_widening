@@ -77,16 +77,21 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     verification, [phase6_playground_comb.md](../docs/algorithms/phase6_playground_comb.md)
     for the display.
   - *Allpass Decorrelation*: the mid signal is filtered through two different allpass
-    cascades and blended into each channel, decorrelating L/R without altering either
-    channel's own magnitude spectrum -- also creates real width from dual-mono input,
-    like Complementary Comb. The left knob sets **Amount** (0-100 %, defaults to 0 % --
-    an exact bypass), the right knob sets **Spread** (0-100 %, how far apart the two
-    cascades' frequencies sit). **Not mono-safe**: unlike every other algorithm here,
-    the mono sum (L+R) is coloured once Amount is above 0 -- StereoWidenerGUI shows a
-    warning below the algorithm selector when this algorithm is active; check your mix
-    in mono (Utilities -> Monitor -> Mono Check) before committing to a setting. See
+    cascades and blended into each channel. Each allpass copy has the dry signal's
+    exact magnitude spectrum but a different phase; blending it with the dry signal
+    decorrelates L/R -- and also colours each channel and the mono sum. It creates
+    real width from dual-mono input, like Complementary Comb. Controls: **Width**,
+    **Amount** (0-100 %, defaults to 0 % -- an exact bypass) and **Spread** (0-100 %,
+    how far apart the two cascades' frequencies sit). The graph shows what happens to
+    a centred (mono) input -- the gain of L, R and the mono sum, with the allpass
+    stages' frequencies marked; drag left/right for Spread, up/down for Amount.
+    **Not mono-safe** (like Early Reflections and Chorus Doubler): the mono sum (L+R)
+    is coloured once Amount is above 0 -- StereoWidenerGUI shows a warning below the
+    playground when such an algorithm is active; check your mix in mono (Utilities ->
+    Monitor -> Mono Check) before committing to a setting. See
     [phase5_allpass.md](../docs/algorithms/phase5_allpass.md) for the algorithm and its
-    verification.
+    verification, [phase6_playground_allpass.md](../docs/algorithms/phase6_playground_allpass.md)
+    for the display.
   - *Multiband Width*: splits the signal into 4 bands (3 crossovers) and applies an
     independent M/S width to each of the upper 3 bands; the lowest band is always mono
     ("bass mono comes built in", not a parameter). The display shows the 4 bands on a
