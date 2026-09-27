@@ -23,12 +23,7 @@ juce::String MSWidthBroadband::getDescription() const
            "mid/side pair is recombined (L' = M + width*S, R' = M - width*S). Width=0 "
            "collapses to mono, Width=100% is unchanged, Width=200% doubles the side "
            "signal. Applied equally across the whole spectrum, including the bass.\n\n"
-           "The picture shows where a source panned hard left or right ends up, for "
-           "loudspeakers at +-30 degrees (stereophonic tangent law: tan(phi) = "
-           "width * tan(30 degrees)). Above 100 % it moves beyond the loudspeakers, "
-           "because the other channel then carries it in antiphase.\n\n"
            "Source: R. Streicher and F. A. Everest, \"The New Stereo Soundbook\", "
            "3rd ed., Audio Engineering Associates, 2006 (stereo enhancement / M-S "
-           "technique); V. Pulkki, \"Virtual Sound Source Positioning Using Vector "
-           "Base Amplitude Panning\", J. Audio Eng. Soc. 45(6), 1997 (tangent law).";
+           "technique).";
 }

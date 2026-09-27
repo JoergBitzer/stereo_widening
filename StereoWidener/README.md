@@ -51,8 +51,7 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
   clicks. Click the "?" button next to the selector for an explanation of the active
   algorithm, with a citation to a written source.
   - *M/S Width (Broadband)*: plain M/S width control across the whole spectrum. Width
-    is its only control; the picture next to it shows where hard-panned sources are
-    heard at the current width and the side signal's gain.
+    is its only control -- a single knob, to show how simple the basic technique is.
   - *M/S Width (Filtered / Bass Mono)*: the same control, but the side signal is
     high-pass filtered first, so bass content is forced mono and only the highs get
     widened, then high-shelved to restore some "air". Controls: **Width**, **Bass
@@ -86,15 +85,19 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     [phase5_allpass.md](../docs/algorithms/phase5_allpass.md) for the algorithm and its
     verification.
   - *Multiband Width*: splits the signal into 4 bands (3 crossovers) and applies an
-    independent M/S width to each of the upper 3 bands; the lowest band's width is
-    always 0 ("bass mono comes built in", not a parameter). The only algorithm here
-    with more than three controls, shown as a grid of small knobs: a master **Width**
-    scaling all three widened bands, **Low-Mid / Mid-High / High-Air** (the 3 crossover
-    frequencies, 40-400/200-4000/1000-18000 Hz, each knob clamped against its
-    neighbours so they can't be dragged past each other) and **Low-Mid / Mid-High /
-    High** (the 3 band widths, 0-200 %, default 100 % -- neutral). See [phase5_multiband.md](../docs/algorithms/phase5_multiband.md) for
-    the algorithm (including the allpass phase-compensation needed for a flat
-    reconstruction) and its verification.
+    independent M/S width to each of the upper 3 bands; the lowest band is always mono
+    ("bass mono comes built in", not a parameter). The display shows the 4 bands on a
+    frequency axis, each band's bar height being its width (dashed line = 100 %): drag
+    a band up/down for its width, drag the lines between bands to move the crossovers
+    (a crossover stops at its neighbours), double-click to reset. Below it, knobs for
+    exact values: **Frequency** -- Split 1-3 (the crossovers, each anywhere from 40 Hz
+    to 18 kHz as long as it stays between its neighbours) -- and **Width** -- Band 2-4
+    (the band widths, 0-200 %, default 100 % -- neutral). There is no
+    overall Width (removed in v0.1.21: it scaled all bands on top of their own widths).
+    See [phase5_multiband.md](../docs/algorithms/phase5_multiband.md) for the algorithm
+    (including the allpass phase-compensation needed for a flat reconstruction) and
+    its verification, [phase6_playground_multiband.md](../docs/algorithms/phase6_playground_multiband.md)
+    for the display.
   - *Early Reflections (Room Widening)*: a handful of short, quiet, delayed copies of
     the mid signal are added to each channel, using a DIFFERENT set of delay times for
     L than for R -- mimics the early reflections a real room adds before its late

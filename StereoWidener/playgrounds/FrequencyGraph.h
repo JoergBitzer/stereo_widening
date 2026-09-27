@@ -14,6 +14,7 @@
 
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
+#include "LogFrequencyAxis.h"
 
 class FrequencyGraph : public juce::Component
 {
@@ -41,9 +42,6 @@ public:
     void mouseUp(const juce::MouseEvent& e) override;
     void mouseDoubleClick(const juce::MouseEvent& e) override;
 
-    static constexpr float kMinHz = 20.0f;
-    static constexpr float kMaxHz = 20000.0f;
-
 private:
     struct Handle
     {
@@ -54,8 +52,7 @@ private:
     };
 
     juce::Rectangle<float> getPlotArea() const;
-    float xForFrequency(float hz) const;
-    float frequencyForX(float x) const;
+    LogFrequencyAxis getAxis() const { return { getPlotArea() }; }
     float yForDb(float db) const;
     float pixelsPerDb() const;
     juce::Point<float> getHandlePosition(const Handle& handle) const;

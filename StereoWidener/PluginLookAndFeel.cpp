@@ -109,7 +109,13 @@ void StereoWidenerLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y,
                                                 float rotaryStartAngle, float rotaryEndAngle, juce::Slider& slider)
 {
     juce::ignoreUnused(slider);
-    const auto radius = (float) juce::jmin(width / 2, height / 2) - 4.0f;
+    // Everything scales with the knob's own size (the smaller of width/height -- for
+    // a small knob the width is its wider value box). Earlier fixed minimums (10 px
+    // pointer, 5 px ring) made small knobs look mostly handle. The proportions are the
+    // ones the large 110 px knob always had.
+    const auto halfSize = (float) juce::jmin(width, height) * 0.5f;
+    const auto ringThickness = juce::jmax(1.5f, halfSize * 0.14f);
+    const auto radius = halfSize - 0.5f * ringThickness - 1.0f;
     const auto centreX = (float) x + (float) width * 0.5f;
     const auto centreY = (float) y + (float) height * 0.5f;
     const auto rx = centreX - radius;
@@ -126,12 +132,12 @@ void StereoWidenerLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y,
     // outline, brightening with sliderPos -- shows how far the knob is turned even
     // before looking at the pointer
     g.setColour(m_knobHandleColour.withMultipliedBrightness(0.3f + 0.7f * sliderPos));
-    g.drawEllipse(rx, ry, rw, rw, (float) juce::jmax((int) ((float) width * 0.07f), 5));
+    g.drawEllipse(rx, ry, rw, rw, ringThickness);
 
     // pointer -- the "handle", kept red in both themes (see file header)
-    const int pointSize = juce::jmax(width / 6, 10);
+    const auto pointSize = juce::jmax(3.0f, radius * 0.36f);
     juce::Path p;
-    p.addEllipse(-pointSize / 2.0f, -0.95f * radius, (float) pointSize, (float) pointSize);
+    p.addEllipse(-0.5f * pointSize, -0.95f * radius, pointSize, pointSize);
     p.applyTransform(juce::AffineTransform::rotation(angle).translated(centreX, centreY));
 
     g.setColour(m_knobHandleColour);
@@ -152,4 +158,11 @@ void StereoWidenerLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::But
     // matching the report that the Day button needed no such fix).
     g.setColour(backgroundColour.brighter(0.3f));
     g.drawRoundedRectangle(button.getLocalBounds().toFloat().reduced(0.5f, 0.5f), 6.0f, 1.0f);
+}
+
+juce::Label* StereoWidenerLookAndFeel::createSliderTextBox(juce::Slider& slider)
+{
+    auto* label = LookAndFeel_V4::createSliderTextBox(slider);
+    label->setFont(juce::Font(juce::FontOptions(juce::jmin(15.0f, 0.85f * (float) slider.getTextBoxHeight()))));
+    return label;
 }

@@ -477,15 +477,22 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      (v0.1.17): the value boxes kept JUCE's default colours because the look-and-feel
      was set before the editor's children were added. See
      [phase6_label_contrast_fix.md](docs/algorithms/phase6_label_contrast_fix.md).
-   - ✅ GUI playground 1, M/S Width (Broadband) (v0.1.18): Width knob next to a
-     top-down stereo-image view showing where hard-panned sources are heard (tangent
-     law) and the side gain. See
+   - ✅ GUI playground 1, M/S Width (Broadband) (v0.1.18, simplified in v0.1.20): just
+     the Width knob, centred, to show how simple the technique is (a stereo-image
+     picture added in v0.1.18 was removed again on request). See
      [phase6_playground_broadband.md](docs/algorithms/phase6_playground_broadband.md).
    - ✅ GUI playground 2, M/S Width (Filtered) (v0.1.19): side-signal response graph
      with draggable cutoff/shelf points (reusable `FrequencyGraph`); Shelf Gain moved
      from the settings file to a real parameter. Display verified against the measured
      DSP response (within 0.06 dB). See
      [phase6_playground_filtered.md](docs/algorithms/phase6_playground_filtered.md).
+   - ✅ GUI playground 3, Multiband Width (v0.1.21): band-split display (bands as bars
+     whose height is their width, draggable crossovers, band 1 always mono) plus
+     compact knobs; overall Width removed. Review fixes in v0.1.22: knob handles scale
+     with knob size, all crossovers share 40 Hz-18 kHz (limited only by their
+     neighbours), Frequency/Width captions; also fixed a knob-limit recursion that
+     pluginval's fuzzing exposed. See
+     [phase6_playground_multiband.md](docs/algorithms/phase6_playground_multiband.md).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.
