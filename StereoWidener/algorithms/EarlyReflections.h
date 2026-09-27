@@ -48,19 +48,17 @@
  * changes" -- see phase5_comb.md), since Room Size changing live would otherwise step
  * every tap's read position discontinuously.
  *
- * Two user-facing parameters, per the project's "2 + Width" convention:
- * - Amount: 0-100 %, defaults to 0 % -- an exact,
- *   algebraically neutral bypass (see phase5_comb.md's "Removing last-used state" for
- *   why every algorithm's default must be neutral).
- * - Room Size: 0-100 %, no neutral value of its own -- inert whenever
- *   Amount = 0, same reasoning as ComplementaryComb's Delay knob. Scales the spread of
- *   the reflection pattern from a small room (tight, early cluster) to a large room
- *   (wider spread, further into planing.md's suggested 5-40 ms window).
- * Pre-delay (time before the first reflection) is a GlobalSettings default instead of
- * a third knob (see GlobalSettings::getEarlyReflectionsPreDelayMs()), same convention
- * as ComplementaryComb's crossover frequency. The number of reflections per channel is
- * a compiled-in constant (kNumReflections), not configurable at all -- analogous to
- * AllpassDecorrelation's fixed cascade-stage count.
+ * Parameters (getParamSpecs()):
+ * - Width: scales the added reflections, like every algorithm's Width.
+ * - Amount: 0-100 %, defaults to 0 % -- an exact, algebraically neutral bypass.
+ * - Room Size: 0-100 %, no neutral value of its own -- inert whenever Amount = 0.
+ *   Scales the spread of the reflection pattern from a small room (tight, early
+ *   cluster) to a large room (wider spread, further into planing.md's suggested
+ *   5-40 ms window).
+ * - Pre-delay: 0-20 ms, default 5 ms -- the time before the first reflection. (Until
+ *   v0.1.23 a fixed value from the global settings file, not a parameter.)
+ * The number of reflections per channel is a compiled-in constant (kNumReflections),
+ * analogous to AllpassDecorrelation's fixed cascade-stage count.
  *
  * Reference: apparent source width (ASW) via early lateral reflections is standard
  * room-acoustics/concert-hall literature; see e.g. L. Beranek, "Concert Halls and Opera
@@ -81,24 +79,35 @@ public:
     void reset() override;
     void process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept override;
 
-    enum ParamIndex { kWidth = 0, kAmount, kRoomSize };
+    enum ParamIndex { kWidth = 0, kAmount, kRoomSize, kPreDelay };
     std::vector<AlgorithmParamSpec> getParamSpecs() const override
     {
         return {
             AlgorithmParamSpec::width("earlyReflWidth"),
             AlgorithmParamSpec::linear("earlyReflAmount", "Amount", "%", 0.0f, 100.0f, 0.0f),
-            AlgorithmParamSpec::linear("earlyReflRoomSize", "Room Size", "%", 0.0f, 100.0f, 50.0f)
+            AlgorithmParamSpec::linear("earlyReflRoomSize", "Room Size", "%", 0.0f, 100.0f, 50.0f),
+            AlgorithmParamSpec::linear("earlyReflPreDelay", "Pre-delay", "ms", 0.0f, kMaxPreDelayMs, 5.0f, 1)
         };
     }
+
+    // Pure math for the GUI's display (no GUI dependency), the same formulas
+    // process() uses.
+
+    /** Time of reflection k (0..kNumReflections-1) of one channel, in ms after the
+     *  direct sound. roomSize is 0..1. */
+    static float tapTimeMs(int k, bool left, float roomSize, float preDelayMs) noexcept
+    {
+        const float spreadMs = kRoomMinSpreadMs + roomSize * (kRoomMaxSpreadMs - kRoomMinSpreadMs);
+        return preDelayMs + (left ? kLeftFractions : kRightFractions)[(size_t) k] * spreadMs;
+    }
+
+    /** Level of reflection k relative to the direct sound, before Width x Amount. */
+    static float tapGain(int k) noexcept { return kBaseGain * std::pow(kGainDecay, (float) k); }
 
     const char* getName() const noexcept override { return "Early Reflections (Room Widening)"; }
     juce::String getDescription() const override;
     bool isMonoSafe() const noexcept override { return false; }
     int getLatencySamples() const noexcept override { return 0; }
-
-    /** User-configurable default (GlobalSettings, Phase 4): time before the first
-     *  reflection tap. Not itself a user-facing parameter, see the file header. */
-    void setPreDelayMs(float ms) noexcept { preDelayMs = ms; }
 
     static constexpr int kNumReflections = 5;
     // Fractional tap positions within the room-size spread window (0..1), irregular
@@ -112,8 +121,8 @@ public:
     // Python reference's _ROOM_MIN_SPREAD_MS/_ROOM_MAX_SPREAD_MS.
     static constexpr float kRoomMinSpreadMs = 8.0f;
     static constexpr float kRoomMaxSpreadMs = 32.0f;
-    // A bit past GlobalSettings' own sane pre-delay range plus the largest possible
-    // spread, so the shared delay line never needs to grow after prepare().
+    // Pre-delay's range maximum; plus the largest possible spread, the shared delay
+    // line never needs to grow after prepare().
     static constexpr float kMaxPreDelayMs = 20.0f;
     static constexpr float kMaxDelayMs = kMaxPreDelayMs + kRoomMaxSpreadMs;
     // Matches ComplementaryComb::kDelaySmoothingSeconds -- same "avoid zipper noise on
@@ -121,11 +130,11 @@ public:
     static constexpr float kDelaySmoothingSeconds = 0.02f;
 
 private:
-    void updateTapTargets(float roomSize) noexcept;
+    void updateTapTargets(float roomSize, float preDelayMs) noexcept;
 
     double sampleRate = 48000.0;
-    float preDelayMs = 5.0f;
     float lastRoomSize = -1.0f;
+    float lastPreDelayMs = -1.0f;
     bool delayInitialized = false;
 
     std::array<float, kNumReflections> gains {};

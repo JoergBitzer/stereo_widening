@@ -498,6 +498,11 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      marker; Crossover moved from the settings file to a real parameter. Display
      verified against the measured DSP (within 0.06 dB). See
      [phase6_playground_comb.md](docs/algorithms/phase6_playground_comb.md).
+   - ✅ GUI playground 5, Early Reflections (v0.1.24): echogram (L reflections above,
+     R below the time axis, levels in dB) with draggable Pre-delay/room-end lines and
+     vertical drag for Amount; Pre-delay moved from the settings file to a real
+     parameter. Display verified against an impulse render (exact). See
+     [phase6_playground_early_reflections.md](docs/algorithms/phase6_playground_early_reflections.md).
 2. Auto gain (calibrated with the level measurements from Phase 1).
 3. Factory presets for both profiles.
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.
