@@ -32,8 +32,6 @@ void GlobalSettings::load()
             meterPeakHoldTimeS = (float) (double) obj->getProperty("meterPeakHoldTimeS");
         if (obj->hasProperty("meterPeakDecayDbPerS"))
             meterPeakDecayDbPerS = (float) (double) obj->getProperty("meterPeakDecayDbPerS");
-        if (obj->hasProperty("combCrossoverHz"))
-            combCrossoverHz = (float) (double) obj->getProperty("combCrossoverHz");
         if (obj->hasProperty("earlyReflectionsPreDelayMs"))
             earlyReflectionsPreDelayMs = (float) (double) obj->getProperty("earlyReflectionsPreDelayMs");
         if (obj->hasProperty("chorusRateHz"))
@@ -64,7 +62,6 @@ void GlobalSettings::write(const juce::File& file) const
     obj->setProperty("meterIntegrationTimeS", (double) meterIntegrationTimeS);
     obj->setProperty("meterPeakHoldTimeS", (double) meterPeakHoldTimeS);
     obj->setProperty("meterPeakDecayDbPerS", (double) meterPeakDecayDbPerS);
-    obj->setProperty("combCrossoverHz", (double) combCrossoverHz);
     obj->setProperty("earlyReflectionsPreDelayMs", (double) earlyReflectionsPreDelayMs);
     obj->setProperty("chorusRateHz", (double) chorusRateHz);
     obj->setProperty("useDayTheme", useDayTheme);

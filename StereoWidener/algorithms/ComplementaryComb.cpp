@@ -1,4 +1,6 @@
 #include "ComplementaryComb.h"
+#include "BiquadResponse.h"
+#include <cmath>
 
 void ComplementaryComb::prepare(double newSampleRate, int maxBlockSize)
 {
@@ -9,7 +11,7 @@ void ComplementaryComb::prepare(double newSampleRate, int maxBlockSize)
     delayLine.prepare(juce::dsp::ProcessSpec { sampleRate, (juce::uint32) maxBlockSize, 1 });
 
     crossoverFilter.prepare(juce::dsp::ProcessSpec { sampleRate, (juce::uint32) maxBlockSize, 1 });
-    updateCrossoverFilter();
+    lastCrossoverHz = -1.0f; // force updateCrossoverIfNeeded() to (re)compute on the next process()
 
     smoothedDelaySamples.reset(sampleRate, (double) kDelaySmoothingSeconds);
     delayInitialized = false; // force a snap (not a glide-in from 0) on the next process()
@@ -22,19 +24,29 @@ void ComplementaryComb::reset()
     delayInitialized = false; // same reasoning as in prepare(): snap cleanly, don't glide in
 }
 
-void ComplementaryComb::setCrossoverHz(float hz) noexcept
+void ComplementaryComb::updateCrossoverIfNeeded(float crossoverHz) noexcept
 {
-    crossoverHz = hz;
-    updateCrossoverFilter();
+    if (std::abs(crossoverHz - lastCrossoverHz) <= 1.0e-6f)
+        return;
+    *crossoverFilter.coefficients = juce::dsp::IIR::ArrayCoefficients<float>::makeHighPass(sampleRate, crossoverHz, kFilterQ);
+    lastCrossoverHz = crossoverHz;
 }
 
-void ComplementaryComb::updateCrossoverFilter() noexcept
+void ComplementaryComb::monoInputGainDb(float frequencyHz, const AlgorithmParamValues& values, double sampleRate,
+                                        float& leftDb, float& rightDb) noexcept
 {
-    *crossoverFilter.coefficients = *juce::dsp::IIR::Coefficients<float>::makeHighPass(sampleRate, crossoverHz, kFilterQ);
+    const double delaySeconds = values[kDelay] * 0.001;
+    const std::complex<double> a = (values[kWidth] * 0.01) * (values[kGain] * 0.01)
+        * biquadResponse(juce::dsp::IIR::ArrayCoefficients<float>::makeHighPass(sampleRate, values[kCrossover], kFilterQ),
+                         frequencyHz, sampleRate)
+        * std::polar(1.0, -juce::MathConstants<double>::twoPi * frequencyHz * delaySeconds);
+    leftDb = juce::Decibels::gainToDecibels((float) std::abs(1.0 + a), -100.0f);
+    rightDb = juce::Decibels::gainToDecibels((float) std::abs(1.0 - a), -100.0f);
 }
 
 void ComplementaryComb::process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept
 {
+    updateCrossoverIfNeeded(values[kCrossover]);
     const float width = values[kWidth] * 0.01f; // % -> 0..2
     const float targetDelaySamples = values[kDelay] * 0.001f * (float) sampleRate;
     if (!delayInitialized)
@@ -78,16 +90,20 @@ juce::String ComplementaryComb::getDescription() const
 {
     return "Complementary comb filter pseudo-stereo (Lauridsen/Schroeder).\n\n"
            "A delayed, gained copy of the mid signal M is added to the side signal S: "
-           "S' = S + Gain * M[n-Delay], high-pass filtered above "
-           + juce::String(juce::roundToInt(crossoverHz)) + " Hz first so low frequencies "
-           "-- the most audible as \"phasiness\" -- are excluded and only the highs get "
-           "the comb-widened treatment. The mid signal itself is never touched, so "
+           "S' = S + Gain * M[n-Delay], high-pass filtered above the Crossover "
+           "frequency first so low frequencies -- the most audible as \"phasiness\" -- "
+           "are excluded and only the highs get the comb-widened treatment. The mid signal itself is never touched, so "
            "L'+R' = 2M always: perfectly mono-compatible by construction, and unlike "
            "the M/S width algorithms, this one creates real width from dual-mono "
            "input.\n\n"
            "Each channel on its own does get audible comb-filtering colouration, "
            "especially on headphones -- this is the known trade-off of this "
            "technique, not a bug.\n\n"
+           "The graph shows exactly that for a centred (mono) input, on a linear "
+           "0-2 kHz axis (the pattern continues up to 20 kHz): L (red) gets peaks "
+           "where R (blue) gets notches, evenly spaced 1/Delay apart. Gain and Width "
+           "set how deep they are; below the Crossover (drag the vertical line) both "
+           "stay flat.\n\n"
            "Source: M. R. Schroeder, \"An Artificial Stereophonic Effect Obtained from "
            "a Single Audio Signal\", J. Audio Eng. Soc., 1958.";
 }

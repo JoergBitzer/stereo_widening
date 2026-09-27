@@ -43,7 +43,7 @@ float BandSplitView::yForWidth(float percent) const
 float BandSplitView::getCrossoverX(int index) const
 {
     const float hz = current(*m_crossovers[(size_t) index]);
-    return getAxis().xForFrequency(juce::jlimit(LogFrequencyAxis::kMinHz, LogFrequencyAxis::kMaxHz, hz));
+    return getAxis().xForFrequency(juce::jlimit(FrequencyAxis::kLogMinHz, FrequencyAxis::kLogMaxHz, hz));
 }
 
 std::array<float, BandSplitView::kNumBands + 1> BandSplitView::getBandEdges() const

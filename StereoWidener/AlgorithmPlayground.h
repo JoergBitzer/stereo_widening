@@ -64,6 +64,10 @@ public:
         resized();
     }
 
+    // The GUI doesn't know the host's sample rate; response displays are computed at
+    // 48 kHz (differences to other rates only show close to Nyquist).
+    static constexpr double kDisplaySampleRate = 48000.0;
+
 protected:
     int scaled(int px) const noexcept { return juce::roundToInt((float) px * m_scale); }
 

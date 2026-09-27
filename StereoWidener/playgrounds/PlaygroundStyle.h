@@ -16,6 +16,7 @@ struct PlaygroundStyle
     juce::Colour text;
     juce::Colour grid;       // axes, reference lines
     juce::Colour accent;     // the thing the controls change (curve, wedge, handles)
+    juce::Colour secondary;  // a second curve next to the accent one (e.g. R next to L)
 
     static PlaygroundStyle of(const juce::Component& component)
     {
@@ -26,7 +27,10 @@ struct PlaygroundStyle
         // reach about 3:1 contrast on it -- darkened, about 6:1.
         if (background.getPerceivedBrightness() > 0.5f)
             text = text.darker(1.0f);
-        return { background, text, text.withAlpha(0.25f), lf.findColour(juce::Slider::thumbColourId) };
+        // Night: the goniometer's output-trace blue. Day: a darker, still clearly blue
+        // tone (deepskyblue has almost the same brightness as the Day display panel).
+        const auto blue = background.getPerceivedBrightness() > 0.5f ? juce::Colour(0xff1a5fc0) : juce::Colours::deepskyblue;
+        return { background, text, text.withAlpha(0.25f), lf.findColour(juce::Slider::thumbColourId), blue };
     }
 
     static constexpr float kCornerSize = 6.0f;  // display panel corner radius, unscaled

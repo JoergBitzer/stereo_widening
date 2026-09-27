@@ -205,6 +205,8 @@ settle the visual language; then the ones that need `FrequencyGraph`; then the r
    ✅ Done in v0.1.21, see [phase6_playground_multiband.md](docs/algorithms/phase6_playground_multiband.md)
    (a dedicated `BandSplitView` sharing `LogFrequencyAxis` with `FrequencyGraph`).
 4. Complementary Comb -- moves Crossover out of settings.
+   ✅ Done in v0.1.23, see [phase6_playground_comb.md](docs/algorithms/phase6_playground_comb.md)
+   (linear frequency axis instead of log: the teeth are evenly spaced in Hz).
 5. Early Reflections -- moves Pre-delay out of settings.
 6. Chorus Doubler -- moves Rate out of settings.
 7. Allpass Decorrelation.

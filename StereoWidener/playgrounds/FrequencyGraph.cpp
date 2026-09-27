@@ -7,16 +7,49 @@ FrequencyGraph::FrequencyGraph(float minDb, float maxDb) : m_minDb(minDb), m_max
 {
 }
 
+void FrequencyGraph::addCurve(const juce::String& name, std::function<float(float)> gainDbAt, bool fillBelow)
+{
+    // A smooth curve: its value at the column's (geometric) centre stands for the column.
+    m_curves.push_back({ name,
+                         [gainDbAt = std::move(gainDbAt)](float loHz, float hiHz)
+                         {
+                             const float db = gainDbAt(std::sqrt(loHz * hiHz));
+                             return juce::Range<float>(db, db);
+                         },
+                         fillBelow });
+    repaint();
+}
+
+void FrequencyGraph::addCurveRange(const juce::String& name, std::function<juce::Range<float>(float, float)> gainDbRange)
+{
+    m_curves.push_back({ name, std::move(gainDbRange), false });
+    repaint();
+}
+
+void FrequencyGraph::addHandleImpl(std::unique_ptr<Handle> handle)
+{
+    handle->frequencyAttachment = std::make_unique<juce::ParameterAttachment>(*handle->frequency, [this](float) { repaint(); });
+    if (handle->gain != nullptr)
+        handle->gainAttachment = std::make_unique<juce::ParameterAttachment>(*handle->gain, [this](float) { repaint(); });
+    m_handles.push_back(std::move(handle));
+    repaint();
+}
+
 void FrequencyGraph::addHandle(juce::RangedAudioParameter& frequencyParam, juce::RangedAudioParameter* gainParam)
 {
     auto handle = std::make_unique<Handle>();
     handle->frequency = &frequencyParam;
     handle->gain = gainParam;
-    handle->frequencyAttachment = std::make_unique<juce::ParameterAttachment>(frequencyParam, [this](float) { repaint(); });
-    if (gainParam != nullptr)
-        handle->gainAttachment = std::make_unique<juce::ParameterAttachment>(*gainParam, [this](float) { repaint(); });
-    m_handles.push_back(std::move(handle));
-    repaint();
+    addHandleImpl(std::move(handle));
+}
+
+void FrequencyGraph::addMarker(juce::RangedAudioParameter& frequencyParam, const juce::String& name)
+{
+    auto handle = std::make_unique<Handle>();
+    handle->frequency = &frequencyParam;
+    handle->isMarker = true;
+    handle->name = name;
+    addHandleImpl(std::move(handle));
 }
 
 juce::Rectangle<float> FrequencyGraph::getPlotArea() const
@@ -37,9 +70,13 @@ float FrequencyGraph::yForDb(float db) const
 
 juce::Point<float> FrequencyGraph::getHandlePosition(const Handle& handle) const
 {
-    const float hz = current(*handle.frequency);
-    const float db = m_curve != nullptr ? m_curve(hz) : 0.0f;
-    return { getAxis().xForFrequency(juce::jlimit(LogFrequencyAxis::kMinHz, LogFrequencyAxis::kMaxHz, hz)), yForDb(db) };
+    const auto axis = getAxis();
+    const float hz = juce::jlimit(axis.minHz, axis.maxHz, current(*handle.frequency));
+    const float x = axis.xForFrequency(hz);
+    if (handle.isMarker) // grip at the top of the line
+        return { x, getPlotArea().getY() + 0.45f * PlaygroundStyle::kFontSize * m_scale };
+    const float db = m_curves.empty() ? 0.0f : m_curves.front().gainDbRange(hz, hz).getStart();
+    return { x, yForDb(db) };
 }
 
 int FrequencyGraph::findHandleAt(juce::Point<float> position) const
@@ -48,7 +85,10 @@ int FrequencyGraph::findHandleAt(juce::Point<float> position) const
     float bestDistance = 9.0f * m_scale; // hit radius, a bit larger than the drawn point
     for (size_t i = 0; i < m_handles.size(); ++i)
     {
-        const float distance = position.getDistanceFrom(getHandlePosition(*m_handles[i]));
+        const auto handlePosition = getHandlePosition(*m_handles[i]);
+        // A marker can be grabbed anywhere along its line.
+        const float distance = m_handles[i]->isMarker ? std::abs(position.x - handlePosition.x) * 1.8f
+                                                      : position.getDistanceFrom(handlePosition);
         if (distance < bestDistance)
         {
             best = (int) i;
@@ -56,6 +96,49 @@ int FrequencyGraph::findHandleAt(juce::Point<float> position) const
         }
     }
     return best;
+}
+
+void FrequencyGraph::drawCurve(juce::Graphics& g, const Curve& curve, juce::Colour colour) const
+{
+    // One pixel column at a time: where the curve varies by more than a pixel within a
+    // column (dense comb teeth), draw the column's full range as a vertical stroke, so
+    // the curve shows as a band instead of aliasing.
+    const auto plot = getPlotArea();
+    const auto axis = getAxis();
+    juce::Path line, top;
+    float lastY = 0.0f;
+    bool firstColumn = true;
+    for (float x = plot.getX(); x <= plot.getRight(); x += 1.0f)
+    {
+        const auto range = curve.gainDbRange(axis.frequencyForX(x - 0.5f), axis.frequencyForX(x + 0.5f));
+        const float yTop = yForDb(range.getEnd());
+        const float yBottom = yForDb(range.getStart());
+        if (firstColumn)
+        {
+            line.startNewSubPath(x, yTop);
+            line.lineTo(x, yBottom);
+            top.startNewSubPath(x, yTop);
+            lastY = yBottom;
+            firstColumn = false;
+            continue;
+        }
+        top.lineTo(x, yTop);
+        const bool topFirst = std::abs(lastY - yTop) < std::abs(lastY - yBottom);
+        line.lineTo(x, topFirst ? yTop : yBottom);
+        line.lineTo(x, topFirst ? yBottom : yTop);
+        lastY = topFirst ? yBottom : yTop;
+    }
+
+    if (curve.fillBelow)
+    {
+        top.lineTo(plot.getRight(), plot.getBottom());
+        top.lineTo(plot.getX(), plot.getBottom());
+        top.closeSubPath();
+        g.setColour(colour.withAlpha(0.25f));
+        g.fillPath(top);
+    }
+    g.setColour(colour);
+    g.strokePath(line, juce::PathStrokeType(2.0f * m_scale));
 }
 
 void FrequencyGraph::paint(juce::Graphics& g)
@@ -71,7 +154,16 @@ void FrequencyGraph::paint(juce::Graphics& g)
     const auto axis = getAxis();
     axis.drawGrid(g, style, fontSize);
 
-    // Level grid every 6 dB, the reference line stronger and labelled.
+    // Markers' shaded regions go under everything else.
+    for (const auto& handle : m_handles)
+        if (handle->isMarker)
+        {
+            const float x = getHandlePosition(*handle).x;
+            g.setColour(style.grid.withMultipliedAlpha(0.6f));
+            g.fillRect(juce::Rectangle<float>(plot.getX(), plot.getY(), x - plot.getX(), plot.getHeight()));
+        }
+
+    // Level grid every 6 dB, the reference line stronger.
     g.setColour(style.grid.withMultipliedAlpha(0.5f));
     for (float db = std::ceil(m_minDb / 6.0f) * 6.0f; db <= m_maxDb; db += 6.0f)
         g.drawHorizontalLine(juce::roundToInt(yForDb(db)), plot.getX(), plot.getRight());
@@ -79,51 +171,52 @@ void FrequencyGraph::paint(juce::Graphics& g)
     g.setColour(style.text.withAlpha(0.5f));
     g.drawHorizontalLine(juce::roundToInt(referenceY), plot.getX(), plot.getRight());
 
-    // The curve, filled down to the bottom of the plot.
-    if (m_curve != nullptr)
-    {
-        juce::Path curve;
-        curve.startNewSubPath(plot.getX(), yForDb(m_curve(axis.frequencyForX(plot.getX()))));
-        for (float x = plot.getX() + 1.0f; x <= plot.getRight(); x += 1.0f)
-            curve.lineTo(x, yForDb(m_curve(axis.frequencyForX(x))));
-        juce::Path filled(curve);
-        filled.lineTo(plot.getRight(), plot.getBottom());
-        filled.lineTo(plot.getX(), plot.getBottom());
-        filled.closeSubPath();
-        g.setColour(style.accent.withAlpha(0.25f));
-        g.fillPath(filled);
-        g.setColour(style.accent);
-        g.strokePath(curve, juce::PathStrokeType(2.0f * m_scale));
-    }
+    // The second curve first, so the first (accent) one is on top.
+    const auto colourOf = [&](size_t index) { return index == 0 ? style.accent : style.secondary; };
+    for (size_t i = m_curves.size(); i-- > 0;)
+        drawCurve(g, m_curves[i], colourOf(i));
 
-    // Names drawn on top of the curve, each on a small backing box so they stay
-    // readable wherever the curve runs.
-    const auto drawTag = [&](const juce::String& text, juce::Colour colour, float x, float y, bool alignRight)
-    {
-        const float width = (float) juce::GlyphArrangement::getStringWidthInt(g.getCurrentFont(), text) + 6.0f * m_scale;
-        auto box = juce::Rectangle<float>(alignRight ? x - width : x, y, width, fontSize + 2.0f * m_scale).constrainedWithin(plot);
-        g.setColour(style.background.withAlpha(0.8f));
-        g.fillRoundedRectangle(box, 2.0f * m_scale);
-        g.setColour(colour);
-        g.drawText(text, box, juce::Justification::centred);
-    };
-    if (m_curveName.isNotEmpty())
-        drawTag(m_curveName, style.accent, plot.getX() + 2.0f * m_scale, plot.getY() + 1.0f * m_scale, false);
-    if (m_referenceName.isNotEmpty())
-        drawTag(m_referenceName, style.text, plot.getX() + 2.0f * m_scale, referenceY + 2.0f * m_scale, false);
-
-    // Handles, with the value of the one under the mouse (or being dragged).
+    // Markers (vertical lines) and points, with the value of the one under the mouse
+    // (or being dragged).
     for (size_t i = 0; i < m_handles.size(); ++i)
     {
+        const auto& handle = *m_handles[i];
         const bool active = (int) i == m_hovered || (int) i == m_dragged;
-        const float radius = (active ? 6.5f : 5.0f) * m_scale;
-        const auto position = getHandlePosition(*m_handles[i]);
+        const auto position = getHandlePosition(handle);
+        if (handle.isMarker)
+        {
+            g.setColour(active ? style.accent : style.text.withAlpha(0.8f));
+            g.drawLine(juce::Line<float>(position.x, plot.getY(), position.x, plot.getBottom()), (active ? 2.5f : 1.5f) * m_scale);
+        }
+        const float radius = (handle.isMarker ? (active ? 5.5f : 4.0f) : (active ? 6.5f : 5.0f)) * m_scale;
         const auto circle = juce::Rectangle<float>(2.0f * radius, 2.0f * radius).withCentre(position);
         g.setColour(style.accent);
         g.fillEllipse(circle);
         g.setColour(style.text);
         g.drawEllipse(circle, 1.5f * m_scale);
     }
+    // Names drawn on top of curves, markers and points, each on a small backing box
+    // so they stay readable wherever those run.
+    const auto drawTag = [&](const juce::String& text, juce::Colour colour, float x, float y) -> float
+    {
+        const float width = (float) juce::GlyphArrangement::getStringWidthInt(g.getCurrentFont(), text) + 6.0f * m_scale;
+        auto box = juce::Rectangle<float>(x, y, width, fontSize + 2.0f * m_scale).constrainedWithin(plot);
+        g.setColour(style.background.withAlpha(0.8f));
+        g.fillRoundedRectangle(box, 2.0f * m_scale);
+        g.setColour(colour);
+        g.drawText(text, box, juce::Justification::centred);
+        return box.getRight();
+    };
+    float tagX = plot.getX() + 2.0f * m_scale;
+    for (size_t i = 0; i < m_curves.size(); ++i)
+        if (m_curves[i].name.isNotEmpty())
+            tagX = drawTag(m_curves[i].name, colourOf(i), tagX, plot.getY() + 1.0f * m_scale) + 3.0f * m_scale;
+    if (m_referenceName.isNotEmpty())
+        drawTag(m_referenceName, style.text, plot.getX() + 2.0f * m_scale, referenceY + 2.0f * m_scale);
+    for (size_t i = 0; i < m_handles.size(); ++i)
+        if (m_handles[i]->isMarker && m_handles[i]->name.isNotEmpty() && (int) i != m_hovered && (int) i != m_dragged)
+            drawTag(m_handles[i]->name, style.text, getHandlePosition(*m_handles[i]).x + 4.0f * m_scale, plot.getBottom() - 2.4f * fontSize);
+
     const int labelled = m_dragged >= 0 ? m_dragged : m_hovered;
     if (labelled >= 0)
     {
@@ -131,10 +224,16 @@ void FrequencyGraph::paint(juce::Graphics& g)
         juce::String text = handle.frequency->getCurrentValueAsText();
         if (handle.gain != nullptr)
             text << ", " << handle.gain->getCurrentValueAsText();
+        if (handle.isMarker && handle.name.isNotEmpty())
+            text = handle.name + " " + text;
         const auto position = getHandlePosition(handle);
         const float width = (float) juce::GlyphArrangement::getStringWidthInt(g.getCurrentFont(), text) + 8.0f * m_scale;
-        auto box = juce::Rectangle<float>(width, fontSize + 4.0f * m_scale)
-                       .withCentre(position.translated(0.0f, position.y > plot.getCentreY() ? -2.0f * fontSize : 2.0f * fontSize));
+        auto box = handle.isMarker
+            ? juce::Rectangle<float>(position.x + 6.0f * m_scale, plot.getCentreY(), width, fontSize + 4.0f * m_scale)
+            : juce::Rectangle<float>(width, fontSize + 4.0f * m_scale)
+                  .withCentre(position.translated(0.0f, position.y > plot.getCentreY() ? -2.0f * fontSize : 2.0f * fontSize));
+        if (handle.isMarker && box.getRight() > plot.getRight())
+            box.setX(position.x - 6.0f * m_scale - width);
         box = box.constrainedWithin(plot);
         g.setColour(style.background.withAlpha(0.9f));
         g.fillRoundedRectangle(box, 3.0f * m_scale);
@@ -148,7 +247,10 @@ void FrequencyGraph::setHovered(int index)
     if (index != m_hovered)
     {
         m_hovered = index;
-        setMouseCursor(index >= 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        const bool marker = index >= 0 && m_handles[(size_t) index]->isMarker;
+        setMouseCursor(index < 0 ? juce::MouseCursor::NormalCursor
+                     : marker    ? juce::MouseCursor::LeftRightResizeCursor
+                                 : juce::MouseCursor::PointingHandCursor);
         repaint();
     }
 }

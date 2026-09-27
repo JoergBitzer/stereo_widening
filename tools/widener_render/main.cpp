@@ -22,8 +22,7 @@
  * 16000) to bypass that stage, same as turning the corresponding knob to Off in the
  * plugin (see MSWidthFiltered.h); highShelfGainDb (last, added later) sets the
  * shelf's gain. combDelayMs/combGainPercent/combCrossoverHz only
- * matter for "comb" (see ComplementaryComb.h); combCrossoverHz mirrors GlobalSettings'
- * combCrossoverHz default (not a user-facing knob in the plugin itself).
+ * matter for "comb" (see ComplementaryComb.h).
  * allpassAmountPercent/allpassSpreadPercent only matter for "allpass" (see
  * AllpassDecorrelation.h). mbFreq1/2/3 and mbWidth2/3/4Percent only matter for
  * "multiband" (see MultibandWidth.h); band 1's width is always 0, not a parameter,
@@ -153,8 +152,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    if (auto* comb = dynamic_cast<ComplementaryComb*>(algorithm.get()))
-        comb->setCrossoverHz(combCrossoverHz);
     if (auto* earlyRefl = dynamic_cast<EarlyReflections*>(algorithm.get()))
         earlyRefl->setPreDelayMs(erPreDelayMs);
     if (auto* chorus = dynamic_cast<ChorusDoubler*>(algorithm.get()))
@@ -176,6 +173,7 @@ int main(int argc, char* argv[])
         values[ComplementaryComb::kWidth] = widthPercent;
         values[ComplementaryComb::kDelay] = combDelayMs;
         values[ComplementaryComb::kGain] = combGainPercent;
+        values[ComplementaryComb::kCrossover] = combCrossoverHz;
     }
     else if (algorithmName == "allpass")
     {
