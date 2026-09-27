@@ -1,192 +1,259 @@
-# GUI redesign: per-algorithm "playground" instead of one generic knob layout
+# GUI redesign: a per-algorithm "playground" (second planning phase)
 
-Planning document only -- no code changes in this step. Written in response to:
+Planning document only -- no code changes yet. Original request:
 
 > "I am not happy with changing size for one algorithm. I would like to have the
 > lower left field as kind of working field / playground for each algorithm with its
 > optimized gui elements (e.g. a special band split element). Think about how to do
 > that and explain your next steps."
 
-## 1. The problem with the current design
+This is the second revision, rewritten after your review of the first draft (your
+answers and comments are kept verbatim in section 8).
 
-The lower-left card (`m_paramPanelBounds`, set up in `StereoWidenerGUI::resized()`,
-`StereoWidener.cpp`) currently shows exactly one layout for every algorithm: Width
-in the middle, flanked by up to two generic rotary "aux" knobs
-(`m_auxLeftKnob`/`m_auxRightKnob`), each relabelled per algorithm via
-`StereoAlgorithm::getAuxLeftInfo()`/`getAuxRightInfo()` (`algorithms/StereoAlgorithm.h`).
-One algorithm, Multiband Width, doesn't fit that pattern at all -- it needs 6 values
-(3 crossover frequencies + 3 band widths), so it instead gets a bolted-on 6-knob grid
-below the row, driven by `getNumMultiParams()`/`getMultiParamInfo()`.
+## 1. Decisions from the review
 
-That grid is the concrete thing you're unhappy with: `getRequiredContentHeight()`
-computes a *taller* panel only when the active algorithm's `getNumMultiParams() > 0`,
-so **the whole plugin window resizes** when you switch to or from Multiband Width.
-Every other algorithm is fine with the generic two-knob row, but it's also not
-particularly *good* for them -- two identical grey rotary knobs is the same
-presentation whether the parameter is a delay time (Complementary Comb), a filter
-cutoff (M/S Width Filtered), a spread percentage (Allpass Decorrelation), or a room
-size (Early Reflections). None of these get anything visually suited to what they
-actually represent.
+| Topic | First draft | Now |
+|---|---|---|
+| Width knob | Fixed chrome above the playground, shared by all algorithms | **Part of each playground.** Each algorithm decides whether and how it shows width (Multiband gets per-band widths instead of one global knob). |
+| Existing algorithms' controls | Unchanged; generic knob row reused | **May change.** Each algorithm gets the controls it really needs, including parameters that are currently hidden in `settings.json`. |
+| Presets | Must stay compatible | **Compatibility not required.** New parameters may be added. |
+| Rollout | Refactor, then fix size, then band split | **Infrastructure first, then one algorithm at a time**, each on its own branch. |
+| Playground size | Decide after the band-split design | **Fixed now, at today's size** (your gut feeling: the band split will fit). Revisited only if a playground genuinely doesn't fit. |
 
-## 2. Design goals for the replacement
+## 2. Design goals (revised)
 
-1. **Fixed size.** The lower-left area has one size, decided once, independent of
-   which algorithm is active. Switching algorithms never resizes the window.
-2. **Per-algorithm content.** Each algorithm can present whatever controls suit it
-   best -- generic knobs for the simple cases, a dedicated custom widget (e.g. an
-   interactive band-split diagram) for the ones that benefit from one.
-3. **Low cost for the common case.** Five of the seven algorithms today are well
-   served by "Width + 0/1/2 labelled knobs." That should stay a one-line
-   declaration, not a hand-written widget per algorithm.
-4. **No change to the DSP layer.** `algorithms/*.cpp` and `StereoAlgorithm.h` stay
-   free of any GUI dependency -- important because `tools/widener_render` compiles
-   those same `.cpp` files into a plain console app linked only against
-   `juce_audio_basics`/`juce_dsp` (see its CMakeLists.txt), with no
-   `juce_gui_basics` at all. Pulling `juce::Component` into `StereoAlgorithm` would
-   break that tool. The playground concept below is entirely a GUI-layer
-   (`StereoWidener/`, not `StereoWidener/algorithms/`) concept, reading the same
-   `StereoAlgorithmParams`/parameter IDs the DSP side already exposes.
-5. **No parameter/preset changes.** Same parameter IDs, ranges and defaults
-   throughout -- this is a presentation change, existing presets keep loading.
+1. **Fixed size.** The lower-left card has one size for every algorithm. Switching
+   algorithms never resizes the window.
+2. **Each algorithm draws its own playground.** Its own controls, its own layout, and
+   where it helps, a small live graphic (a filter curve, a band split, a reflection
+   pattern) that shows what the controls actually do.
+3. **Self-explanatory controls.** Every control is labelled with its unit, and the
+   graphic reacts immediately when a control moves, so it's clear what each one
+   does -- this is a teaching plugin as much as a tool (planing.md section 5). All
+   playgrounds share one visual language: the same knob style, graph style and
+   theme colours (Day/Night, see `PluginLookAndFeel.h`), so they look like parts of
+   one plugin, not seven.
+4. **The DSP layer stays GUI-free.** `algorithms/*.cpp` and `StereoAlgorithm.h` must
+   not depend on `juce_gui_basics`: `tools/widener_render` compiles those same files
+   into a console app linked only against `juce_audio_basics`/`juce_dsp`. Playgrounds
+   live in `StereoWidener/` (GUI layer). The algorithms may *describe* their
+   parameters and expose pure-math helpers (e.g. "magnitude response at f"), both
+   plain data/functions with no GUI dependency, which the playgrounds use for drawing.
 
-## 3. Proposed architecture
+(Dropped from the first draft: "low cost for the common case" and "no
+parameter/preset changes".)
 
-### 3.1 `AlgorithmPlayground`: one small `juce::Component` per algorithm
+## 3. Architecture
 
-A new abstract base class (new file, e.g. `StereoWidener/AlgorithmPlayground.h`):
+### 3.1 Per-algorithm parameter lists instead of aux-left/aux-right/multi
+
+Today every algorithm receives `StereoAlgorithmParams { width, auxLeft, auxRight,
+multi[6] }`, and `StereoWidener.cpp` has hand-maintained per-index tables
+(`auxLeftParamIdFor()`, `auxRightParamIdFor()`, `auxMultiParamIdFor()`,
+`paramsFor()`) mapping each algorithm's slots to parameter IDs. That model assumes
+"Width + 2 knobs" and only works for Multiband via the bolted-on `multi` array. Once
+each algorithm has its own set of 1-6 controls it no longer fits.
+
+Proposal: each algorithm declares its own parameter list, as plain data:
 
 ```cpp
-class AlgorithmPlayground : public juce::Component
+struct AlgorithmParamSpec          // GUI-free, lives in StereoAlgorithm.h
+{
+    const char* id;                // e.g. "msFilteredShelfGain"
+    const char* name;              // e.g. "Shelf Gain"
+    const char* unit;              // e.g. "dB"
+    float min, max, defaultValue, step;
+    bool logFrequency = false;     // true -> makeLogFrequencyParameter()-style range
+};
+
+virtual std::vector<AlgorithmParamSpec> getParamSpecs() const = 0;  // replaces getAuxLeftInfo()/getAuxRightInfo()/getNumMultiParams()/getMultiParamInfo()
+```
+
+and `process()` receives `std::array<float, kMaxAlgorithmParams> values`, indexed by
+the algorithm's own enum (the pattern `MultibandWidth` already uses for `multi`).
+`StereoWidenerAudio::addParameter()` then registers every algorithm's specs in a
+loop, and `paramsFor()` fills `values` from the matching parameter pointers. That
+removes the per-index ID tables entirely, and adding a parameter to an algorithm
+becomes a one-place change inside that algorithm's own class.
+
+Width becomes one of an algorithm's own parameters. One global `width` parameter
+shared by all algorithms (today's `g_paramWidth`) vs. one width parameter per
+algorithm is an open question (section 7.1).
+
+### 3.2 `AlgorithmPlayground`: one `juce::Component` per algorithm
+
+```cpp
+class AlgorithmPlayground : public juce::Component   // StereoWidener/AlgorithmPlayground.h
 {
 public:
-    // Bind to the given algorithm's parameters. Called once whenever the algorithm
-    // selector changes (and once at startup for the initial algorithm). Replaces
-    // today's updateAuxKnobsForActiveAlgorithm()'s per-algorithm special-casing.
-    virtual void bindToAlgorithm(juce::AudioProcessorValueTreeState& apvts, int algorithmIndex) = 0;
-
-    // Called from StereoWidenerGUI::resized() with the fixed playground rectangle
-    // (m_paramPanelBounds' inner area, minus the Width knob's own space -- see 3.3).
-    // Component::resized() already exists for this; no new method needed.
+    explicit AlgorithmPlayground(juce::AudioProcessorValueTreeState& apvts);
+    // resized()/paint() implemented per algorithm, always within the same fixed bounds
 };
 ```
 
-`StereoWidenerGUI` holds one `std::unique_ptr<AlgorithmPlayground>` per algorithm
-(built once, up front, in the constructor -- not recreated on every switch), plus one
-"current" pointer. On an algorithm change it hides the old one and shows/resizes the
-new one (`setVisible`, `addAndMakeVisible`, `resized()`), exactly the same
-show/hide idea `updateAuxKnobsForActiveAlgorithm()` already uses for the multiband
-grid's 6 knobs today, just at the level of a whole component instead of individual
-knobs.
+- One subclass per algorithm (`BroadbandPlayground`, `FilteredPlayground`,
+  `BandSplitPlayground`, ...), each owning its own sliders/buttons and their
+  `SliderAttachment`s, created **once** in `StereoWidenerGUI`'s constructor and
+  bound permanently to their own parameters. Because each algorithm has its own
+  parameters and its own controls, no rebinding happens on an algorithm switch --
+  which also retires `bindAuxKnob()`/`bindMultiKnob()` and the whole class of stale
+  slider value bugs behind the v0.1.14 crash fix.
+- On an algorithm switch, `StereoWidenerGUI` only hides the old playground and shows
+  the new one. All playgrounds get the same bounds in `resized()`.
+- Live graphics are painted from the current parameter values (read via the
+  APVTS on the message thread, repainted on parameter change through a listener or
+  a low-rate timer) using the algorithm's own pure-math helpers -- never by reading
+  DSP state across threads.
 
-### 3.2 `GenericKnobsPlayground`: the default, for the simple cases
+### 3.3 Shared building blocks
 
-One reusable playground class that reproduces today's aux-left/aux-right row, but
-built generically from `getAuxLeftInfo()`/`getAuxRightInfo()` (0, 1, or 2 active
-knobs, centred within the fixed area) -- this is what M/S Width (Broadband/Filtered),
-Complementary Comb, Allpass Decorrelation, Early Reflections and Chorus Doubler all
-use, unchanged from today's visuals and parameter bindings. Today's
-`bindAuxKnob()`/aux-knob layout code in `StereoWidener.cpp` moves into this class
-essentially as-is; no behaviour change for these six algorithms.
+Built once, in the first algorithm step that needs them, then reused:
 
-### 3.3 Where does Width live?
+- `PlaygroundKnob`: label + rotary + value box, sized for the playground grid (today's
+  aux-knob styling, packaged so every playground uses the same one).
+- `FrequencyGraph`: log frequency axis (20 Hz-20 kHz), grid, a curve from a
+  `std::function<float(float hz)>`, and optional draggable vertical handles bound to
+  frequency parameters. Needed by MS Filtered, Complementary Comb, Multiband and
+  Allpass.
+- The existing "not mono-safe" badge stays shared: a thin strip at the bottom of the
+  card, owned by `StereoWidenerGUI`, not by the playgrounds.
 
-Width (`m_widthKnob`) is the one control every algorithm shares, and it isn't part of
-any algorithm's own "extra" parameters -- I'd keep it as fixed chrome *above* the
-playground area (same position as today), not inside the swappable component. Each
-`AlgorithmPlayground` only owns the space below it. This keeps Width visually
-consistent across every algorithm (per plan2.md's original framing of Width as
-the one control that's always present) and means a custom playground like the band
-split (3.4) only has to design around its own controls, not also reimplement Width.
+### 3.4 Fixed size
 
-Open question I'd like your call on: should the fixed playground height be sized to
-today's *short* case (0/1/2 knobs -- what every algorithm except Multiband needs),
-or to whatever the new band-split widget (3.4) turns out to need? If the band-split
-widget needs more vertical room than today's short case, the window's *default*
-height would grow slightly (every algorithm's playground area gets the same fixed
-size, including the simple ones, which would then have some empty/centred space).
-My default recommendation: size it to the band-split widget's actual needs once it's
-designed (3.4 first, then fix the constant), since a bit of unused space around a
-few centred knobs looks fine, but a cramped band-split diagram would not.
+Today the card's inner area is about 290 x 175 px at scale 1.0 (card width
+`480 - g_rightBlockWidth - g_panelDividerWidth - 2*g_panelPadding`; height set by
+the taller of the knob row + badge and the Utilities column). Minus the shared badge
+strip, each playground gets about **290 x 155 px**. `getRequiredContentHeight()`
+stops depending on the active algorithm.
 
-### 3.4 `BandSplitPlayground`: the "special band split element" for Multiband Width
+That is tight for "graph + 3-4 knobs": a row of four 48 px knobs with label and value
+box is about 240 x 80 px, leaving about 70 px for a graph. Feasible, but if a
+playground clearly doesn't fit, the fallback is to raise the fixed height once for
+every algorithm (still never resizing on a switch), not to go back to per-algorithm
+sizes.
 
-This is the genuinely new piece of GUI work, replacing Multiband Width's 6-knob grid.
-Concept (subject to iteration once I start prototyping):
+## 4. Per-algorithm plan
 
-- A horizontal frequency axis, log-scaled (matching `makeLogFrequencyParameter()`'s
-  own mapping, so the visual position of a frequency matches how the plugin already
-  thinks about it), spanning the three crossover parameters' combined range.
-- Confirmed against `algorithms/MultibandWidth.cpp`: 3 crossovers
-  (`g_paramMultibandFreq1`/`Freq2`/`Freq3`, labelled "Low-Mid"/"Mid-High"/"High-Air")
-  split the signal into **4 bands**. Only 3 dedicated per-band width parameters exist
-  (`g_paramMultibandWidth2`/`Width3`/`Width4`, labelled "Low-Mid"/"Mid-High"/"High") --
-  the lowest band reuses the shared Width knob rather than having a 4th of its own.
-  So the widget needs 3 draggable crossover handles and 3 band-width controls (plus
-  the always-present Width knob covering the 4th/lowest band, per 3.3).
-- Each of the 3 upper bands gets its own small width control -- most likely a short
-  vertical slider or a small rotary knob positioned under/over its band's region on
-  the axis, bound to that band's existing width parameter.
-- Dragging a crossover handle updates that frequency parameter directly and
-  continuously (`setValueNotifyingHost`), with a small numeric readout for precision
-  (a text box, or a tooltip while dragging) -- the generic rotary knobs' text boxes
-  already give exact values today; the new widget needs to keep that precision, not
-  just the visual.
-- Colour-code the bands so the split is legible at a glance (reusing the theme's
-  existing palette, not inventing new colours -- see `PluginLookAndFeel.h`).
+"From settings" means the value currently lives in `settings.json` via
+`GlobalSettings` (loaded once at construction, applied through a setter in
+`StereoWidenerAudio`'s constructor, not automatable, not saved per project). Moving
+these into real parameters means each algorithm must pick them up per block with
+change detection and (where needed) smoothing, the way
+`MultibandWidth::updateFrequenciesIfNeeded()` already does for its crossovers, and
+the field is removed from `GlobalSettings`/`settings.json` in the same step.
+Each new parameter defaults to the current hardcoded/settings value, so default
+processing sounds identical before and after.
 
-This is new interactive-mouse-input code (drag handling, hit-testing, snapping),
-which is more design and testing effort than anything else in this change, and is
-why it's its own phase below rather than bundled with the mechanical refactor.
+| # | Algorithm | Controls in its playground | New parameters | Graphic |
+|---|---|---|---|---|
+| 0 | M/S Width (Broadband) | Width | -- | Large Width knob; a readout/bar of what Width means in level terms (side gain in dB, mid/side balance). |
+| 1 | M/S Width (Filtered) | Width, Bass Cutoff (Off), High Shelf Freq (Off), **High Shelf Gain** | High Shelf Gain (from settings, default 3 dB) | `FrequencyGraph` of the side-channel treatment (high-pass + high shelf); cutoff and shelf frequency draggable on the curve. |
+| 2 | Complementary Comb | Width, Delay, Gain, **Crossover** | Crossover (from settings, default 300 Hz) | Complementary L/R comb responses on a `FrequencyGraph`, the crossover region shaded. |
+| 3 | Allpass Decorrelation | Width, Amount, Spread | none planned (internal constants like the 4 stage base frequencies could become parameters later if useful) | The 4 allpass centre frequencies for L and R on a frequency axis, showing how Spread pushes them apart. |
+| 4 | Multiband Width | 3 crossovers, per-band widths | Possibly a band-1 width (section 7.2); **no global Width knob** | `BandSplitPlayground`: see 4.1. |
+| 5 | Early Reflections | Width, Amount, Room Size, **Pre-delay** | Pre-delay (from settings, default 5 ms) | Tap diagram: L taps above, R taps below a time axis, heights = tap gains, moving with Room Size and Pre-delay. |
+| 6 | Chorus Doubler | Width, Amount, Depth, **Rate** | Rate (from settings, default 0.3 Hz) | The two modulated delay times over one LFO cycle (L and R, 90 degrees apart), scaled by Depth. |
 
-## 4. Implementation phases (each its own branch + commit, per the current workflow)
+### 4.1 Multiband Width: the band-split element
 
-**Phase A -- introduce the abstraction, no visual change.**
-Add `AlgorithmPlayground` + `GenericKnobsPlayground`, move today's aux-knob binding
-logic into it, and use it for all seven algorithms (Multiband Width still gets its
-6-knob grid, just now hosted inside a playground instance instead of inline in
-`resized()`). Verify via the offline GUI snapshot tool that every algorithm renders
-pixel-identical to before. This alone does **not** yet fix the resizing complaint for
-Multiband Width -- it's a pure refactor, kept as its own reviewable step rather than
-mixed with the behaviour change in Phase B.
+Corrected against `algorithms/MultibandWidth.cpp` (the first draft got this wrong):
+3 crossovers split the signal into 4 bands. **Band 1 (lowest) is always mono** (its
+side part is discarded, not scaled by Width). Bands 2-4 each have their own width
+(`multibandWidth2/3/4`), and the global Width multiplies all three on top -- the
+"single global width knob" that makes no sense here.
 
-**Phase B -- fix the window-resize problem.**
-Give the playground area a single fixed size (`getRequiredContentHeight()` stops
-depending on `getNumMultiParams()`), and adapt Multiband Width's grid to fit that
-fixed area (likely smaller knobs, still the plain 6-knob grid at this point -- not
-the band-split widget yet). This is the smallest change that satisfies "don't change
-size for one algorithm," decoupled from the larger band-split design/build effort.
+Playground:
 
-**Phase C -- the band-split widget.**
-Design (mock up a few visual options, likely as static GUI-snapshot renders first,
-since the interaction can't be screenshot-tested the same way pluginval's automated
-fuzzing can't meaningfully drive custom mouse-drag widgets) and implement
-`BandSplitPlayground`, replacing Multiband Width's 6-knob grid from Phase B.
+- A `FrequencyGraph` spanning the crossovers' range, divided into 4 colour-coded
+  bands by 3 draggable crossover handles (labelled with their frequency while
+  dragging, exact value also editable).
+- Inside each of bands 2-4, a width control (a small vertical slider or knob) placed
+  in that band's own region, so "this width belongs to this band" is visible at a
+  glance. The band's fill height or opacity can reflect its width.
+- Band 1 shown as "Mono" (unless 7.2 adds a width for it).
+- The global Width parameter is dropped from this algorithm; bands 2-4's own width
+  ranges take over its job.
+- Crossover ordering (Freq1 < Freq2 < Freq3) is already enforced by
+  `clampCrossoverKnob()`; the handles keep that behaviour (a handle stops at its
+  neighbour).
 
-**Phase D (optional, not required for this request) -- revisit other algorithms.**
-Once the mechanism exists, consider whether Complementary Comb (a small delay-line
-diagram) or Early Reflections (a decaying-taps diagram) would similarly benefit from
-a bespoke playground instead of generic knobs. Explicitly deferred; listed here so
-it isn't forgotten, not scheduled.
+## 5. Rollout (each step its own branch, merged when verified)
 
-## 5. Verification plan (per algorithm, per phase)
+**Step 0 -- infrastructure, no visual change yet.**
+`AlgorithmParamSpec`/`getParamSpecs()` and `values[]` in the DSP interface (all 7
+algorithms migrated mechanically, same parameters and IDs as today), the
+`AlgorithmPlayground` base class, the switching logic in `StereoWidenerGUI`, the
+fixed-size card, the shared badge strip, and `PlaygroundKnob`. Each algorithm
+initially gets a plain "knobs only" playground reproducing today's controls, so the
+plugin looks and sounds the same except that Multiband's 6 knobs must now fit the
+fixed size (interim, replaced in its own step) -- this is where the window stops
+resizing. `tools/widener_render` is updated for the new interface in the same step.
 
-- Offline `WidenerGuiSnapshot` throwaway tool (built, used, fully removed each time,
-  per project convention) across all seven algorithms, to catch layout regressions
-  without needing a real host.
-- `pluginval --strictness-level 10`, several consecutive clean runs, per the
-  project's established bar.
-- Phase C additionally needs manual interaction testing in the real Standalone
-  build (drag the crossover handles, confirm the bound parameters and their text
-  readouts update correctly, confirm undo/automation still works through the normal
-  `AudioProcessorValueTreeState` attachment mechanism) -- automated tooling doesn't
-  exercise custom mouse-drag code the way it does a `juce::Slider`.
+**Steps 1-7 -- one algorithm per step**, in this proposed order (simplest first, to
+settle the visual language; then the ones that need `FrequencyGraph`; then the rest):
 
-## 6. Things I want your input on before starting Phase A
+1. M/S Width (Broadband) -- smallest possible playground, sets the visual style.
+2. M/S Width (Filtered) -- builds `FrequencyGraph`; moves High Shelf Gain out of
+   settings.
+3. Multiband Width -- the band-split element (reuses `FrequencyGraph`).
+4. Complementary Comb -- moves Crossover out of settings.
+5. Early Reflections -- moves Pre-delay out of settings.
+6. Chorus Doubler -- moves Rate out of settings.
+7. Allpass Decorrelation.
 
-1. Confirm Width should stay fixed above the playground (3.3), not become part of
-   each algorithm's own space.
-2. Confirm the phase order above (mechanical refactor, then fix the resize, then
-   build the band-split widget) rather than trying to do it all in one pass.
-3. Whether the fixed playground size should be decided now (sized to today's short
-   case, accepting that the band-split widget will have to fit within it) or after
-   Phase C's design is clearer (my recommendation, see 3.3).
+Each step: new playground, any new parameters, the `GlobalSettings` cleanup for that
+algorithm, a doc in `docs/algorithms/`, `plan2.md` entry, version bump, README update.
+
+## 6. Verification (every step)
+
+- Offline GUI snapshot tool (throwaway, removed afterwards) across **all seven**
+  algorithms, both themes, to confirm the new playground and no regression elsewhere.
+- **Sound unchanged at defaults:** render the test signals through
+  `tools/widener_render` before and after the step and compare with
+  `python/stereo_eval`; new parameters default to the old hardcoded/settings values,
+  so default output must match. Results saved to `python/results`.
+- `pluginval --strictness-level 10`, several runs (the known, unrelated JUCE X11
+  teardown crash excepted and identified by backtrace, as before).
+- For interactive graphics (draggable handles): manual test in the Standalone build
+  -- dragging updates the parameter and its readout, automation and undo still work,
+  handles respect their limits. Automated tools don't exercise custom mouse code.
+
+## 7. Open questions (none block Step 0)
+
+1. **Width: one shared parameter or one per algorithm?** Shared (today's model) keeps
+   the width setting when switching between similar algorithms and keeps the
+   switch crossfade smooth; per-algorithm allows ranges and meanings that fit each
+   algorithm (and matches "each algorithm has its own playground"). My
+   recommendation: one width parameter per algorithm, since presets don't need to
+   stay compatible anyway and it removes the last shared "special" control.
+2. **Multiband band 1:** keep it fixed mono (today's DSP, "bass mono" is the point of
+   the algorithm) or give it its own width like bands 2-4? Recommendation: keep it
+   mono, clearly labelled, to avoid adding a control that mostly breaks mono
+   compatibility.
+3. **Step order** in section 5 -- fine as proposed, or do you want Multiband earlier
+   since it motivated the change?
+
+## 8. Your review of the first draft (verbatim)
+
+Answers to the first draft's questions:
+
+1. *Width fixed above the playground?* -- "NO, we should change that."
+2. *Phase order?* -- "yes we should change each aalgorith one by one."
+3. *Fix the size now or later?* -- "difficult to say, but my gut-feeling is, that
+   the band-split widget will fit in the space available."
+
+Comments:
+
+1. "Several algorithms have important parameters hidden in the settings. Therefore,
+   I would loosen the strict requirement of no changes for the remaining
+   algorithms. This changes the width idea as well. Again for the multiband approach
+   a single global width knob is counterintuitive. So, the GUI playground should
+   really adapt in the best possible way to the algorithm. For example, MS broadband
+   has only one knob for width. MS filtered has at the moment width, lowcut and
+   highcut. But we could add the gain of the high-shelv filter as well. Therefore,
+   adapt this document in a second planning phase."
+2. "Change the design goals: 2.3 and 2.5 are not valid anymore. Each algorithm can
+   draw its own playground with its own controls. The playground should be designed
+   in a way that it is clear to the user what the controls are doing. The width knob
+   should be part of the playground and not fixed above it. The presets do not have
+   to be compatible anymore, since we add new parameters if necessary."
