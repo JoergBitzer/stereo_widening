@@ -22,12 +22,10 @@
  * per-octave correlation plot shows "out" tracking "in" closely below the crossover and
  * dropping above it.
  *
- * Two user-facing parameters, per the user's explicit request to minimise per-algorithm
- * controls to "2 + Width": Delay (StereoWidenerGUI's left aux knob for this algorithm)
- * and Gain (the right aux knob). Width (shared across every algorithm) scales the whole
+ * Parameters (getParamSpecs()): Width, Delay and Gain. Width scales the whole
  * resulting S', exactly like MSWidthBroadband/MSWidthFiltered, so every algorithm
- * shares the same "how much effect" feel. The crossover frequency is a GlobalSettings
- * default (Phase 4), not a user-facing knob -- see setCrossoverHz().
+ * shares the same "how much effect" feel. The crossover frequency is still a
+ * GlobalSettings default (Phase 4), not yet a parameter -- see setCrossoverHz().
  *
  * Unlike MSWidthBroadband/MSWidthFiltered, this algorithm creates real width from
  * dual-mono input (verified in python/evaluate_comb.py: speech_dry_answers, which M/S
@@ -61,12 +59,23 @@ class ComplementaryComb : public StereoAlgorithm
 public:
     void prepare(double sampleRate, int maxBlockSize) override;
     void reset() override;
-    void process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept override;
+    void process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept override;
+
+    // Ranges from planing.md 2.4: "D ~= 5-20 ms and g ~= 0.3-0.7". Gain is widened to
+    // the full 0-100 %; 0 % is neutral (same output as MSWidthBroadband), so Delay just
+    // starts at a representative mid-range value.
+    enum ParamIndex { kWidth = 0, kDelay, kGain };
+    std::vector<AlgorithmParamSpec> getParamSpecs() const override
+    {
+        return {
+            AlgorithmParamSpec::width("combWidth"),
+            AlgorithmParamSpec::linear("combDelay", "Delay", "ms", 5.0f, 20.0f, 10.0f, 1),
+            AlgorithmParamSpec::linear("combGain", "Gain", "%", 0.0f, 100.0f, 0.0f)
+        };
+    }
 
     const char* getName() const noexcept override { return "Complementary Comb (Pseudo-Stereo)"; }
     juce::String getDescription() const override;
-    AuxKnobInfo getAuxLeftInfo() const noexcept override { return { true, "Delay" }; }
-    AuxKnobInfo getAuxRightInfo() const noexcept override { return { true, "Gain" }; }
     bool isMonoSafe() const noexcept override { return true; }
     int getLatencySamples() const noexcept override { return 0; } // the delay only feeds S, it is not an output-wide latency
 
@@ -77,8 +86,7 @@ public:
     void setCrossoverHz(float hz) noexcept;
 
     static constexpr float kFilterQ = 0.70710678f; // Butterworth (maximally flat)
-    // a bit past the Delay knob's own max (g_paramCombDelay.maxValue = 20 ms,
-    // StereoWidener.h), so the delay line never needs to grow after prepare()
+    // a bit past the Delay parameter's own max (20 ms, getParamSpecs()), so the delay line never needs to grow after prepare()
     static constexpr float kMaxDelayMs = 25.0f;
     // How long a Delay-knob change takes to glide in, rather than stepping instantly
     // (see smoothedDelaySamples below) -- matches the project's other short UI-driven

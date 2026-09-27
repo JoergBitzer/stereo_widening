@@ -28,8 +28,7 @@
  * StereoWidenerGUI shows a "not mono-safe" badge + mono-check hint when this algorithm
  * is selected (see StereoWidener.cpp).
  *
- * Two user-facing parameters (Amount, Spread) plus the shared Width knob, per the
- * project's "2 + Width" control-minimisation convention (see ComplementaryComb.h).
+ * Parameters (getParamSpecs()): Width, Amount and Spread.
  * Amount defaults to 0 % (neutral/bypass, matching every other algorithm's neutral-
  * default convention, see GlobalSettings.h); Spread has no "neutral" value of its own
  * (inert when Amount = 0, same reasoning as ComplementaryComb's Delay default).
@@ -51,12 +50,21 @@ class AllpassDecorrelation : public StereoAlgorithm
 public:
     void prepare(double sampleRate, int maxBlockSize) override;
     void reset() override;
-    void process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept override;
+    void process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept override;
+
+    // Spread 0-100 % maps to 0..kMaxSpreadOctaves inside process().
+    enum ParamIndex { kWidth = 0, kAmount, kSpread };
+    std::vector<AlgorithmParamSpec> getParamSpecs() const override
+    {
+        return {
+            AlgorithmParamSpec::width("allpassWidth"),
+            AlgorithmParamSpec::linear("allpassAmount", "Amount", "%", 0.0f, 100.0f, 0.0f),
+            AlgorithmParamSpec::linear("allpassSpread", "Spread", "%", 0.0f, 100.0f, 50.0f)
+        };
+    }
 
     const char* getName() const noexcept override { return "Allpass Decorrelation"; }
     juce::String getDescription() const override;
-    AuxKnobInfo getAuxLeftInfo() const noexcept override { return { true, "Amount" }; }
-    AuxKnobInfo getAuxRightInfo() const noexcept override { return { true, "Spread" }; }
     bool isMonoSafe() const noexcept override { return false; }
     int getLatencySamples() const noexcept override { return 0; }
 

@@ -1,7 +1,8 @@
 #include "MSWidthBroadband.h"
 
-void MSWidthBroadband::process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept
+void MSWidthBroadband::process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept
 {
+    const float width = values[kWidth] * 0.01f; // % -> 0..2
     auto* left = buffer.getWritePointer(0);
     auto* right = buffer.getWritePointer(1);
     const int numSamples = buffer.getNumSamples();
@@ -9,7 +10,7 @@ void MSWidthBroadband::process(juce::AudioBuffer<float>& buffer, const StereoAlg
     for (int i = 0; i < numSamples; ++i)
     {
         const float m = 0.5f * (left[i] + right[i]);
-        const float s = 0.5f * (left[i] - right[i]) * params.width;
+        const float s = 0.5f * (left[i] - right[i]) * width;
         left[i] = m + s;
         right[i] = m - s;
     }

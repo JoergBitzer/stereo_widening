@@ -52,13 +52,14 @@ void MultibandWidth::updateFrequenciesIfNeeded(float freq1, float freq2, float f
     lastFreq1 = freq1; lastFreq2 = freq2; lastFreq3 = freq3;
 }
 
-void MultibandWidth::process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept
+void MultibandWidth::process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept
 {
-    updateFrequenciesIfNeeded(params.multi[kFreq1], params.multi[kFreq2], params.multi[kFreq3]);
+    updateFrequenciesIfNeeded(values[kFreq1], values[kFreq2], values[kFreq3]);
 
-    const float width2 = params.multi[kWidth2];
-    const float width3 = params.multi[kWidth3];
-    const float width4 = params.multi[kWidth4];
+    const float width = values[kWidth] * 0.01f; // % -> 0..2, likewise below
+    const float width2 = values[kWidth2] * 0.01f;
+    const float width3 = values[kWidth3] * 0.01f;
+    const float width4 = values[kWidth4] * 0.01f;
 
     auto* left = buffer.getWritePointer(0);
     auto* right = buffer.getWritePointer(1);
@@ -76,24 +77,10 @@ void MultibandWidth::process(juce::AudioBuffer<float>& buffer, const StereoAlgor
         juce::ignoreUnused(s1); // band 1 forced mono -- deliberately excluded below
 
         const float midOut = m1 + m2 + m3 + m4;
-        const float sideOut = params.width * (width2 * s2 + width3 * s3 + width4 * s4);
+        const float sideOut = width * (width2 * s2 + width3 * s3 + width4 * s4);
 
         left[i] = midOut + sideOut;
         right[i] = midOut - sideOut;
-    }
-}
-
-AuxKnobInfo MultibandWidth::getMultiParamInfo(int index) const noexcept
-{
-    switch (index)
-    {
-        case kFreq1:  return { true, "Low-Mid" };
-        case kFreq2:  return { true, "Mid-High" };
-        case kFreq3:  return { true, "High-Air" };
-        case kWidth2: return { true, "Low-Mid" };
-        case kWidth3: return { true, "Mid-High" };
-        case kWidth4: return { true, "High" };
-        default:      return {};
     }
 }
 

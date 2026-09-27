@@ -8,21 +8,8 @@ const bool g_forcePowerOf2(false); // should be true for FFT Processing
 // global GUI setting for StereoWidener
 const int g_minGuiSize_x(480);
 const int g_maxGuiSize_x(1200);
-// meterRow (260) + rowGap (8) + the taller of the three control columns below it
-// (currently the middle one: Width label+knob+textbox 146, + rowGap 8 + algorithm row
-// 30, + rowGap 8 + mono-safe badge 18 = 210, see the layout constants below) + 31 for
-// the preset control reserved above it (g_minPresetHandlerHeight = 30, plus the 1px gap
-// PluginEditor.cpp's resized() adds) now that WITH_PRESETHANDLERGUI is enabled
-// (StereoWidener/CMakeLists.txt) -- without this, the preset bar simply ate into
-// StereoWidenerGUI's own height instead of the window growing to fit both, pushing the
-// algorithm selector below the visible window -- with a small margin. Substantially
-// shorter than before the Phase 5 GUI compaction (was 685): Utilities used to be its
-// own set of full-width rows below the algorithm selector; it is now a third column
-// alongside Width and the aux knobs, stacked below the output meter instead (every
-// utility acts on the final output signal), so it adds no height of its own as long as
-// it fits within the middle column's height -- see g_util* below.
-const int g_minGuiSize_y(520);
-const float g_guiratio = float(g_minGuiSize_y)/g_minGuiSize_x;
+// The window's height follows from the layout itself (StereoWidenerGUI::
+// getRequiredContentHeight() plus the preset bar), see PluginEditor::applyWindowSize().
 
 // ---------- presethandler ----------
 const juce::StringArray g_PresetCategories(""); // keep empty for "no categories"
@@ -73,8 +60,8 @@ const int g_rowGap(8);                    // vertical gap between the three stac
 
 // GUI redesign ("divide the parameter part into thirds"): below the meter row sits
 // the algorithm-selector row, then two boxed "card" panels side by side -- left
-// two-thirds: the active algorithm's own parameters (aux knobs + Width [+ the
-// multiband grid, when active]); right third: Utilities. g_rightBlockWidth (not
+// two-thirds: the active algorithm's playground (see g_playgroundHeight below); right
+// third: Utilities. g_rightBlockWidth (not
 // g_levelMeterWidth -- the two rows use different fractions, quarters vs. thirds, see
 // g_levelMeterWidth's own comment) is the shared right-column width for both this row
 // and the algorithm-selector row above it. 165, not the mathematically exact
@@ -93,16 +80,28 @@ const int g_panelCornerSize(8);            // rounded-rect corner radius for the
 // other along their straight edges, with no gap at all).
 const int g_panelDividerWidth(6);
 
-const int g_widthKnobSize(110);           // diameter of the big Width rotary knob
-const int g_widthKnobLabelHeight(18);
+// Algorithm playground (AlgorithmPlayground.h): the selected algorithm's own controls,
+// in the parameter card above the mono-safe badge. One fixed height for every
+// algorithm, so switching algorithms never resizes the window. 146 = the large Width
+// knob's label + knob + value box (18 + 110 + 18), today's tallest control row.
+const int g_playgroundHeight(146);
 
-// Aux knobs: now flanking Width in one horizontal row (aux-left, Width, aux-right)
-// inside the parameter panel, not stacked in their own column any more -- their
-// meaning depends on the active algorithm, see StereoAlgorithm::getAuxLeftInfo()/
-// getAuxRightInfo().
-const int g_auxKnobSize(64);
+// KnobsPlayground, up to three parameters: the first (Width) large in the middle, the
+// others flanking it.
+const int g_widthKnobSize(110);           // diameter of the large main knob
+const int g_widthKnobLabelHeight(18);
+const int g_auxKnobSize(64);              // the flanking knobs
 const int g_auxKnobLabelHeight(16);
-const int g_paramKnobGap(20);              // horizontal gap between aux-left/Width/aux-right
+const int g_paramKnobGap(20);             // horizontal gap between the knobs in that row
+
+// KnobsPlayground, more than three parameters: a centred grid of small knobs, up to
+// g_gridMaxColumns per row. Two rows (2*68 + 8 = 144 px) fit g_playgroundHeight.
+const int g_gridMaxColumns(4);
+const int g_gridKnobSize(40);
+const int g_gridKnobTextBoxWidth(60);     // wider than the knob itself: fits "6000 Hz"
+const int g_gridKnobLabelHeight(14);
+const int g_gridKnobColGap(10);
+const int g_gridKnobRowGap(8);
 
 // Algorithm selector row: centred within the left two-thirds (g_rightBlockWidth),
 // below the meter row (only approximately below the input meter + goniometer
@@ -118,7 +117,7 @@ const int g_helpButtonGap(6);
 const int g_algorithmHelpPanelWidth(340);
 
 // "Not mono-safe" badge (Phase 5 step 4), inside the parameter panel, below the
-// aux/Width knob row -- visible only when the active algorithm's isMonoSafe() is
+// playground -- visible only when the active algorithm's isMonoSafe() is
 // false (first needed by algorithm 2.5, AllpassDecorrelation). Always reserved in the
 // layout (empty text when not shown) so switching algorithms never shifts anything
 // below it or changes the parameter panel's own height.
@@ -142,18 +141,3 @@ const int g_utilToggleRowHeight(24);
 const int g_utilToggleWidth(44);          // Swap / Inv L / Inv R buttons
 const int g_utilToggleGap(6);
 const int g_utilMonitorBoxHeight(22);
-
-// Multiband width's dedicated parameter grid (Phase 5 algorithm 2.7): sits inside the
-// parameter panel, below the aux/Width knob row and mono-safe badge, growing that
-// panel's own height (and so the whole window's, see StereoWidenerGUI::
-// getRequiredContentHeight()/PluginEditor.cpp) only when the active algorithm's
-// getNumMultiParams() > 0 (currently just Multiband Width; its 6 parameters don't fit
-// the usual two-aux-knob pattern, see StereoAlgorithm.h's StereoAlgorithmParams::
-// multi). Laid out g_multiGridCols-wide, as many rows as needed (Multiband Width's 6
-// params need exactly 2 rows of 3: crossovers, then widths).
-const int g_multiGridCols(3);
-const int g_multiKnobSize(48);
-const int g_multiKnobTextBoxWidth(60);    // wider than the knob itself: fits "6000 Hz" without truncating
-const int g_multiKnobLabelHeight(14);
-const int g_multiKnobColGap(20);          // horizontal gap between knobs in the same row
-const int g_multiKnobRowGap(8);           // vertical gap between rows

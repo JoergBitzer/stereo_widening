@@ -49,9 +49,10 @@ void MSWidthFiltered::updateFiltersIfNeeded(float bassCutoffHz, float highShelfH
     }
 }
 
-void MSWidthFiltered::process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept
+void MSWidthFiltered::process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept
 {
-    updateFiltersIfNeeded(params.auxLeft, params.auxRight);
+    updateFiltersIfNeeded(values[kBassCutoff], values[kHighShelf]);
+    const float width = values[kWidth] * 0.01f; // % -> 0..2
 
     auto* left = buffer.getWritePointer(0);
     auto* right = buffer.getWritePointer(1);
@@ -66,7 +67,7 @@ void MSWidthFiltered::process(juce::AudioBuffer<float>& buffer, const StereoAlgo
         // kHighShelfOffThreshold.
         const float sBassMono = bassCutoffBypassed ? s : sideHighpass.processSample(s);
         const float sShelved = highShelfBypassed ? sBassMono : sideHighShelf.processSample(sBassMono);
-        const float sOut = sShelved * params.width;
+        const float sOut = sShelved * width;
         left[i] = m + sOut;
         right[i] = m - sOut;
     }

@@ -42,14 +42,16 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
 
 ## Parameters
 
-- **Width**: 0-200 %. 0 collapses the side signal to mono, 100 is unity (unchanged from
-  the input), 200 doubles the side signal.
 - **Algorithm**: which stereo-widening algorithm processes the signal, selected from the
-  list below the Width knob. Switching is crossfaded (equal-power, 30 ms) so it never
+  list below the meters. Its controls appear in the card below the selector (the
+  algorithm's "playground", the same size for every algorithm, so the window never
+  changes size on a switch). Every algorithm has its own **Width** (0-200 %: 0
+  collapses the side signal to mono, 100 is unity, 200 doubles the side signal) and
+  its own settings, so switching algorithms and back keeps each one's values. Switching is crossfaded (equal-power, 30 ms) so it never
   clicks. Click the "?" button next to the selector for an explanation of the active
   algorithm, with a citation to a written source.
-  - *M/S Width (Broadband)*: plain M/S width control across the whole spectrum. The two
-    knobs flanking Width are unused (greyed out) for this algorithm.
+  - *M/S Width (Broadband)*: plain M/S width control across the whole spectrum. Width
+    is its only control.
   - *M/S Width (Filtered / Bass Mono)*: the same control, but the side signal is
     high-pass filtered first, so bass content is forced mono and only the highs get
     widened, then high-shelved to restore some "air". The left knob sets the **Bass
@@ -83,13 +85,11 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
   - *Multiband Width*: splits the signal into 4 bands (3 crossovers) and applies an
     independent M/S width to each of the upper 3 bands; the lowest band's width is
     always 0 ("bass mono comes built in", not a parameter). The only algorithm here
-    that doesn't fit "2 + Width" (6 parameters), so it gets its own grid of 6 knobs
-    below the usual layout instead of the two flanking knobs, and the plugin window
-    grows while it's selected: **Low-Mid / Mid-High / High-Air** (the 3 crossover
+    with more than three controls, shown as a grid of small knobs: a master **Width**
+    scaling all three widened bands, **Low-Mid / Mid-High / High-Air** (the 3 crossover
     frequencies, 40-400/200-4000/1000-18000 Hz, each knob clamped against its
     neighbours so they can't be dragged past each other) and **Low-Mid / Mid-High /
-    High** (the 3 band widths, 0-200 %, default 100 % -- neutral, same as the shared
-    Width knob). See [phase5_multiband.md](../docs/algorithms/phase5_multiband.md) for
+    High** (the 3 band widths, 0-200 %, default 100 % -- neutral). See [phase5_multiband.md](../docs/algorithms/phase5_multiband.md) for
     the algorithm (including the allpass phase-compensation needed for a flat
     reconstruction) and its verification.
   - *Early Reflections (Room Widening)*: a handful of short, quiet, delayed copies of
@@ -120,6 +120,9 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     [phase5_chorus.md](../docs/algorithms/phase5_chorus.md) for the algorithm and its
     verification.
 
+  Presets saved before v0.1.16 load without their Width setting (each algorithm now has
+  its own Width parameter; the old shared one is gone).
+
   Every parameter's default -- and so what double-clicking its knob resets it to -- is
   chosen to be as close to neutral/pass-through processing as possible for its
   algorithm (Width 100 %, Rotation/Balance 0, Bass Cutoff/High Shelf/Comb Gain/Allpass
@@ -127,12 +130,10 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
   preset (see `tools/PresetHandler.h`) rather than relying on the plugin to remember
   its last state.
 
-  Note: the two knobs flank Width in one row, below the algorithm selector, inside a
-  boxed "parameter" card (left two-thirds of the window -- see
-  [phase6_gui_thirds.md](../docs/algorithms/phase6_gui_thirds.md) for the current
-  layout) -- and are shared widgets: which parameter they actually control, their
-  range, and their unit all change with the selected algorithm (rebound automatically
-  on switch); they are not per-algorithm knobs.
+  Each algorithm's controls are its own knobs, bound to its own parameters -- see
+  [phase6_playground_step0.md](../docs/algorithms/phase6_playground_step0.md) and
+  [plan_changeGUI.md](../plan_changeGUI.md), which gives every algorithm a dedicated
+  playground with graphics suited to it, one algorithm at a time.
 - **Utilities** (its own boxed card, the right third of the window, since every one of
   them acts on the final output signal regardless of which algorithm is selected --
   see [phase4_settings.md](../docs/algorithms/phase4_settings.md) for what each one

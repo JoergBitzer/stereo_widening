@@ -23,9 +23,10 @@ void ChorusDoubler::reset()
     phase = 0.0f;
 }
 
-void ChorusDoubler::process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept
+void ChorusDoubler::process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept
 {
-    const float targetDepth = params.auxRight; // 0..1, see StereoWidenerAudio::paramsFor()
+    const float width = values[kWidth] * 0.01f; // % -> 0..2
+    const float targetDepth = values[kDepth] * 0.01f; // % -> 0..1
     if (!depthInitialized)
     {
         smoothedDepth.setCurrentAndTargetValue(targetDepth);
@@ -39,8 +40,8 @@ void ChorusDoubler::process(juce::AudioBuffer<float>& buffer, const StereoAlgori
     auto* left = buffer.getWritePointer(0);
     auto* right = buffer.getWritePointer(1);
     const int numSamples = buffer.getNumSamples();
-    const float amount = params.auxLeft; // 0..1, see StereoWidenerAudio::paramsFor()
-    const float gain = params.width * amount;
+    const float amount = values[kAmount] * 0.01f; // % -> 0..1
+    const float gain = width * amount;
 
     const float samplesPerMs = 0.001f * (float) sampleRate;
     const float baseSamples = kBaseDelayMs * samplesPerMs;

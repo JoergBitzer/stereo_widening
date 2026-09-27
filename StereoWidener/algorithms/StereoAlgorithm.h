@@ -4,52 +4,88 @@
  *        switch between algorithms without knowing what each one does internally.
  *
  * One small class per algorithm (see planing.md section 5, "code rules": the codebase
- * is also a teaching example). Each algorithm processes a stereo buffer in place, given
- * the current parameters (see StereoAlgorithmParams below).
+ * is also a teaching example). Each algorithm declares its own parameters
+ * (getParamSpecs()) and processes a stereo buffer in place from their current values.
+ *
+ * Deliberately free of any GUI dependency: tools/widener_render compiles these files
+ * into a console app linked only against juce_audio_basics/juce_dsp. The plugin's GUI
+ * (StereoWidener/AlgorithmPlayground.h) reads the same parameter specs to build its
+ * controls.
  *
  * (c) J. Bitzer, Jade HS, MIT license
  */
 
 #pragma once
 #include <array>
+#include <limits>
+#include <vector>
 #include <juce_audio_basics/juce_audio_basics.h>
 
-// Cap for StereoAlgorithmParams::multi / StereoAlgorithm::getNumMultiParams() below --
-// see the comment there for why this exists alongside auxLeft/auxRight. 6 is exactly
-// what Phase 5's multiband width (algorithm 2.7) needs (3 crossover frequencies + 3
-// per-band widths); raise it if a future algorithm needs more.
-static constexpr int kMaxMultiParams = 6;
+// Upper bound on getParamSpecs().size() for any algorithm -- sizes the fixed array
+// passed to process(), so the audio thread never allocates. Raise it if an algorithm
+// ever needs more.
+static constexpr int kMaxAlgorithmParams = 8;
 
-/** Everything an algorithm's process() needs. width is common to every algorithm; the
- *  two aux values are the StereoWidenerGUI's two flanking knobs (left/right of Width) --
- *  what each one actually means (if anything) is entirely up to the active algorithm,
- *  see getAuxLeftInfo()/getAuxRightInfo() below. An algorithm that doesn't use one or
- *  both aux values just ignores them; their knobs are also disabled in the GUI for it
- *  (AuxKnobInfo::enabled = false), so the user never sees a value that does nothing.
- *
- *  `multi` is a separate, larger set for algorithms that need more than two
- *  independent values (currently only multiband width, algorithm 2.7) -- rather than
- *  generalise auxLeft/auxRight themselves (which would force every existing algorithm
- *  and all of StereoWidenerGUI's knob-rebinding code to change for a case only one
- *  algorithm needs), an algorithm just opts in via getNumMultiParams() > 0 and reads
- *  params.multi[0..getNumMultiParams()-1]; every existing algorithm is unaffected and
- *  needs no changes at all (the interface's default implementation returns 0). */
-struct StereoAlgorithmParams
+/** One parameter of one algorithm, as plain data. StereoWidenerAudio turns every
+ *  algorithm's specs into APVTS parameters; the values reach process() in the units
+ *  declared here (e.g. "%" arrives as 0..100, "Hz" as Hz) -- converting to whatever
+ *  the DSP needs internally is the algorithm's own job. */
+struct AlgorithmParamSpec
 {
-    float width = 1.0f;    // 0 = mono, 1 = unity/unchanged, 2 = double the side signal
-    float auxLeft = 0.0f;
-    float auxRight = 0.0f;
-    std::array<float, kMaxMultiParams> multi {};
+    enum class Scale
+    {
+        Linear,       // equal value steps get equal knob rotation
+        LogFrequency  // equal frequency *ratios* get equal rotation (several octaves)
+    };
+
+    const char* id = "";      // APVTS parameter ID, unique across all algorithms
+    const char* name = "";    // shown as the control's label
+    const char* unit = "";    // appended to the displayed value, e.g. "%", "Hz", "ms"
+    float minValue = 0.0f;
+    float maxValue = 1.0f;
+    float defaultValue = 0.0f;
+    int numDecimalPlaces = 0; // display precision; also the step (10^-n) for Linear
+    Scale scale = Scale::Linear;
+
+    // "Off" zones: values below offBelow / above offAbove are displayed as "Off" (the
+    // algorithm bypasses that stage there, e.g. MSWidthFiltered's Bass Cutoff).
+    float offBelow = std::numeric_limits<float>::lowest();
+    float offAbove = std::numeric_limits<float>::max();
+
+    static AlgorithmParamSpec linear(const char* id, const char* name, const char* unit,
+                                     float minValue, float maxValue, float defaultValue,
+                                     int numDecimalPlaces = 0)
+    {
+        AlgorithmParamSpec s;
+        s.id = id; s.name = name; s.unit = unit;
+        s.minValue = minValue; s.maxValue = maxValue; s.defaultValue = defaultValue;
+        s.numDecimalPlaces = numDecimalPlaces;
+        return s;
+    }
+
+    static AlgorithmParamSpec logFrequency(const char* id, const char* name,
+                                           float minValue, float maxValue, float defaultValue)
+    {
+        auto s = linear(id, name, "Hz", minValue, maxValue, defaultValue, 0);
+        s.scale = Scale::LogFrequency;
+        return s;
+    }
+
+    AlgorithmParamSpec withOffBelow(float threshold) const { auto s = *this; s.offBelow = threshold; return s; }
+    AlgorithmParamSpec withOffAbove(float threshold) const { auto s = *this; s.offAbove = threshold; return s; }
+
+    // The standard 0-200 % width control: 0 = mono, 100 = unchanged, 200 = double the
+    // side signal. Every algorithm that has one declares its own (own ID), so each
+    // keeps its own setting.
+    static AlgorithmParamSpec width(const char* id, const char* name = "Width")
+    {
+        return linear(id, name, "%", 0.0f, 200.0f, 100.0f);
+    }
 };
 
-/** Describes how the active algorithm wants one of the two aux knobs used, so
- *  StereoWidenerGUI can relabel and enable/disable them per algorithm instead of
- *  showing a knob that silently does nothing. */
-struct AuxKnobInfo
-{
-    bool enabled = false; // false: StereoWidenerGUI greys the knob out for this algorithm
-    juce::String label;   // e.g. "Bass Cutoff"; ignored (and normally empty) when !enabled
-};
+/** Current values for process(), indexed like getParamSpecs() (each algorithm defines
+ *  an enum for its own indices). Entries past getParamSpecs().size() are unused. */
+using AlgorithmParamValues = std::array<float, kMaxAlgorithmParams>;
 
 class StereoAlgorithm
 {
@@ -68,7 +104,11 @@ public:
     /** Processes buffer in place. buffer always has exactly 2 channels (L, R); the
      *  caller (StereoWidenerAudio) is responsible for that, so algorithms don't each
      *  have to guard against mono/multichannel input. */
-    virtual void process(juce::AudioBuffer<float>& buffer, const StereoAlgorithmParams& params) noexcept = 0;
+    virtual void process(juce::AudioBuffer<float>& buffer, const AlgorithmParamValues& values) noexcept = 0;
+
+    /** This algorithm's parameters, in the index order process() reads them. Called
+     *  at setup time only (parameter creation, GUI construction), never per block. */
+    virtual std::vector<AlgorithmParamSpec> getParamSpecs() const = 0;
 
     /** Display name, shown in the algorithm selector. */
     virtual const char* getName() const noexcept = 0;
@@ -78,23 +118,11 @@ public:
      *  tool as much as a plugin (planing.md section 5). Plain text, may contain '\n'. */
     virtual juce::String getDescription() const = 0;
 
-    /** How this algorithm wants StereoWidenerGUI's left/right aux knobs used. */
-    virtual AuxKnobInfo getAuxLeftInfo() const noexcept = 0;
-    virtual AuxKnobInfo getAuxRightInfo() const noexcept = 0;
-
-    /** How many of params.multi[] this algorithm uses (0..kMaxMultiParams), and their
-     *  labels -- see StereoAlgorithmParams::multi above. StereoWidenerGUI shows a
-     *  dedicated grid of knobs (growing the window if needed) only when this is > 0;
-     *  0 for every algorithm except multiband width, so the default implementation
-     *  here means no other algorithm needs to override either method. */
-    virtual int getNumMultiParams() const noexcept { return 0; }
-    virtual AuxKnobInfo getMultiParamInfo(int index) const noexcept { juce::ignoreUnused(index); return {}; }
-
     /** Mastering profile (plan2.md section 2) only offers mono-safe algorithms. */
     virtual bool isMonoSafe() const noexcept = 0;
 
     /** Extra latency this algorithm adds, in samples, beyond StereoWidenerAudio's own
-     *  (currently zero -- see StereoWidener.h). Both algorithms so far report 0; a
+     *  (currently zero -- see StereoWidener.h). Every algorithm so far reports 0; a
      *  future linear-phase crossover would not. */
     virtual int getLatencySamples() const noexcept = 0;
 };

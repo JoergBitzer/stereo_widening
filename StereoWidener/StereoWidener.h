@@ -9,6 +9,7 @@
 #include "tools/SynchronBlockProcessor.h"
 #include "PluginSettings.h"
 #include "AlgorithmHelpPanel.h"
+#include "AlgorithmPlayground.h"
 #include "GlobalSettings.h"
 #include "UtilityProcessor.h"
 #include "algorithms/StereoAlgorithm.h"
@@ -25,291 +26,15 @@
 
 class StereoWidenerAudioProcessor;
 
-// Width: 0 % collapses the side signal to mono, 100 % is unity (unchanged from input),
-// 200 % doubles the side signal. See algorithms/MSWidthBroadband.h.
-const struct
-{
-	const std::string ID = "width";
-	const std::string name = "Width";
-	const std::string unitName = "%";
-	const float minValue = 0.0f;
-	const float maxValue = 200.0f;
-	const float defaultValue = 100.0f;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramWidth;
-
-// StereoWidenerGUI's left aux knob when the active algorithm enables it (currently only
-// MSWidthFiltered -- see AuxKnobInfo). The range extends below
-// MSWidthFiltered::kBassCutoffOffThreshold (40 Hz) on purpose: that bottom stretch is
-// the knob's "Off" position (filter fully bypassed, see MSWidthFiltered.h), a common
-// pattern for a cutoff control -- turn it low enough and the effect switches off
-// instead of just approaching an extreme frequency. skew is 1.0 (linear) deliberately:
-// with JUCE's skew formula (value = start + (end-start)*proportion^(1/skew), see
-// NormalisableRange), any skew < 1 gives the LOW end of the range disproportionately
-// more of the knob's rotation -- exactly the low end this Off zone sits in, which
-// first made it occupy a full third of the knob's travel instead of a small sliver
-// right at the minimum. Linear skew keeps rotation proportional to the (deliberately
-// narrow, 10 Hz) Off zone's actual share of the total range.
-const struct
-{
-	const std::string ID = "bassCutoff";
-	const std::string name = "Bass Cutoff";
-	const std::string unitName = "Hz";
-	const float minValue = 30.0f;  // 30-40 Hz: "Off" zone, see the comment above
-	const float maxValue = 500.0f;
-	// Off by default (neutral/pass-through: MSWidthFiltered reduces to plain width,
-	// same as MSWidthBroadband, until the user dials this in) -- also the value a
-	// double-click on the knob resets to, see GlobalSettings.h.
-	const float defaultValue = minValue;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramBassCutoff;
-
-// StereoWidenerGUI's right aux knob when the active algorithm enables it. Mirrors
-// g_paramBassCutoff in having an "Off" zone above MSWidthFiltered::kHighShelfOffThreshold
-// (16 kHz), but differs in one respect: linear is fine for Bass Cutoff's much narrower
-// practical range, but not here -- 1000-16500 Hz spans more than four octaves, and a
-// linear (or simple power-law skewed) mapping would cram the musically useful low end
-// (1-4 kHz) into a sliver of the knob while wasting most of the rotation on the top
-// octave. This parameter is therefore built with makeLogFrequencyParameterWithOff()
-// (StereoWidener.cpp) instead of makeFrequencyParameterWithOff(): a *true* logarithmic
-// mapping (equal Hz ratios get equal rotation, not just "some skew"), so the field below
-// named `skew` is unused for this parameter -- kept only so the struct still matches the
-// same shape as the other g_param* definitions.
-const struct
-{
-	const std::string ID = "highShelfFreq";
-	const std::string name = "High Shelf";
-	const std::string unitName = "Hz";
-	const float minValue = 1000.0f;
-	const float maxValue = 16500.0f; // 16000-16500 Hz: "Off" zone, see the comment above
-	// Off by default, same reasoning as g_paramBassCutoff's defaultValue above.
-	const float defaultValue = maxValue;
-	const float skew = 1.0f; // unused, see the comment above
-	const int numDecimalPlaces = 0;
-}g_paramHighShelfFreq;
-
-// ComplementaryComb's aux knobs (Phase 5, algorithm 2.4). Range from planing.md 2.4:
-// "D ~= 5-20 ms and g ~= 0.3-0.7"; Gain's range is widened to the full 0-100 % (g's
-// "usable" spec range sits comfortably in the middle) so the user isn't limited to a
-// narrower band than the Width knob's own 0-200 %.
-const struct
-{
-	const std::string ID = "combDelay";
-	const std::string name = "Delay";
-	const std::string unitName = "ms";
-	const float minValue = 5.0f;
-	const float maxValue = 20.0f;
-	// No "neutral" value of its own (see g_paramCombGain below -- Gain = 0 % already
-	// makes the whole algorithm neutral regardless of Delay), so this just starts at a
-	// representative mid-range value for when the user raises Gain.
-	const float defaultValue = 10.0f;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 1;
-}g_paramCombDelay;
-
-const struct
-{
-	const std::string ID = "combGain";
-	const std::string name = "Gain";
-	const std::string unitName = "%";
-	const float minValue = 0.0f;
-	const float maxValue = 100.0f;
-	// 0 % is neutral (no delayed contribution added to S -- same output as
-	// MSWidthBroadband at the same Width) until the user dials this in, same reasoning
-	// as g_paramBassCutoff/g_paramHighShelfFreq's Off defaults above.
-	const float defaultValue = minValue;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramCombGain;
-
-// AllpassDecorrelation's aux knobs (Phase 5, algorithm 2.5). See AllpassDecorrelation.h
-// for the formula; Spread's range (0-2 octaves internally, see
-// AllpassDecorrelation::kMaxSpreadOctaves) is exposed here as a plain 0-100 % knob, same
-// convention as g_paramCombGain, with the actual octave conversion done in
-// StereoWidenerAudio::paramsFor().
-const struct
-{
-	const std::string ID = "allpassAmount";
-	const std::string name = "Amount";
-	const std::string unitName = "%";
-	const float minValue = 0.0f;
-	const float maxValue = 100.0f;
-	// 0 % is neutral (exact bypass, algebraically -- see AllpassDecorrelation.h) until
-	// the user dials this in, same reasoning as g_paramCombGain's default above.
-	const float defaultValue = minValue;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramAllpassAmount;
-
-const struct
-{
-	const std::string ID = "allpassSpread";
-	const std::string name = "Spread";
-	const std::string unitName = "%";
-	const float minValue = 0.0f;
-	const float maxValue = 100.0f;
-	// No "neutral" value of its own -- inert whenever Amount = 0, same reasoning as
-	// g_paramCombDelay's default above.
-	const float defaultValue = 50.0f;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramAllpassSpread;
-
-// MultibandWidth's crossover frequencies (Phase 5, algorithm 2.7). Ranges overlap a
-// little between neighbours on purpose -- the DSP side always sorts and separates the
-// three raw values defensively (MultibandWidth::updateFrequenciesIfNeeded()), and the
-// GUI additionally clamps each knob against its current neighbours on drag
-// (StereoWidenerGUI::clampCrossoverKnob()), so free-running individually-clamped
-// ranges are simpler than trying to keep three JUCE parameter ranges mutually
-// exclusive at construction time.
-const struct
-{
-	const std::string ID = "multibandFreq1";
-	const std::string name = "Low-Mid";
-	const std::string unitName = "Hz";
-	const float minValue = 40.0f;
-	const float maxValue = 400.0f;
-	const float defaultValue = 150.0f;
-	const float skew = 1.0f; // unused -- built with a true log mapping, see makeLogFrequencyParameter()
-	const int numDecimalPlaces = 0;
-}g_paramMultibandFreq1;
-
-const struct
-{
-	const std::string ID = "multibandFreq2";
-	const std::string name = "Mid-High";
-	const std::string unitName = "Hz";
-	const float minValue = 200.0f;
-	const float maxValue = 4000.0f;
-	const float defaultValue = 1500.0f;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramMultibandFreq2;
-
-const struct
-{
-	const std::string ID = "multibandFreq3";
-	const std::string name = "High-Air";
-	const std::string unitName = "Hz";
-	const float minValue = 1000.0f;
-	const float maxValue = 18000.0f;
-	const float defaultValue = 6000.0f;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramMultibandFreq3;
-
-// MultibandWidth's per-band widths -- band 1 ("bass") is always forced to width 0, not
-// a parameter (see MultibandWidth.h, "bass mono comes built in"). Same 0-200 %
-// range/neutral-at-100 % convention as the shared g_paramWidth.
-const struct
-{
-	const std::string ID = "multibandWidth2";
-	const std::string name = "Low-Mid";
-	const std::string unitName = "%";
-	const float minValue = 0.0f;
-	const float maxValue = 200.0f;
-	const float defaultValue = 100.0f;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramMultibandWidth2;
-
-const struct
-{
-	const std::string ID = "multibandWidth3";
-	const std::string name = "Mid-High";
-	const std::string unitName = "%";
-	const float minValue = 0.0f;
-	const float maxValue = 200.0f;
-	const float defaultValue = 100.0f;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramMultibandWidth3;
-
-const struct
-{
-	const std::string ID = "multibandWidth4";
-	const std::string name = "High";
-	const std::string unitName = "%";
-	const float minValue = 0.0f;
-	const float maxValue = 200.0f;
-	const float defaultValue = 100.0f;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramMultibandWidth4;
-
-// EarlyReflections' aux knobs (Phase 5, algorithm 2.12). See EarlyReflections.h for the
-// formula; Room Size's range (a spread window in ms internally, see
-// EarlyReflections::kRoomMinSpreadMs/kRoomMaxSpreadMs) is exposed here as a plain
-// 0-100 % knob, same convention as g_paramCombGain/g_paramAllpassSpread.
-const struct
-{
-	const std::string ID = "earlyReflAmount";
-	const std::string name = "Amount";
-	const std::string unitName = "%";
-	const float minValue = 0.0f;
-	const float maxValue = 100.0f;
-	// 0 % is neutral (exact bypass, algebraically -- see EarlyReflections.h) until the
-	// user dials this in, same reasoning as g_paramAllpassAmount's default above.
-	const float defaultValue = minValue;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramEarlyReflAmount;
-
-const struct
-{
-	const std::string ID = "earlyReflRoomSize";
-	const std::string name = "Room Size";
-	const std::string unitName = "%";
-	const float minValue = 0.0f;
-	const float maxValue = 100.0f;
-	// No "neutral" value of its own -- inert whenever Amount = 0, same reasoning as
-	// g_paramCombDelay's default above.
-	const float defaultValue = 50.0f;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramEarlyReflRoomSize;
-
-// ChorusDoubler's aux knobs (Phase 5, algorithm 2.11). See ChorusDoubler.h for the
-// formula; Depth's range (an LFO excursion in ms internally, see
-// ChorusDoubler::kMaxDepthMs) is exposed here as a plain 0-100 % knob, same
-// convention as g_paramCombGain/g_paramAllpassSpread/g_paramEarlyReflRoomSize.
-const struct
-{
-	const std::string ID = "chorusAmount";
-	const std::string name = "Amount";
-	const std::string unitName = "%";
-	const float minValue = 0.0f;
-	const float maxValue = 100.0f;
-	// 0 % is neutral (exact bypass, algebraically -- see ChorusDoubler.h) until the
-	// user dials this in, same reasoning as g_paramEarlyReflAmount's default above.
-	const float defaultValue = minValue;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramChorusAmount;
-
-const struct
-{
-	const std::string ID = "chorusDepth";
-	const std::string name = "Depth";
-	const std::string unitName = "%";
-	const float minValue = 0.0f;
-	const float maxValue = 100.0f;
-	// No "neutral" value of its own -- inert whenever Amount = 0, same reasoning as
-	// g_paramEarlyReflRoomSize's default above.
-	const float defaultValue = 50.0f;
-	const float skew = 1.0f;
-	const int numDecimalPlaces = 0;
-}g_paramChorusDepth;
+// Each algorithm's own parameters (IDs, ranges, defaults, units) are declared by the
+// algorithm itself -- see StereoAlgorithm::getParamSpecs() and algorithms/*.h.
+// StereoWidenerAudio::addParameter() turns them into APVTS parameters.
 
 constexpr const char* g_paramAlgorithmID = "algorithm";
 constexpr const char* g_paramAlgorithmName = "Algorithm";
 
 // Must stay in the same order as the algorithm instances StereoWidenerAudio's
-// constructor creates in algorithms/ -- see the comment there, and
-// StereoWidenerGUI::auxLeftParamIdFor()/auxRightParamIdFor()/auxMultiParamIdFor()
-// (StereoWidener.cpp), which must also stay in sync with this order.
+// constructor creates in algorithms/ -- see the comment there.
 const juce::StringArray g_algorithmNames {
     "M/S Width (Broadband)",
     "M/S Width (Filtered / Bass Mono)",
@@ -405,7 +130,7 @@ public:
     // again on every algorithm switch (plan2.md Phase 4, "Latency").
     int getLatency(){return 0;};
 
-    // Read-only access for the GUI (help popup text, aux-knob labels/enabled state):
+    // Read-only access for the GUI (help popup text, parameter specs for the playgrounds):
     // deliberately keyed by the algorithm's own index in g_algorithmNames/the Algorithm
     // choice parameter, not by StereoWidenerAudio's internal (possibly mid-crossfade)
     // active/target index -- the GUI only ever needs "what does the *selected* one say".
@@ -427,31 +152,16 @@ private:
 	StereoWidenerAudioProcessor* m_processor;
     double m_sampleRate = 44100.0;
 
-    juce::AudioParameterFloat* m_widthParam = nullptr;
-    juce::AudioParameterFloat* m_bassCutoffParam = nullptr;
-    juce::AudioParameterFloat* m_highShelfFreqParam = nullptr;
-    juce::AudioParameterFloat* m_combDelayParam = nullptr;
-    juce::AudioParameterFloat* m_combGainParam = nullptr;
-    juce::AudioParameterFloat* m_allpassAmountParam = nullptr;
-    juce::AudioParameterFloat* m_allpassSpreadParam = nullptr;
-    juce::AudioParameterFloat* m_multibandFreq1Param = nullptr;
-    juce::AudioParameterFloat* m_multibandFreq2Param = nullptr;
-    juce::AudioParameterFloat* m_multibandFreq3Param = nullptr;
-    juce::AudioParameterFloat* m_multibandWidth2Param = nullptr;
-    juce::AudioParameterFloat* m_multibandWidth3Param = nullptr;
-    juce::AudioParameterFloat* m_multibandWidth4Param = nullptr;
-    juce::AudioParameterFloat* m_earlyReflAmountParam = nullptr;
-    juce::AudioParameterFloat* m_earlyReflRoomSizeParam = nullptr;
-    juce::AudioParameterFloat* m_chorusAmountParam = nullptr;
-    juce::AudioParameterFloat* m_chorusDepthParam = nullptr;
+    // One entry per algorithm (same order as m_algorithms), each holding that
+    // algorithm's parameters in its own getParamSpecs() order. Filled once by
+    // prepareParameter(); read-only on the audio thread.
+    std::vector<std::vector<juce::AudioParameterFloat*>> m_algorithmParams;
     juce::AudioParameterChoice* m_algorithmParam = nullptr;
 
-    // Builds this block's params for algorithmIndex, sourced from whichever aux
-    // parameters *that* algorithm actually uses (each algorithm may have its own --
-    // see the g_paramBassCutoff/g_paramCombDelay comments). Needed because a crossfade
-    // runs two DIFFERENT algorithms in the same block, each needing its own aux values,
-    // not one shared pair -- see processSynchronBlock().
-    StereoAlgorithmParams paramsFor(int algorithmIndex, float width) const noexcept;
+    // This block's parameter values for algorithmIndex. A crossfade runs two
+    // different algorithms in the same block, each with its own parameters -- see
+    // processSynchronBlock().
+    AlgorithmParamValues valuesFor(int algorithmIndex) const noexcept;
 
     juce::AudioParameterFloat* m_rotationParam = nullptr;
     juce::AudioParameterFloat* m_balanceParam = nullptr;
@@ -490,72 +200,28 @@ public:
 	void paint(juce::Graphics& g) override;
 	void resized() override;
 
-    // Total content height (px, at scale = 1.0) this component needs for whichever
-    // algorithm is currently selected -- normally just the fixed compact layout, but
-    // taller for an algorithm with getNumMultiParams() > 0 (currently only Multiband
-    // Width, whose 6 parameters need a dedicated grid that doesn't fit the usual two
-    // aux knobs -- see StereoAlgorithm.h's StereoAlgorithmParams::multi). PluginEditor.cpp
-    // queries this via onActiveAlgorithmChanged below and resizes the window to match.
-    int getRequiredContentHeight() const noexcept;
-
-    // Fired from updateAuxKnobsForActiveAlgorithm() whenever the active algorithm
-    // changes (including the initial state at construction, called manually once by
-    // PluginEditor.cpp right after wiring this up, since the constructor's own initial
-    // call happens before PluginEditor's body can set it) -- see getRequiredContentHeight().
-    std::function<void()> onActiveAlgorithmChanged;
+    // Total content height (px, at scale = 1.0). Fixed: the same for every algorithm,
+    // since each algorithm's controls live in a playground of one shared size (see
+    // AlgorithmPlayground.h) -- switching algorithms never resizes the window.
+    // PluginEditor.cpp sizes the window from this once, at construction.
+    static int getRequiredContentHeight() noexcept;
 
 private:
     void showAlgorithmHelp();
-    // Relabels and rebinds the two aux knobs for whichever algorithm is now selected
-    // (see StereoAlgorithm::getAuxLeftInfo()/getAuxRightInfo() for the label/enabled
-    // state, and bindAuxKnob() for the rebinding -- each algorithm may have its own aux
-    // parameters, e.g. MSWidthFiltered's Bass Cutoff/High Shelf vs. ComplementaryComb's
-    // Delay/Gain, so the knob *positions* are shared but which parameter each one
-    // actually controls changes with the algorithm), and updates the "not mono-safe"
-    // badge (StereoAlgorithm::isMonoSafe(), plan2.md Phase 5 step 4 -- first needed by
-    // AllpassDecorrelation, algorithm 2.5). Called once at construction for the initial
-    // selection, and from m_algorithmBox.onChange after that (which fires for both user
-    // clicks and host-automation-driven changes -- see ComboBoxParameterAttachment::
-    // setValue() in JUCE, it notifies external listeners even though it suppresses the
-    // attachment's own re-entrant one).
-    void updateAuxKnobsForActiveAlgorithm();
 
-    // Rebinds knob to the parameter named paramId (destroying/recreating attachment),
-    // configuring whatever display formatting that specific parameter needs; paramId
-    // empty means "no parameter for this algorithm" -- detach and disable the knob.
-    using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
-    void bindAuxKnob(juce::Slider& knob, std::unique_ptr<SliderAttachment>& attachment, const juce::String& paramId);
-
-    // Like bindAuxKnob(), but for one of the multi-param grid's knobs (m_multiKnobs
-    // below): no "Off" zone formatting (none of MultibandWidth's parameters have one),
-    // just a plain Hz or % suffix depending on which parameter it is.
-    void bindMultiKnob(int index, const juce::String& paramId);
-
-    // Keeps MultibandWidth's three crossover-frequency knobs (m_multiKnobs[0..2], see
-    // MultibandWidth::MultiParamIndex) from being dragged past their immediate
-    // neighbour, so "which knob is the low-mid split" never silently swaps -- attached
-    // to their onValueChange once, in the constructor (harmless when a different
-    // algorithm has these slots hidden/unbound, since it only ever touches the Slider
-    // objects themselves, never an APVTS parameter by ID). The DSP side
-    // (MultibandWidth::updateFrequenciesIfNeeded()) also sorts defensively, since a
-    // host can automate the underlying parameters directly, bypassing this.
-    void clampCrossoverKnob(int index);
-
-    // Guards clampCrossoverKnob() while updateAuxKnobsForActiveAlgorithm() is (re)binding
-    // the multi-param grid: bindMultiKnob() sets each knob's value from its newly
-    // attached parameter one at a time, so mid-loop the *other* two knobs' values are
-    // still whatever they were left at (possibly from a different algorithm, or an
-    // unbound default) -- without this guard, that transient stale state gets read as
-    // a real "neighbour" value and clamps the knob being bound to something wrong
-    // (found during development: Freq1/Freq2 collapsed to their range minimum on
-    // startup because Freq3 wasn't bound yet when Freq1 was).
-    bool m_bindingMultiKnobs = false;
+    // Shows the selected algorithm's playground (hiding the others) and updates the
+    // "not mono-safe" badge. Called once at construction for the initial selection,
+    // and from m_algorithmBox.onChange after that (which fires for both user clicks and
+    // host-automation-driven changes -- see ComboBoxParameterAttachment::setValue() in
+    // JUCE, it notifies external listeners even though it suppresses the attachment's
+    // own re-entrant one).
+    void showPlaygroundForSelectedAlgorithm();
 
 	StereoWidenerAudioProcessor& m_processor;
     juce::AudioProcessorValueTreeState& m_apvts;
 
-    // The parameter panel (left two-thirds: aux/Width knobs, mono-safe badge, and the
-    // multiband grid when active) and the Utilities panel (right third) are each drawn
+    // The parameter panel (left two-thirds: the selected algorithm's playground and the
+    // mono-safe badge) and the Utilities panel (right third) are each drawn
     // with a slightly brighter "card" background in paint() -- these are set in
     // resized() and just read back in paint(), not used for child layout (that still
     // happens directly against the Rectangle<int> locals in resized() itself).
@@ -566,24 +232,18 @@ private:
     GoniometerComponent m_goniometer;
     LevelMeterComponent m_levelMeterOut;
 
-    juce::Label m_auxLeftLabel;
-    juce::Slider m_auxLeftKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> m_auxLeftAttachment;
-
-    juce::Label m_widthLabel;
-    juce::Slider m_widthKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> m_widthAttachment;
-
-    juce::Label m_auxRightLabel;
-    juce::Slider m_auxRightKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> m_auxRightAttachment;
+    // One playground per algorithm (same order as g_algorithmNames), created once and
+    // bound permanently to that algorithm's own parameters; only the selected one is
+    // visible. See AlgorithmPlayground.h.
+    std::vector<std::unique_ptr<AlgorithmPlayground>> m_playgrounds;
 
     juce::TextButton m_helpButton { "?" };
     juce::ComboBox m_algorithmBox;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> m_algorithmAttachment;
 
     // "Not mono-safe" badge (plan2.md Phase 5 step 4): visible only when the active
-    // algorithm's isMonoSafe() is false, updated by updateAuxKnobsForActiveAlgorithm().
+    // algorithm's isMonoSafe() is false, updated by showPlaygroundForSelectedAlgorithm().
+    // Shared by all algorithms, a strip at the bottom of the parameter card.
     juce::Label m_monoSafeBadge;
 
     // Build/version footer, anchored to the very bottom of the whole plugin window in
@@ -630,15 +290,4 @@ private:
 
     juce::ComboBox m_monitorModeBox;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> m_monitorModeAttachment;
-
-    // Multiband width's dedicated parameter grid (Phase 5 algorithm 2.7): up to
-    // kMaxMultiParams knobs, shown -- and given their own dedicated space, growing the
-    // whole window -- only when the active algorithm's getNumMultiParams() > 0
-    // (currently just Multiband Width; see StereoAlgorithm.h's StereoAlgorithmParams::
-    // multi for why this doesn't fit the usual two-aux-knob pattern). Style (rotary,
-    // text box below) is set in the constructor body, not via the member-initialiser
-    // list, since arrays can't easily give each element different constructor args.
-    std::array<juce::Label, kMaxMultiParams> m_multiLabels;
-    std::array<juce::Slider, kMaxMultiParams> m_multiKnobs;
-    std::array<std::unique_ptr<SliderAttachment>, kMaxMultiParams> m_multiAttachments;
 };

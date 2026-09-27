@@ -65,11 +65,8 @@ StereoWidenerAudioProcessorEditor::StereoWidenerAudioProcessorEditor (StereoWide
 {
     setLookAndFeel(&m_lookAndFeel);
 
-    float scaleFactor = m_processorRef.getScaleFactor();
-    setResizeLimits (g_minGuiSize_x,static_cast<int>(g_minGuiSize_x*g_guiratio) , g_maxGuiSize_x, static_cast<int>(g_maxGuiSize_x*g_guiratio));
     setResizable(true,true);
-    getConstrainer()->setFixedAspectRatio(1./g_guiratio);
-    setSize (static_cast<int>(scaleFactor*g_minGuiSize_x), static_cast<int>(scaleFactor*g_minGuiSize_x*g_guiratio));
+    applyWindowSize();
 
 	addAndMakeVisible(m_presetGUI);
 
@@ -89,15 +86,6 @@ StereoWidenerAudioProcessorEditor::StereoWidenerAudioProcessorEditor (StereoWide
 
     // from here your algo editor ---------
     addAndMakeVisible(m_editor);
-
-    // Resizes the window to fit whichever algorithm ends up selected (e.g. a restored
-    // DAW project's own saved choice) -- see updateWindowSizeForActiveAlgorithm(). The
-    // manual call right after wiring the callback is needed because m_editor's own
-    // constructor already ran its initial updateAuxKnobsForActiveAlgorithm() (and so
-    // already tried to fire onActiveAlgorithmChanged) before this callback existed to
-    // catch it.
-    m_editor.onActiveAlgorithmChanged = [this] { updateWindowSizeForActiveAlgorithm(); };
-    updateWindowSizeForActiveAlgorithm();
 }
 
 StereoWidenerAudioProcessorEditor::~StereoWidenerAudioProcessorEditor()
@@ -118,11 +106,10 @@ void StereoWidenerAudioProcessorEditor::toggleTheme()
     sendLookAndFeelChange(); // repaints this + every child that doesn't have its own explicit LookAndFeel
 }
 
-void StereoWidenerAudioProcessorEditor::updateWindowSizeForActiveAlgorithm()
+void StereoWidenerAudioProcessorEditor::applyWindowSize()
 {
     // Width-based scale factor (same one resized() computes and persists via
-    // m_processorRef.setScaleFactor()) is preserved across this resize -- only the
-    // height/aspect ratio changes, not how "zoomed in" the plugin currently is.
+    // m_processorRef.setScaleFactor()), restored from the previous session.
     const float scaleFactor = m_processorRef.getScaleFactor();
     const int contentHeight = m_editor.getRequiredContentHeight(); // unscaled, scale = 1.0
     const int presetBarHeight = g_minPresetHandlerHeight + 1; // matches resized()'s own "+1" gap
@@ -146,10 +133,8 @@ void StereoWidenerAudioProcessorEditor::resized()
     float scaleFactor = float(width)/g_minGuiSize_x;
     m_processorRef.setScaleFactor(scaleFactor);
 
-    // scaleFactor-based (not height*g_minPresetHandlerHeight/g_minGuiSize_y, a ratio
-    // that assumed height always equals scaleFactor*g_minGuiSize_y -- no longer true
-    // once the window's own aspect ratio changes per algorithm, see
-    // updateWindowSizeForActiveAlgorithm()).
+    // Everything below scales with the width-based scaleFactor (the aspect ratio is
+    // fixed, see applyWindowSize()).
     // Theme toggle: fixed top-right corner, independent of whether the preset bar
     // exists (WITH_PRESETHANDLERGUI) -- so it also has a sensible position in a build
     // without it.
