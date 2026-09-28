@@ -91,9 +91,12 @@ public:
     {
         return {
             AlgorithmParamSpec::width("earlyReflWidth"),
-            AlgorithmParamSpec::linear("earlyReflAmount", "Amount", "%", 0.0f, 100.0f, 0.0f),
-            AlgorithmParamSpec::linear("earlyReflRoomSize", "Room Size", "%", 0.0f, 100.0f, 50.0f),
+            AlgorithmParamSpec::linear("earlyReflAmount", "Amount", "%", 0.0f, 100.0f, 0.0f)
+                .withHelp("level of the reflections. 0 % = no effect."),
+            AlgorithmParamSpec::linear("earlyReflRoomSize", "Room Size", "%", 0.0f, 100.0f, 50.0f)
+                .withHelp("how spread out the reflections are: small = a tight cluster, large = spread over up to 32 ms."),
             AlgorithmParamSpec::linear("earlyReflPreDelay", "Pre-delay", "ms", 0.0f, kMaxPreDelayMs, 5.0f, 1)
+                .withHelp("time between the direct sound and the first reflection.")
         };
     }
 

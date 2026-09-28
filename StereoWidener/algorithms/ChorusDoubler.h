@@ -105,9 +105,12 @@ public:
     {
         return {
             AlgorithmParamSpec::width("chorusWidth"),
-            AlgorithmParamSpec::linear("chorusAmount", "Amount", "%", 0.0f, 100.0f, 0.0f),
-            AlgorithmParamSpec::linear("chorusDepth", "Depth", "%", 0.0f, 100.0f, 50.0f),
+            AlgorithmParamSpec::linear("chorusAmount", "Amount", "%", 0.0f, 100.0f, 0.0f)
+                .withHelp("how much of the modulated copies is blended in. 0 % = no effect."),
+            AlgorithmParamSpec::linear("chorusDepth", "Depth", "%", 0.0f, 100.0f, 50.0f)
+                .withHelp("how far the delay times swing (up to +-10 ms)."),
             AlgorithmParamSpec::linear("chorusRate", "Rate", "Hz", 0.05f, 2.0f, 0.3f, 2)
+                .withHelp("how fast they swing -- capped at 2 Hz, so it stays a chorus rather than a vibrato.")
         };
     }
 

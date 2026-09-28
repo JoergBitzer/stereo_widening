@@ -65,12 +65,18 @@ public:
     std::vector<AlgorithmParamSpec> getParamSpecs() const override
     {
         return {
-            AlgorithmParamSpec::logFrequency("multibandFreq1", "Crossover 1", kMinCrossoverHz, kMaxCrossoverHz, 150.0f),
-            AlgorithmParamSpec::logFrequency("multibandFreq2", "Crossover 2", kMinCrossoverHz, kMaxCrossoverHz, 1500.0f),
-            AlgorithmParamSpec::logFrequency("multibandFreq3", "Crossover 3", kMinCrossoverHz, kMaxCrossoverHz, 6000.0f),
-            AlgorithmParamSpec::width("multibandWidth2", "Band 2 Width"),
-            AlgorithmParamSpec::width("multibandWidth3", "Band 3 Width"),
+            AlgorithmParamSpec::logFrequency("multibandFreq1", "Crossover 1", kMinCrossoverHz, kMaxCrossoverHz, 150.0f)
+                .withHelp("between band 1 (always mono) and band 2."),
+            AlgorithmParamSpec::logFrequency("multibandFreq2", "Crossover 2", kMinCrossoverHz, kMaxCrossoverHz, 1500.0f)
+                .withHelp("between band 2 and band 3."),
+            AlgorithmParamSpec::logFrequency("multibandFreq3", "Crossover 3", kMinCrossoverHz, kMaxCrossoverHz, 6000.0f)
+                .withHelp("between band 3 and band 4. Each crossover stays between its neighbours."),
+            AlgorithmParamSpec::width("multibandWidth2", "Band 2 Width")
+                .withHelp("width of band 2 (Crossover 1 to 2): 0 % = mono, 100 % = unchanged, 200 % = double."),
+            AlgorithmParamSpec::width("multibandWidth3", "Band 3 Width")
+                .withHelp("width of band 3 (Crossover 2 to 3)."),
             AlgorithmParamSpec::width("multibandWidth4", "Band 4 Width")
+                .withHelp("width of band 4 (above Crossover 3).")
         };
     }
 

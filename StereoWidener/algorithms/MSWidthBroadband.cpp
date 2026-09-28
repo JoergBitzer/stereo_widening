@@ -19,10 +19,11 @@ void MSWidthBroadband::process(juce::AudioBuffer<float>& buffer, const Algorithm
 juce::String MSWidthBroadband::getDescription() const
 {
     return "Mid/Side width control.\n\n"
-           "M = (L+R)/2, S = (L-R)/2. The side signal S is scaled by Width and the "
-           "mid/side pair is recombined (L' = M + width*S, R' = M - width*S). Width=0 "
-           "collapses to mono, Width=100% is unchanged, Width=200% doubles the side "
-           "signal. Applied equally across the whole spectrum, including the bass.\n\n"
+           "M = (L+R)/2, S = (L-R)/2. The side signal is scaled by Width and recombined: "
+           "L' = M + Width*S, R' = M - Width*S -- equally across the whole spectrum, "
+           "including the bass.\n\n"
+           + getControlsText() + "\n\n"
+           "Mono-compatible: the mid signal (L+R) is never changed.\n\n"
            "Source: R. Streicher and F. A. Everest, \"The New Stereo Soundbook\", "
            "3rd ed., Audio Engineering Associates, 2006 (stereo enhancement / M-S "
            "technique).";
