@@ -538,6 +538,10 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      ~1 % of a core (Multiband), 4-7x faster than Debug. Ship JUCE's Release build. See
      [phase6_release_builds.md](docs/algorithms/phase6_release_builds.md).
    - Open: tests in Reaper and AudioPluginHost.
+   - ✅ JUCE 9.0.3 (branch `master`, v1.0.1): builds without errors or warnings (also
+     strict C++17), bit-identical sound, pluginval passes. See
+     [juce9_update.md](docs/algorithms/juce9_update.md). Windows/macOS builds still to
+     be tested on those machines.
 5. README, user documentation, versioning.
    - ✅ README for release (download via KVR, features, presets, build), screenshots,
      license: source MIT (`LICENSE`), binaries AGPLv3 because of JUCE

@@ -81,7 +81,7 @@ automatable.
 
 ## Build from source
 
-The plugin uses [JUCE 8](https://juce.com) and CMake, in the AudioDev environment of
+The plugin uses [JUCE 9](https://juce.com) (tested with 9.0.3, branch `master`) and CMake, in the AudioDev environment of
 the [AdvancedAudioTemplate](https://github.com/JoergBitzer/AdvancedAudioTemplate)
 (top-level `CMakeLists.txt`, `JUCE/`, `Libs/`):
 
@@ -138,14 +138,13 @@ cd python
 - **Source code of this repository: [MIT License](LICENSE)**, (c) 2026 Jörg Bitzer,
   Jade Hochschule.
 - **Plugin binaries:** they contain third-party code:
-  - [JUCE 8](https://github.com/juce-framework/JUCE), used under the
+  - [JUCE 9](https://github.com/juce-framework/JUCE), used under the
     [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.html) (JUCE is dual-licensed
     AGPLv3 / commercial JUCE licence). Therefore the binaries as a whole are
     distributed under the **AGPLv3** (full text: [LICENSE-AGPL-3.0.txt](LICENSE-AGPL-3.0.txt));
     the complete source code is this repository plus JUCE.
-  - the VST3 SDK by Steinberg (bundled with JUCE; GPLv3 option in the SDK version
-    bundled with JUCE 8.0.x, MIT from VST 3.8 on) -- VST is a registered trademark
-    of Steinberg Media Technologies GmbH;
+  - the VST3 SDK 3.8 by Steinberg (bundled with JUCE 9; MIT License) -- VST is a
+    registered trademark of Steinberg Media Technologies GmbH;
   - the Audio Unit SDK by Apple (Apache License 2.0, macOS AU only).
 
 MIT code may be combined with AGPLv3/GPLv3 code; the MIT license of the files in this

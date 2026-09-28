@@ -221,9 +221,13 @@ int main(int argc, char* argv[])
 
     // 32-bit float, matching python/stereo_eval/audio_io.write_stereo (subtype="FLOAT"),
     // so no quantisation is added beyond what the algorithm itself does
-    std::unique_ptr<juce::AudioFormatWriter> writer(
-        juce::WavAudioFormat().createWriterFor(new juce::FileOutputStream(outputFile),
-                                                reader->sampleRate, 2, 32, {}, 0));
+    std::unique_ptr<juce::OutputStream> stream = std::make_unique<juce::FileOutputStream>(outputFile);
+    const auto options = juce::AudioFormatWriterOptions{}
+                             .withSampleRate(reader->sampleRate)
+                             .withNumChannels(2)
+                             .withBitsPerSample(32)
+                             .withSampleFormat(juce::AudioFormatWriterOptions::SampleFormat::floatingPoint);
+    std::unique_ptr<juce::AudioFormatWriter> writer = juce::WavAudioFormat().createWriterFor(stream, options);
     if (writer == nullptr)
     {
         std::cerr << "could not create " << outputFile.getFullPathName() << "\n";

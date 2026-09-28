@@ -114,7 +114,7 @@ void StereoWidenerAudioProcessor::prepareToPlay (double sampleRate, int samplesP
 {
     // Since we only support if in and output is the same, we can just ask for input
     int nrofchannels = this->getMainBusNumOutputChannels();
-    jassert(("number of channels should never be zero", nrofchannels>0));
+    jassert(nrofchannels > 0); // number of channels should never be zero
 
     juce::ignoreUnused (samplesPerBlock);
     m_fs = static_cast<float>(sampleRate);
