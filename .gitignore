@@ -97,3 +97,8 @@ python/results/
 *~
 .DS_Store
 Thumbs.db
+
+# ---------------------------------------------------------------
+# Local notes, not part of the repository
+# ---------------------------------------------------------------
+marketing.md
