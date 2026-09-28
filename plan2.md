@@ -544,34 +544,37 @@ to be tuned by listening (samples from Phase 0) and checked with the StereoAnaly
 `stereo_eval` (correlation, mono-sum loss); the utility section stays neutral unless
 noted. Names start with the instrument so the list sorts usefully.
 
-| # | Preset | Source | Algorithm | Starting values | Why |
+| # | Preset | Source | Algorithm | Values (v0.1.31) | Why |
 |---|--------|--------|-----------|-----------------|-----|
-| 1 | Synth Lead - Pseudo Stereo | mono synth | Complementary Comb | Delay 12 ms, Gain 60 %, Crossover 300 Hz, Width 120 % | classic pseudo-stereo, mono sum stays exact |
-| 2 | Synth Bass - Wide Top | mono synth bass | Complementary Comb | Delay 8 ms, Gain 40 %, Crossover 500 Hz | only the harmonics get wider, the fundamental stays mono |
+| 1 | Synth Lead - Pseudo Stereo | mono synth | Complementary Comb | Delay 12 ms, Gain 60 %, Crossover 300 Hz, Width 120 %, out -1.5 dB | classic pseudo-stereo, mono sum stays exact |
+| 2 | Synth Bass - Wide Top | mono synth bass | Complementary Comb | Delay 8 ms, Gain 60 %, Crossover 250 Hz | only the harmonics get wider, the fundamental stays mono |
 | 3 | Synth Pad - Big | stereo pad | Multiband Width | Splits 200/2000/8000 Hz, widths 110/140/160 % | wider towards the top, no low-end phase issues |
-| 4 | Synth Arp - Shimmer | mono arpeggio | Allpass Decorrelation | Amount 60 %, Spread 70 %, Width 120 % | decorrelation without audible delay or combing |
-| 5 | Guitar Clean - Chorus Wide | mono clean guitar | Chorus Doubler | Amount 50 %, Depth 40 %, Rate 0.4 Hz, Width 120 % | the classic slow stereo-chorus guitar sound |
-| 6 | Guitar Rhythm - Double | mono distorted guitar | Chorus Doubler | Amount 35 %, Depth 30 %, Rate 0.2 Hz, Width 130 % | fake double-tracking, slow so it doesn't warble |
+| 4 | Synth Arp - Shimmer | mono arpeggio | Allpass Decorrelation | Amount 35 %, Spread 40 %, Width 110 %, out +2.5 dB | decorrelation without audible delay or combing |
+| 5 | Guitar Clean - Chorus Wide | mono clean guitar | Chorus Doubler | Amount 50 %, Depth 40 %, Rate 0.4 Hz, Width 120 %, out +2.5 dB | the classic slow stereo-chorus guitar sound |
+| 6 | Guitar Rhythm - Double | mono distorted guitar | Chorus Doubler | Amount 35 %, Depth 30 %, Rate 0.2 Hz, Width 130 %, out +2.5 dB | fake double-tracking, slow so it doesn't warble |
 | 7 | Acoustic Guitar - Mono Mic | mono acoustic | Early Reflections | Amount 35 %, Room 30 %, Pre-delay 3 ms, Width 110 % | natural space, no chorus character |
-| 8 | Acoustic Guitar - Stereo Pair | stereo acoustic | M/S Filtered | Width 130 %, Bass Cutoff 120 Hz, Shelf 6 kHz +2 dB | wider and airier, body stays centred |
+| 8 | Acoustic Guitar - Stereo Pair | stereo acoustic | M/S Filtered | Width 130 %, Bass Cutoff 120 Hz, Shelf 6 kHz +2 dB, out -1 dB | wider and airier, body stays centred |
 | 9 | Piano - Stereo | stereo piano | Multiband Width | Splits 150/800/5000 Hz, widths 100/120/140 % | wide top, focused low and mid register |
 | 10 | Electric Piano - Pseudo Stereo | mono Rhodes/Wurli | Complementary Comb | Delay 7 ms, Gain 50 %, Crossover 250 Hz | vintage-style pseudo stereo |
-| 11 | Organ - Rotary Feel | mono organ | Chorus Doubler | Amount 60 %, Depth 60 %, Rate 1.5 Hz, Width 130 % | movement reminiscent of a rotary speaker |
-| 12 | Strings - Mono Patch | mono string patch | Allpass Decorrelation | Amount 50 %, Spread 60 %, Width 120 % | ensemble-like spread without pitch wobble |
+| 11 | Organ - Rotary Feel | mono organ | Chorus Doubler | Amount 60 %, Depth 60 %, Rate 1.5 Hz, Width 130 %, out +2 dB | movement reminiscent of a rotary speaker |
+| 12 | Strings - Mono Patch | mono string patch | Allpass Decorrelation | Amount 30 %, Spread 40 %, Width 110 %, out +2.5 dB | ensemble-like spread without pitch wobble |
 | 13 | Lead Vocal - Space | mono vocal | Early Reflections | Amount 20 %, Room 25 %, Pre-delay 8 ms, Width 100 % | a little room, the vocal stays centred |
-| 14 | Backing Vocals - Wide | mono/stereo backing vocals | Chorus Doubler | Amount 45 %, Depth 50 %, Rate 0.3 Hz, Width 140 % | thicker and pushed to the sides, away from the lead |
+| 14 | Backing Vocals - Wide | mono/stereo backing vocals | Chorus Doubler | Amount 45 %, Depth 50 %, Rate 0.3 Hz, Width 140 %, out +2 dB | thicker and pushed to the sides, away from the lead |
 | 15 | Drums - Overheads | stereo overheads | M/S Filtered | Width 130 %, Bass Cutoff 150 Hz, Shelf 8 kHz +2 dB | wider cymbals, kick/snare stay centred |
 | 16 | Drums - Bus | stereo drum bus | Multiband Width | Splits 120/1000/6000 Hz, widths 100/115/135 % | kick mono, cymbals wide |
-| 17 | Percussion - Mono Shaker | mono percussion | Allpass Decorrelation | Amount 70 %, Spread 80 %, Width 130 % | high-frequency content decorrelates well |
-| 18 | Bass Guitar - Grit Only | mono bass DI/amp | Complementary Comb | Delay 10 ms, Gain 30 %, Crossover 800 Hz | only the grit gets wider, the low end stays mono |
+| 17 | Percussion - Mono Shaker | mono percussion | Allpass Decorrelation | Amount 25 %, Spread 40 %, Width 110 %, out +1.5 dB | high-frequency content decorrelates well |
+| 18 | Bass Guitar - Grit Only | mono bass DI/amp | Complementary Comb | Delay 10 ms, Gain 60 %, Crossover 400 Hz | only the grit gets wider, the low end stays mono |
 | 19 | Master - Gentle Widen | full mix | M/S Filtered | Width 115 %, Bass Cutoff 100 Hz, Shelf 10 kHz +1.5 dB | mono-safe polish for mastering |
 | 20 | Master - Tight Low End | full mix | Multiband Width | Splits 120/1000/8000 Hz, widths 100/105/115 % | mono bass below 120 Hz, slightly wider top |
 
-Open points: presets store all parameters incl. the utility section (so loading one
-resets Gain/Flip); decide whether to ship them as binary data (`FACTORY_PRESETS` in
-`StereoWidener/CMakeLists.txt`) or as files; check each preset's mono compatibility
-and loudness change (a preset may set the output Gain to compensate, since there is
-no auto gain).
+✅ Built in (v0.1.31): the 20 presets plus a neutral "Init" are generated by
+`python/make_factory_presets.py` into `StereoWidener/presets/` and embedded as binary
+data; values tuned with `python/evaluate_factory_presets.py` ("out" = output Gain as
+loudness compensation; the allpass presets were toned down for mono compatibility,
+the bass presets made stronger). No categories. See
+[phase6_factory_presets.md](docs/algorithms/phase6_factory_presets.md). Next: deploy
+each preset if it's missing, or if it's an unmodified factory copy with a lower
+`presetversion` -- never over a user-saved preset.
 
 ### Phase 7 – v2 and later
 Every algorithm from planing.md not implemented (or not yet decided) for v1 lives
