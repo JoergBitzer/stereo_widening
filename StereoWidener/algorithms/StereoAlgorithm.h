@@ -52,6 +52,8 @@ struct AlgorithmParamSpec
     float offBelow = std::numeric_limits<float>::lowest();
     float offAbove = std::numeric_limits<float>::max();
 
+    const char* help = ""; // one line for the "?" popup's Controls list: what it does
+
     static AlgorithmParamSpec linear(const char* id, const char* name, const char* unit,
                                      float minValue, float maxValue, float defaultValue,
                                      int numDecimalPlaces = 0)
@@ -73,13 +75,15 @@ struct AlgorithmParamSpec
 
     AlgorithmParamSpec withOffBelow(float threshold) const { auto s = *this; s.offBelow = threshold; return s; }
     AlgorithmParamSpec withOffAbove(float threshold) const { auto s = *this; s.offAbove = threshold; return s; }
+    AlgorithmParamSpec withHelp(const char* text) const { auto s = *this; s.help = text; return s; }
 
     // The standard 0-200 % width control: 0 = mono, 100 = unchanged, 200 = double the
     // side signal. Every algorithm that has one declares its own (own ID), so each
     // keeps its own setting.
     static AlgorithmParamSpec width(const char* id, const char* name = "Width")
     {
-        return linear(id, name, "%", 0.0f, 200.0f, 100.0f);
+        return linear(id, name, "%", 0.0f, 200.0f, 100.0f)
+            .withHelp("M/S width of the output: 0 % = mono, 100 % = unchanged, 200 % = double the side signal.");
     }
 };
 
@@ -109,6 +113,40 @@ public:
     /** This algorithm's parameters, in the index order process() reads them. Called
      *  at setup time only (parameter creation, GUI construction), never per block. */
     virtual std::vector<AlgorithmParamSpec> getParamSpecs() const = 0;
+
+    /** "Controls:" followed by one line per parameter -- name, range (with any Off
+     *  zone), default, and its help text -- generated from getParamSpecs(), so the
+     *  "?" popup always matches the actual knobs. For getDescription() to include. */
+    juce::String getControlsText() const
+    {
+        const auto number = [](float value, int decimals)
+        {
+            auto text = juce::String(value, decimals);
+            return text.containsChar('.') ? text.trimCharactersAtEnd("0").trimCharactersAtEnd(".") : text;
+        };
+        juce::String text = "Controls:";
+        for (const auto& spec : getParamSpecs())
+        {
+            const juce::String unit = juce::String(spec.unit).isEmpty() ? juce::String() : " " + juce::String(spec.unit);
+            const bool offLow = spec.offBelow > spec.minValue;
+            const bool offHigh = spec.offAbove < spec.maxValue;
+            const int decimals = spec.numDecimalPlaces;
+            const float lowest = offLow ? spec.offBelow : spec.minValue;
+            const float highest = offHigh ? spec.offAbove : spec.maxValue;
+            // "40-500 Hz", but "-6 to +6 dB" when the range includes negative values
+            juce::String range = lowest < 0.0f ? number(lowest, decimals) + " to " + (highest > 0.0f ? "+" : "") + number(highest, decimals) + unit
+                                               : number(lowest, decimals) + "-" + number(highest, decimals) + unit;
+            if (offLow)
+                range << ", Off below " << number(spec.offBelow, decimals) << unit;
+            if (offHigh)
+                range << ", Off above " << number(spec.offAbove, decimals) << unit;
+            const bool defaultOff = spec.defaultValue < spec.offBelow || spec.defaultValue > spec.offAbove;
+            const juce::String sign = lowest < 0.0f && spec.defaultValue > 0.0f ? "+" : "";
+            const juce::String defaultText = defaultOff ? juce::String("Off") : sign + number(spec.defaultValue, decimals) + unit;
+            text << "\n- " << spec.name << " (" << range << "; default " << defaultText << "): " << spec.help;
+        }
+        return text;
+    }
 
     /** Display name, shown in the algorithm selector. */
     virtual const char* getName() const noexcept = 0;

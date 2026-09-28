@@ -58,8 +58,10 @@ public:
     {
         return {
             AlgorithmParamSpec::width("allpassWidth"),
-            AlgorithmParamSpec::linear("allpassAmount", "Amount", "%", 0.0f, 100.0f, 0.0f),
+            AlgorithmParamSpec::linear("allpassAmount", "Amount", "%", 0.0f, 100.0f, 0.0f)
+                .withHelp("how far each channel is blended towards its phase-shifted copy. 0 % = no effect."),
             AlgorithmParamSpec::linear("allpassSpread", "Spread", "%", 0.0f, 100.0f, 50.0f)
+                .withHelp("how far R's allpass frequencies sit above L's (0-2 octaves). 0 % = identical, no decorrelation.")
         };
     }
 

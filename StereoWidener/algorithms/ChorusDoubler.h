@@ -1,15 +1,15 @@
 /**
  * @file ChorusDoubler.h
- * @brief Algorithm 2.11 (planing.md): micro-pitch / chorus doubler ("Dimension D"
- *        style).
+ * @brief Algorithm 2.11 (planing.md): micro-pitch / chorus doubler (slow stereo
+ *        chorus ensemble).
  *
  * planing.md 2.11: "L and R get slightly different short, modulated delays (5-30 ms,
- * LFO) ... the classic 'Dimension D' or 'micro shift' effect (Eventide H3000 style)."
+ * LFO) ... the classic ensemble/micro-shift chorus effect."
  * Group S+P (works on existing stereo content and creates pseudo-stereo from mono),
  * mono-compatibility "-" -- worse than algorithm 2.5's allpass decorrelation or 2.12's
  * early reflections (both "o"), matching planing.md's own con: "mono sum shows comb
  * and flanging artefacts". Per explicit user decision, this implements only the
- * modulated-delay chorus/Dimension-D member of planing.md 2.11's family, not the
+ * modulated-delay chorus member of planing.md 2.11's family, not the
  * fixed-cent micro-pitch-shift variant (needs a structurally different ramp/sawtooth
  * LFO with a crossfading delay line -- a real redesign, out of scope here).
  *
@@ -78,11 +78,11 @@
  * - Depth: 0-100 %, scales the LFO's modulation excursion. No neutral value of its
  *   own -- inert whenever Amount = 0.
  * - Rate: 0.05-2 Hz, default 0.3 Hz. (Until v0.1.24 a fixed value from the global
- *   settings file.) Deliberately capped at 2 Hz: the slow, "Dimension D"-like range is
+ *   settings file.) Deliberately capped at 2 Hz: the slow, ensemble-like range is
  *   the point; faster rates turn this into an obvious vibrato/warble, a different,
  *   arguably worse-sounding effect for a width tool.
  *
- * Reference: the "Dimension D" / stereo chorus family described in planing.md 2.11;
+ * Reference: the stereo chorus family described in planing.md 2.11;
  * the underlying "modulated delay line" chorus technique is standard (e.g. Dattorro,
  * "Effect Design Part 2: Delay Line Modulation and Chorus", JAES 1997).
  *
@@ -105,9 +105,12 @@ public:
     {
         return {
             AlgorithmParamSpec::width("chorusWidth"),
-            AlgorithmParamSpec::linear("chorusAmount", "Amount", "%", 0.0f, 100.0f, 0.0f),
-            AlgorithmParamSpec::linear("chorusDepth", "Depth", "%", 0.0f, 100.0f, 50.0f),
+            AlgorithmParamSpec::linear("chorusAmount", "Amount", "%", 0.0f, 100.0f, 0.0f)
+                .withHelp("how much of the modulated copies is blended in. 0 % = no effect."),
+            AlgorithmParamSpec::linear("chorusDepth", "Depth", "%", 0.0f, 100.0f, 50.0f)
+                .withHelp("how far the delay times swing (up to +-10 ms)."),
             AlgorithmParamSpec::linear("chorusRate", "Rate", "Hz", 0.05f, 2.0f, 0.3f, 2)
+                .withHelp("how fast they swing -- capped at 2 Hz, so it stays a chorus rather than a vibrato.")
         };
     }
 
@@ -120,7 +123,7 @@ public:
                     : kBaseDelayMs + kStereoOffsetMs + depth * kMaxDepthMs * std::sin(phaseRadians + kStereoPhaseOffsetRadians);
     }
 
-    const char* getName() const noexcept override { return "Chorus Doubler (Dimension D)"; }
+    const char* getName() const noexcept override { return "Chorus Doubler"; }
     juce::String getDescription() const override;
     bool isMonoSafe() const noexcept override { return false; }
     int getLatencySamples() const noexcept override { return 0; }

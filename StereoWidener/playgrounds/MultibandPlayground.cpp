@@ -8,8 +8,9 @@ MultibandPlayground::MultibandPlayground(juce::AudioProcessorValueTreeState& apv
     using MB = MultibandWidth;
     const auto specs = algorithm.getParamSpecs();
 
-    // Short labels matching the display: split k separates band k and k+1.
-    const juce::StringArray labels { "Split 1", "Split 2", "Split 3", "Band 2", "Band 3", "Band 4" };
+    // Short labels matching the display: split k separates band k and k+1; band k's
+    // width knob sits between the knobs of the splits that bound it (see resized()).
+    const juce::StringArray labels { "Split 1", "Split 2", "Split 3", "Width 2", "Width 3", "Width 4" };
     for (size_t i = 0; i < specs.size(); ++i)
     {
         m_knobs.push_back(std::make_unique<PlaygroundKnob>(apvts, specs[i], labels[(int) i]));
@@ -23,15 +24,6 @@ MultibandPlayground::MultibandPlayground(juce::AudioProcessorValueTreeState& apv
                                                      &getParameter(specs[MB::kWidth4].id) },
         MB::kMinCrossoverRatio);
     addAndMakeVisible(*m_bandSplit);
-
-    // Group captions, so it's clear the splits are frequencies and the band knobs widths.
-    for (auto* caption : { &m_frequencyCaption, &m_widthCaption })
-    {
-        caption->setJustificationType(juce::Justification::centred);
-        addAndMakeVisible(*caption);
-    }
-    m_frequencyCaption.setText("Frequency", juce::dontSendNotification);
-    m_widthCaption.setText("Width", juce::dontSendNotification);
 
     limitCrossoverKnobs();
 }
@@ -67,29 +59,33 @@ void MultibandPlayground::limitCrossoverKnobs()
 
 void MultibandPlayground::resized()
 {
+    using MB = MultibandWidth;
     const int textBoxWidth = scaled(g_compactKnobTextBoxWidth);
     for (auto& knob : m_knobs)
         knob->setKnobLayout(scaled(g_compactKnobSize), scaled(g_compactKnobLabelHeight), textBoxWidth);
     m_bandSplit->setScaleFactor(m_scale);
 
-    // Display across the full width on top; below it the captions and knobs in two
-    // groups: splits (Frequency, left), band widths (Width, right).
+    // Display across the full width on top; below it the knobs in two staggered rows,
+    // laid out like the frequency axis: the splits (crossovers) in the first row, and
+    // each band's width in the second, half a step to the right -- between the two
+    // splits that bound the band (band 4: right of split 3). The rows overlap by half a
+    // knob, which is free space because the columns alternate.
+    const int knobHeight = m_knobs.front()->getPreferredHeight();
+    const int rowOffset = scaled(g_compactKnobLabelHeight) + scaled(g_compactKnobSize) / 2;
     auto area = getLocalBounds();
-    auto knobRow = area.removeFromBottom(m_knobs.front()->getPreferredHeight());
-    auto captionRow = area.removeFromBottom(scaled(g_compactKnobLabelHeight));
-    area.removeFromBottom(scaled(g_smallKnobRowGap));
+    auto knobArea = area.removeFromBottom(rowOffset + knobHeight);
+    area.removeFromBottom(scaled(g_compactKnobGap));
     m_bandSplit->setBounds(area);
 
-    const int gap = scaled(g_compactKnobGap);
-    const int groupGap = scaled(g_compactKnobGroupGap);
-    const int groupWidth = 3 * textBoxWidth + 2 * gap;
-    knobRow = knobRow.withSizeKeepingCentre(2 * groupWidth + groupGap, knobRow.getHeight());
-    captionRow = captionRow.withSizeKeepingCentre(knobRow.getWidth(), captionRow.getHeight());
-    m_frequencyCaption.setBounds(captionRow.removeFromLeft(groupWidth));
-    m_widthCaption.setBounds(captionRow.removeFromRight(groupWidth));
-    for (size_t i = 0; i < m_knobs.size(); ++i)
+    // six columns, alternating split / width; a column step of at least the text box
+    // plus a small gap, at most a comfortable spacing
+    const int step = juce::jlimit(textBoxWidth + scaled(g_compactKnobGap), textBoxWidth + scaled(g_compactKnobGroupGap),
+                                  (knobArea.getWidth() - textBoxWidth) / 5);
+    const int left = knobArea.getX() + (knobArea.getWidth() - (5 * step + textBoxWidth)) / 2;
+    for (int k = 0; k < 3; ++k)
     {
-        m_knobs[i]->setBounds(knobRow.removeFromLeft(textBoxWidth));
-        knobRow.removeFromLeft(i == 2 ? groupGap : gap);
+        m_knobs[(size_t) (MB::kFreq1 + k)]->setBounds(left + 2 * k * step, knobArea.getY(), textBoxWidth, knobHeight);
+        m_knobs[(size_t) (MB::kWidth2 + k)]->setBounds(left + (2 * k + 1) * step, knobArea.getY() + rowOffset,
+                                                       textBoxWidth, knobHeight);
     }
 }

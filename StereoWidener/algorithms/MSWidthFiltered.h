@@ -66,10 +66,13 @@ public:
         return {
             AlgorithmParamSpec::width("filteredWidth"),
             AlgorithmParamSpec::linear("bassCutoff", "Bass Cutoff", "Hz", 30.0f, 500.0f, 30.0f)
-                .withOffBelow(kBassCutoffOffThreshold),
+                .withOffBelow(kBassCutoffOffThreshold)
+                .withHelp("below this frequency the side signal is removed, so the bass stays mono."),
             AlgorithmParamSpec::logFrequency("highShelfFreq", "High Shelf", 1000.0f, 16500.0f, 16500.0f)
-                .withOffAbove(kHighShelfOffThreshold),
+                .withOffAbove(kHighShelfOffThreshold)
+                .withHelp("above this frequency the side signal is raised (or lowered) by Shelf Gain."),
             AlgorithmParamSpec::linear("highShelfGain", "Shelf Gain", "dB", -6.0f, 6.0f, 3.0f, 1)
+                .withHelp("gain of that high shelf -- a boost restores some \"air\" to the widened sound.")
         };
     }
 

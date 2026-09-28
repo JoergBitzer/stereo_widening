@@ -88,19 +88,17 @@ void MSWidthFiltered::process(juce::AudioBuffer<float>& buffer, const AlgorithmP
 
 juce::String MSWidthFiltered::getDescription() const
 {
-    return "Mid/Side width control with bass mono and a side high shelf.\n\n"
-           "Same M/S width control as the broadband algorithm, but the side signal S "
-           "is high-pass filtered at the Bass Cutoff frequency first, so content below "
-           "it is forced into the mid signal (i.e. mono) regardless of the Width "
-           "setting -- low frequencies translate poorly to mono playback if left wide "
-           "and carry most of a mix's energy. A high shelf at the High Shelf frequency "
-           "(Shelf Gain, default +3 dB) then restores some high-frequency \"air\" to "
-           "the widened side signal. Either stage can be switched off entirely: turn "
-           "Bass Cutoff below 40 Hz, or High Shelf above 16 kHz.\n\n"
-           "The graph shows the gain the side signal gets at each frequency (Width and "
-           "both filters combined); the mid signal always passes unchanged (0 dB line). "
-           "Drag the two points to set the cutoff and shelf frequencies; drag the shelf "
-           "point up or down to change its gain.\n\n"
+    return "Mid/Side width with bass mono and a side high shelf.\n\n"
+           "Like M/S Width (Broadband), but the side signal is high-pass filtered first "
+           "(the bass stays mono -- low frequencies carry most of a mix's energy and "
+           "translate poorly to mono playback when wide) and then high-shelved, before "
+           "Width scales it.\n\n"
+           + getControlsText() + "\n\n"
+           "Display: the gain the side signal gets at each frequency (Width and both "
+           "filters combined); the mid signal is unchanged (0 dB line). Drag the two "
+           "points for the frequencies, the shelf point up/down for its gain; "
+           "double-click resets.\n\n"
+           "Mono-compatible: the mid signal is never changed.\n\n"
            "Source: B. Katz, \"Mastering Audio: The Art and the Science\", 3rd ed., "
            "Focal Press, 2015, ch. 3 (\"Mono Compatibility and M-S Processing\").";
 }

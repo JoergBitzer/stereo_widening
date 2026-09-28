@@ -70,9 +70,12 @@ public:
     {
         return {
             AlgorithmParamSpec::width("combWidth"),
-            AlgorithmParamSpec::linear("combDelay", "Delay", "ms", 5.0f, 20.0f, 10.0f, 1),
-            AlgorithmParamSpec::linear("combGain", "Gain", "%", 0.0f, 100.0f, 0.0f),
+            AlgorithmParamSpec::linear("combDelay", "Delay", "ms", 5.0f, 20.0f, 10.0f, 1)
+                .withHelp("delay of the copy added to the side signal; sets the comb spacing (1/Delay)."),
+            AlgorithmParamSpec::linear("combGain", "Gain", "%", 0.0f, 100.0f, 0.0f)
+                .withHelp("level of the delayed copy -- how deep the combs are. 0 % = no effect."),
             AlgorithmParamSpec::logFrequency("combCrossover", "Crossover", 50.0f, 2000.0f, 300.0f)
+                .withHelp("the copy is only added above this frequency, keeping the bass free of combing.")
         };
     }
 
