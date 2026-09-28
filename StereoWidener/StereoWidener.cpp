@@ -428,9 +428,10 @@ void StereoWidenerGUI::showPlaygroundForSelectedAlgorithm()
         m_playgrounds[i]->setVisible((int) i == index);
 
     // "Not mono-safe" badge (plan2.md Phase 5 step 4): empty (but still laid out, see
-    // resized()) for every mono-safe algorithm.
+    // resized()) for every mono-safe algorithm. ASCII only: the warning sign and arrow
+    // glyphs used before (U+26A0, U+2192) are missing in some Windows fonts.
     m_monoSafeBadge.setText(m_processor.m_algo.getAlgorithm(index).isMonoSafe() ? juce::String()
-        : juce::String::fromUTF8("\xe2\x9a\xa0 Not mono-safe -- check Utilities \xe2\x86\x92 Monitor \xe2\x86\x92 Mono Check"),
+        : juce::String("Not mono-safe -- check Utilities > Monitor > Mono Check"),
         juce::dontSendNotification);
 }
 

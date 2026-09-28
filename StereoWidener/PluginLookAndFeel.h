@@ -51,6 +51,14 @@ public:
     // avoided entirely by never constructing one outside function scope.
     static constexpr const char* themeToggleComponentID = "themeToggle";
 
+    // Which icon the theme toggle shows: set as a component property ("sun" or
+    // "moon") on that button; drawButtonBackground() draws it as a vector icon in the
+    // button's textColourOffId colour. Drawn, not a text glyph: the Unicode sun/moon
+    // (U+2600/U+263E) are missing or too wide in some system fonts -- on Windows the
+    // sun was drawn as "..." (elided text).
+    static constexpr const char* themeIconProperty = "themeIcon";
+    static void drawThemeIcon(juce::Graphics& g, juce::Rectangle<float> area, bool sun, juce::Colour colour);
+
 private:
     void applyTheme();
     void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height, float sliderPos,

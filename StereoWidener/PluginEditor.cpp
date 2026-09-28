@@ -5,22 +5,7 @@
 
 namespace
 {
-    // Shows the icon of the mode a click would switch TO (common toggle-icon
-    // convention): a moon while in Day mode (click for Night), a sun while in Night
-    // mode (click for Day). juce::String::fromUTF8(), not an implicit const char*
-    // conversion, for the same reason as StereoWidener.cpp's own mono-safe badge text.
-    juce::String themeButtonGlyphFor(StereoWidenerLookAndFeel::Theme theme)
-    {
-        // Both from the same "Miscellaneous Symbols" Unicode block (U+2600 range),
-        // not the supplementary-plane colour-emoji moon (U+1F319) -- that one had no
-        // glyph in the font available where this was first tested, rendering as a
-        // blank/placeholder box.
-        return theme == StereoWidenerLookAndFeel::Theme::Day
-             ? juce::String::fromUTF8("\xe2\x98\xbe")  // last-quarter moon, U+263E
-             : juce::String::fromUTF8("\xe2\x98\x80"); // sun, U+2600
-    }
-
-    // The moon/sun glyph colours are fixed, independent of theme -- a dark moon, a
+    // The moon/sun icon colours are fixed, independent of theme -- a dark moon, a
     // bright sun -- rather than following the general button-text convention
     // (m_buttonTextColour), per explicit request. The button's own fill follows the
     // opposite rule: white specifically in Day mode (an explicit per-component
@@ -32,7 +17,14 @@ namespace
 
     void applyThemeButtonStyle(juce::TextButton& button, StereoWidenerLookAndFeel::Theme theme)
     {
-        button.setButtonText(themeButtonGlyphFor(theme));
+        // Shows the icon of the mode a click would switch TO (common toggle-icon
+        // convention): a moon in Day mode, a sun in Night mode. Drawn by
+        // StereoWidenerLookAndFeel::drawThemeIcon(), not a text glyph (see there).
+        const bool showSun = theme != StereoWidenerLookAndFeel::Theme::Day;
+        button.setButtonText({});
+        button.getProperties().set(StereoWidenerLookAndFeel::themeIconProperty, showSun ? "sun" : "moon");
+        button.setTitle(showSun ? "Switch to day theme" : "Switch to night theme"); // accessibility
+        button.repaint();
         if (theme == StereoWidenerLookAndFeel::Theme::Day)
         {
             button.setColour(juce::TextButton::ColourIds::buttonColourId, juce::Colours::white);
