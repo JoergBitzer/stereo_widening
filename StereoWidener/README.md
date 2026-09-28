@@ -98,9 +98,10 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     frequency axis, each band's bar height being its width (dashed line = 100 %): drag
     a band up/down for its width, drag the lines between bands to move the crossovers
     (a crossover stops at its neighbours), double-click to reset. Below it, knobs for
-    exact values: **Frequency** -- Split 1-3 (the crossovers, each anywhere from 40 Hz
-    to 18 kHz as long as it stays between its neighbours) -- and **Width** -- Band 2-4
-    (the band widths, 0-200 %, default 100 % -- neutral). There is no
+    exact values in two staggered rows, ordered like the frequency axis: Split 1-3 on
+    top (the crossovers, each anywhere from 40 Hz to 18 kHz as long as it stays between
+    its neighbours), and Width 2-4 below, each between the two splits that bound its
+    band (the band widths, 0-200 %, default 100 % -- neutral). There is no
     overall Width (removed in v0.1.21: it scaled all bands on top of their own widths).
     See [phase5_multiband.md](../docs/algorithms/phase5_multiband.md) for the algorithm
     (including the allpass phase-compensation needed for a flat reconstruction) and
