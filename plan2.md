@@ -550,7 +550,7 @@ noted. Names start with the instrument so the list sorts usefully.
 | 2 | Synth Bass - Wide Top | mono synth bass | Complementary Comb | Delay 8 ms, Gain 40 %, Crossover 500 Hz | only the harmonics get wider, the fundamental stays mono |
 | 3 | Synth Pad - Big | stereo pad | Multiband Width | Splits 200/2000/8000 Hz, widths 110/140/160 % | wider towards the top, no low-end phase issues |
 | 4 | Synth Arp - Shimmer | mono arpeggio | Allpass Decorrelation | Amount 60 %, Spread 70 %, Width 120 % | decorrelation without audible delay or combing |
-| 5 | Guitar Clean - Dimension | mono clean guitar | Chorus Doubler | Amount 50 %, Depth 40 %, Rate 0.4 Hz, Width 120 % | the classic "Dimension D" guitar sound |
+| 5 | Guitar Clean - Chorus Wide | mono clean guitar | Chorus Doubler | Amount 50 %, Depth 40 %, Rate 0.4 Hz, Width 120 % | the classic slow stereo-chorus guitar sound |
 | 6 | Guitar Rhythm - Double | mono distorted guitar | Chorus Doubler | Amount 35 %, Depth 30 %, Rate 0.2 Hz, Width 130 % | fake double-tracking, slow so it doesn't warble |
 | 7 | Acoustic Guitar - Mono Mic | mono acoustic | Early Reflections | Amount 35 %, Room 30 %, Pre-delay 3 ms, Width 110 % | natural space, no chorus character |
 | 8 | Acoustic Guitar - Stereo Pair | stereo acoustic | M/S Filtered | Width 130 %, Bass Cutoff 120 Hz, Shelf 6 kHz +2 dB | wider and airier, body stays centred |

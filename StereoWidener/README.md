@@ -126,9 +126,9 @@ cd ../stereo_widening/python && python evaluate_widener_plugin.py
     during cross-checking) and its verification,
     [phase6_playground_early_reflections.md](../docs/algorithms/phase6_playground_early_reflections.md)
     for the display.
-  - *Chorus Doubler (Dimension D)*: the mid signal is fed through two independently
+  - *Chorus Doubler*: the mid signal is fed through two independently
     LFO-modulated delay lines, one per channel, held a quarter-cycle apart -- the
-    classic modulated-delay chorus/"Dimension D" effect, also creating real width
+    classic modulated-delay stereo chorus effect, also creating real width
     from mono input like Complementary Comb, Allpass Decorrelation and Early
     Reflections. Controls: **Width**, **Amount** (0-100 %, defaults to 0 % -- an
     exact bypass), **Depth** (0-100 %, how much the delay time swings around its

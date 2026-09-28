@@ -42,7 +42,7 @@ const juce::StringArray g_algorithmNames {
     "Allpass Decorrelation",
     "Multiband Width",
     "Early Reflections (Room Widening)",
-    "Chorus Doubler (Dimension D)"
+    "Chorus Doubler"
 };
 
 // ---- Utilities (Phase 4 step 2: planing.md 2.13 + 2.2) -------------------------

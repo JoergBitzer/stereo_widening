@@ -92,10 +92,10 @@ void ChorusDoubler::process(juce::AudioBuffer<float>& buffer, const AlgorithmPar
 
 juce::String ChorusDoubler::getDescription() const
 {
-    return "Chorus doubler (\"Dimension D\" style).\n\n"
+    return "Chorus doubler (slow stereo chorus ensemble).\n\n"
            "The mid signal runs through two slowly modulated delay lines, one per "
            "channel, swinging a quarter cycle apart (R 3 ms longer on average) -- the "
-           "classic chorus/\"Dimension D\" width. This creates real width even from a "
+           "classic stereo chorus width. This creates real width even from a "
            "mono source. Width then scales the side signal of the result.\n\n"
            + getControlsText() + "\n\n"
            "Display: both channels' delay times over 4 seconds. Drag up/down for "
