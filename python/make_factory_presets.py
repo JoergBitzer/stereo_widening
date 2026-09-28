@@ -48,11 +48,11 @@ DEFAULTS = {
     "highShelfFreq": (16500, 1000, 16500),      # > 16 kHz = Off
     "highShelfGain": (3, -6, 6),
     "invertL": (0, 0, 1), "invertR": (0, 0, 1),
-    "monitorMode": (0, 0, 10),
+    "monitorMode": (0, 0, 2),
     "multibandFreq1": (150, 40, 18000), "multibandFreq2": (1500, 40, 18000), "multibandFreq3": (6000, 40, 18000),
     "multibandWidth2": (100, 0, 200), "multibandWidth3": (100, 0, 200), "multibandWidth4": (100, 0, 200),
-    "outputGain": (0, -24, 24),
-    "rotation": (0, -180, 180),
+    "outputGain": (0, -24, 6),
+    "rotation": (0, -45, 45),
     "swapLR": (0, 0, 1),
 }
 

@@ -2,8 +2,8 @@
 
 A free stereo widening plugin (VST3, AU, Standalone) for Windows, macOS and Linux:
 seven widening algorithms, from mono-safe M/S width for mastering to pseudo-stereo for
-mono synths and guitars, each with its own interactive display, plus goniometer,
-correlation and L/R/M/S meters to see what happens to the stereo image.
+mono synths and guitars, each with its own interactive display, plus a goniometer
+and L/R/M/S level meters to see what happens to the stereo image.
 
 Developed at the [Jade Hochschule](https://www.kvraudio.com/developer/jade-hochschule)
 (Jörg Bitzer) as a teaching example for students and young engineers -- and as a tool
