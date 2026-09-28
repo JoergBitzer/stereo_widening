@@ -7,7 +7,8 @@ correlation and L/R/M/S meters to see what happens to the stereo image.
 
 Developed at the [Jade Hochschule](https://www.kvraudio.com/developer/jade-hochschule)
 (Jörg Bitzer) as a teaching example for students and young engineers -- and as a tool
-for mixing and mastering. Free, open source, no commercial interest.
+for mixing and mastering. Free, open source, no commercial interest. **Vibe-coded with
+an AI** -- see [How it was made](#how-it-was-made).
 
 | Night theme: Multiband Width ("Synth Pad - Big") | Day theme: Chorus Doubler ("Guitar Clean - Chorus Wide") |
 |---|---|
@@ -78,6 +79,45 @@ overwrite a preset you saved yourself:
 Day and night theme (button top right), scalable GUI (drag the corner), zero latency,
 low CPU load (at most about 1 % of one core, Multiband Width), all parameters
 automatable.
+
+## How it was made
+
+To be honest: StereoWidener is **vibe-coded**. The code was written by an AI,
+Anthropic's Claude (in Claude Code; models Claude Sonnet 5 and Claude Opus 5.5), in
+conversation with Jörg Bitzer. But not in the "type one prompt, ship the result" way:
+
+- **An intense planning phase first.** Before any plugin code: a catalogue of stereo
+  widening algorithms with their theory, pros and cons ([planing.md](planing.md)), then
+  a plan with decisions, release scope and roadmap ([plan2.md](plan2.md)), and later a
+  separate plan for the GUI redesign ([plan_changeGUI.md](plan_changeGUI.md)).
+- **Interactive, step-by-step development.** One feature or fix at a time, each on its
+  own git branch, explained, reviewed and only merged on the human's go -- about 75
+  commits, each step documented in [docs/algorithms/](docs/algorithms/).
+- **Human review, listening and usage tests.** The steps were reviewed, listened to
+  and used by humans; their review comments changed algorithms, parameters and the GUI (for
+  example a consistent Width for all algorithms, the multiband knob layout, readable
+  displays).
+- **Meticulous testing by the AI, with these tools:**
+  - [pluginval](https://github.com/Tracktion/pluginval) at strictness level 10, usually
+    several runs per change (and `gdb` when it found a crash);
+  - `WidenerRender` (`tools/widener_render`): renders audio through the plugin's own
+    C++ algorithm classes, used for byte-identical before/after checks of every
+    refactor;
+  - Python reference implementations of every algorithm and cross-checks against the
+    C++ code (`python/crosscheck_*.py`, `tools/meter_crosscheck`);
+  - `stereo_eval`, a Python evaluation package (correlation per band and over time,
+    L/R/M/S levels, loudness BS.1770, mono-sum colouration, IACC), used by
+    `python/evaluate_*.py` on test signals and music samples, plus `pytest` unit tests;
+  - every algorithm display checked against the transfer function measured from the
+    rendered audio;
+  - offline GUI renders in both themes and synthetic mouse-drag tests;
+  - `python/evaluate_factory_presets.py` (loudness and mono compatibility of every
+    preset) and `python/compare_builds.py` (six optimisation levels against the Debug
+    build).
+
+What this does not replace: there was no formal listening test or user study, and the
+presets for guitar, organ and strings were tuned on stand-in material (no such
+recordings were at hand) -- worth your own ears. Feedback is welcome.
 
 ## Build from source
 
