@@ -1,76 +1,155 @@
-# Stereo Widening
+# StereoWidener
 
-JUCE audio plugins that analyse and change the stereo image of audio signals.
-The project is a teaching example for students and young engineers, and at the same
-time a tool for mixing and mastering.
+A free stereo widening plugin (VST3, AU, Standalone) for Windows, macOS and Linux:
+seven widening algorithms, from mono-safe M/S width for mastering to pseudo-stereo for
+mono synths and guitars, each with its own interactive display, plus goniometer,
+correlation and L/R/M/S meters to see what happens to the stereo image.
 
-- **StereoAnalyzer**: goniometer, correlation meter, L/R/M/S levels (spectra planned).
-  See [docs/algorithms/phase2_stereo_analyzer.md](docs/algorithms/phase2_stereo_analyzer.md).
-- **StereoWidener**: several switchable stereo widening algorithms, in two profiles:
-  Mastering (mono-safe) and Creative (planned)
+Developed at the [Jade Hochschule](https://www.kvraudio.com/developer/jade-hochschule)
+(Jörg Bitzer) as a teaching example for students and young engineers -- and as a tool
+for mixing and mastering. Free, open source, no commercial interest.
 
-Planning documents: [planing.md](planing.md) (algorithm catalogue and theory) and
-[plan2.md](plan2.md) (current plan and roadmap).
+| Night theme: Multiband Width ("Synth Pad - Big") | Day theme: Chorus Doubler ("Guitar Clean - Chorus Wide") |
+|---|---|
+| ![StereoWidener, night theme, Multiband Width](docs/img/stereowidener_night_multiband.png) | ![StereoWidener, day theme, Chorus Doubler](docs/img/stereowidener_day_chorus.png) |
 
-## Structure
+## Download
 
-| Folder | Content |
-|--------|---------|
-| `shared/` | code used by both plugins (metering, DSP helpers) |
-| `StereoAnalyzer/` | analysis plugin |
-| `StereoWidener/` | widening plugin, one class per algorithm in `algorithms/` |
-| `python/` | test signal generation, evaluation (`stereo_eval`), algorithm references |
-| `docs/algorithms/` | one short page per algorithm |
-| `test_signals/` | test audio, **not in the repository** (see [test_signals.md](test_signals.md)) |
+Binaries for Windows, macOS and Linux: on the
+[Jade Hochschule developer page at KVR Audio](https://www.kvraudio.com/developer/jade-hochschule),
+together with the other free Jade Hochschule plugins.
 
-## Setup
+Install by copying the plugin into your plugin folder and rescanning in your DAW:
 
-The plugins use the AudioDev environment: the top-level `CMakeLists.txt` from
-AudioDevOrga, `JUCE/`, and `Libs/TGMStaticLib`, based on the
-[AdvancedAudioTemplate](https://github.com/JoergBitzer/AdvancedAudioTemplate).
+| | VST3 | AU |
+|---|---|---|
+| Windows | `C:\Program Files\Common Files\VST3\` | -- |
+| macOS | `~/Library/Audio/Plug-Ins/VST3/` | `~/Library/Audio/Plug-Ins/Components/` |
+| Linux | `~/.vst3/` | -- |
+
+The Standalone version runs without a DAW (audio in -> widener -> audio out).
+
+## Features
+
+### Seven algorithms
+
+| Algorithm | Best for | Mono-safe | Display |
+|---|---|---|---|
+| **M/S Width (Broadband)** | stereo material, the classic width knob | yes | M/S width |
+| **M/S Width (Filtered / Bass Mono)** | mastering: wider top, mono bass, optional "air" shelf on the side signal | yes | side-signal filter curve |
+| **Complementary Comb (Pseudo-Stereo)** | mono synths, e-pianos, bass "grit": stereo from mono, mono sum stays exact | yes | L/R comb responses |
+| **Allpass Decorrelation** | mono pads, strings, percussion: stereo without audible delay | no | L/R/mono-sum response |
+| **Multiband Width** | pads, pianos, drum buses: separate width for 3 bands, lowest band always mono | yes | band-split display, drag bands and crossovers |
+| **Early Reflections (Room Widening)** | mono acoustic instruments and vocals: width from a small virtual room | no | echogram |
+| **Chorus Doubler** | guitars, organs, backing vocals: slowly modulated delays, double-tracking feel | no | delay modulation over time |
+
+"Mono-safe" means the mono sum (L+R) is unchanged; for the other algorithms a hint
+points to the Mono Check monitor. Every algorithm has its own **Width** (0 % = mono,
+100 % = unchanged, 200 % = double the side signal) and a **?** button with a short
+explanation of the algorithm and all its controls.
+
+### Utilities, applied after every algorithm
+
+Rotation, Balance, output Gain, Swap L/R, Invert L / Invert R, and a Monitor switch
+(Normal, Mono Check (L+R), Solo Side (S)).
+
+### Meters
+
+Input and output L/R/M/S level meters with side-to-mid ratio, and a goniometer that
+overlays input (green) and output (blue).
+
+### Factory presets
+
+20 starting points, mostly per instrument, each using the algorithm that suits it
+(e.g. "Synth Lead - Pseudo Stereo", "Organ - Rotary Feel", "Drums - Overheads",
+"Master - Gentle Widen"), plus a neutral "Init". Loudness changes are compensated with
+the output Gain, so presets can be compared fairly. Presets are plain XML files in
+your user preset folder; factory presets are copied there when missing and never
+overwrite a preset you saved yourself:
+
+| | Presets | Settings (GUI size, theme) |
+|---|---|---|
+| Windows | `%APPDATA%\Jade_Hochschule\StereoWidener\` | `%APPDATA%\StereoWidener\settings.json` |
+| macOS | `~/Library/Audio/Presets/Jade_Hochschule/StereoWidener/` | `~/Library/StereoWidener/settings.json` |
+| Linux | `~/.config/Jade_Hochschule/StereoWidener/` | `~/.config/StereoWidener/settings.json` |
+
+### Other
+
+Day and night theme (button top right), scalable GUI (drag the corner), zero latency,
+low CPU load (at most about 1 % of one core, Multiband Width), all parameters
+automatable.
+
+## Build from source
+
+The plugin uses [JUCE 8](https://juce.com) and CMake, in the AudioDev environment of
+the [AdvancedAudioTemplate](https://github.com/JoergBitzer/AdvancedAudioTemplate)
+(top-level `CMakeLists.txt`, `JUCE/`, `Libs/`):
 
 ```
 AudioDev/
-├── CMakeLists.txt     # add_subdirectory(stereo_widening/StereoAnalyzer) ...
+├── CMakeLists.txt     # add_subdirectory(stereo_widening/StereoWidener) ...
 ├── JUCE/
 ├── Libs/
 └── stereo_widening/   # this repository
 ```
 
-Build (from `AudioDev/`, the shared top-level build directory):
+Release build (from `AudioDev/`):
 
 ```console
-cd build
-cmake ..
-cmake --build . --target StereoAnalyzer_VST3 -j8
-cmake --build . --target StereoAnalyzer_Standalone -j8
+cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build-release --target StereoWidener_VST3 StereoWidener_Standalone -j8
+# macOS additionally: --target StereoWidener_AU
 ```
 
-Load `StereoAnalyzer.vst3` (under
-`build/stereo_widening/StereoAnalyzer/StereoAnalyzer_artefacts/Debug/VST3/`) in a DAW.
-`tools/meter_crosscheck/` is a headless console tool that validates the metering math
-against `python/stereo_eval` without needing a GUI/display; `pluginval` is used for
-automated host-compatibility testing. See
-[docs/algorithms/phase2_stereo_analyzer.md](docs/algorithms/phase2_stereo_analyzer.md)
-for both, and for a heap-corruption bug found (and fixed) in `SynchronBlockProcessor`'s
-direct-through mode along the way.
+The results are in
+`build-release/stereo_widening/StereoWidener/StereoWidener_artefacts/Release/`.
+Release (`-O3` with link-time optimisation) is the tested configuration: it produces
+bit-identical output to the Debug build and passes pluginval at strictness level 10
+(see [docs/algorithms/phase6_release_builds.md](docs/algorithms/phase6_release_builds.md)).
 
-Python environment, test signals and evaluation (run from the project folder):
+## For students and developers
+
+The repository documents the whole development, from the algorithm catalogue to the
+verification of each algorithm:
+
+| Folder / file | Content |
+|--------|---------|
+| [StereoWidener/](StereoWidener/) | the plugin, one class per algorithm in `algorithms/`, one playground (display) per algorithm in `playgrounds/`; [StereoWidener/README.md](StereoWidener/README.md) describes every algorithm in detail |
+| [StereoAnalyzer/](StereoAnalyzer/) | a separate analysis plugin: goniometer, correlation meter, L/R/M/S levels |
+| `shared/` | code used by both plugins (metering) |
+| `python/` | test-signal generation, the evaluation package `stereo_eval` (correlation, levels, loudness, mono-sum colouration, IACC), Python reference implementations, the factory preset generator |
+| [docs/algorithms/](docs/algorithms/) | one page per algorithm and development step, with measurements |
+| `tools/` | `widener_render` (renders a wav file through the plugin's algorithm classes, headless) and `meter_crosscheck` |
+| [planing.md](planing.md), [plan2.md](plan2.md) | algorithm catalogue and theory; plan and roadmap |
+
+Test audio is not in the repository (see [test_signals.md](test_signals.md)). Python
+environment and evaluation (from the project folder):
 
 ```console
 python3 -m venv .venv && .venv/bin/pip install -r python/requirements.txt
-./copy_test_samples.sh                              # samples from ~/Music/samples
 cd python
 ../.venv/bin/python generate_test_signals.py        # -> test_signals/generated/
 ../.venv/bin/python -m pytest                       # validates measures and algorithms
-../.venv/bin/python evaluate_ms_width.py            # -> python/results/ms_width/
+../.venv/bin/python evaluate_factory_presets.py     # renders and measures the presets
 ```
-
-`stereo_eval` provides correlation (broadband, per 1/3 octave, over time), L/R/M/S
-levels, loudness (BS.1770), mono-sum colouration, and IACC for loudspeaker playback
-(spherical head model, speakers at ±30°). `report.evaluate(x_in, x_out, fs)` runs all
-of them.
 
 ## License
 
-TBD
+- **Source code of this repository: [MIT License](LICENSE)**, (c) 2026 Jörg Bitzer,
+  Jade Hochschule.
+- **Plugin binaries:** they contain third-party code:
+  - [JUCE 8](https://github.com/juce-framework/JUCE), used under the
+    [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.html) (JUCE is dual-licensed
+    AGPLv3 / commercial JUCE licence). Therefore the binaries as a whole are
+    distributed under the **AGPLv3**; the complete source code is this repository
+    plus JUCE.
+  - the VST3 SDK by Steinberg (bundled with JUCE; GPLv3 option in the SDK version
+    bundled with JUCE 8.0.x, MIT from VST 3.8 on) -- VST is a registered trademark
+    of Steinberg Media Technologies GmbH;
+  - the Audio Unit SDK by Apple (Apache License 2.0, macOS AU only).
+
+MIT code may be combined with AGPLv3/GPLv3 code; the MIT license of the files in this
+repository stays as it is, and anyone can reuse them under MIT (for example in a
+project with a commercial JUCE licence).
+
+The plugin comes without any warranty (see the licenses).
