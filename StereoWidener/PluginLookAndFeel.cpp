@@ -158,6 +158,51 @@ void StereoWidenerLookAndFeel::drawButtonBackground(juce::Graphics& g, juce::But
     // matching the report that the Day button needed no such fix).
     g.setColour(backgroundColour.brighter(0.3f));
     g.drawRoundedRectangle(button.getLocalBounds().toFloat().reduced(0.5f, 0.5f), 6.0f, 1.0f);
+
+    const auto icon = button.getProperties()[themeIconProperty].toString();
+    if (icon.isNotEmpty())
+        drawThemeIcon(g, button.getLocalBounds().toFloat(), icon == "sun",
+                      button.findColour(juce::TextButton::textColourOffId));
+}
+
+void StereoWidenerLookAndFeel::drawThemeIcon(juce::Graphics& g, juce::Rectangle<float> area, bool sun, juce::Colour colour)
+{
+    const float size = juce::jmin(area.getWidth(), area.getHeight());
+    const auto centre = area.getCentre();
+    g.setColour(colour);
+
+    if (sun)
+    {
+        // disc plus eight rays
+        const float discRadius = 0.17f * size;
+        g.fillEllipse(juce::Rectangle<float>(2.0f * discRadius, 2.0f * discRadius).withCentre(centre));
+        juce::Path rays;
+        for (int i = 0; i < 8; ++i)
+        {
+            const float angle = juce::MathConstants<float>::twoPi * (float) i / 8.0f;
+            const auto dir = juce::Point<float>(std::sin(angle), -std::cos(angle));
+            rays.startNewSubPath(centre + dir * (0.26f * size));
+            rays.lineTo(centre + dir * (0.38f * size));
+        }
+        g.strokePath(rays, juce::PathStrokeType(0.07f * size, juce::PathStrokeType::curved,
+                                                juce::PathStrokeType::rounded));
+    }
+    else
+    {
+        // crescent: a disc with a second, offset disc cut out (clip to everything
+        // outside the cut-out disc, using even-odd winding)
+        const float radius = 0.30f * size;
+        const auto disc = juce::Rectangle<float>(2.0f * radius, 2.0f * radius).withCentre(centre);
+        const auto cutOut = juce::Rectangle<float>(1.7f * radius, 1.7f * radius)
+                                .withCentre(centre + juce::Point<float>(0.55f * radius, -0.35f * radius));
+        juce::Path outsideCutOut;
+        outsideCutOut.setUsingNonZeroWinding(false);
+        outsideCutOut.addRectangle(area);
+        outsideCutOut.addEllipse(cutOut);
+        juce::Graphics::ScopedSaveState state(g);
+        g.reduceClipRegion(outsideCutOut);
+        g.fillEllipse(disc);
+    }
 }
 
 juce::Label* StereoWidenerLookAndFeel::createSliderTextBox(juce::Slider& slider)
