@@ -91,3 +91,37 @@ pass on real instruments.
 - `python/make_factory_presets.py`, `python/evaluate_factory_presets.py` (new).
 - `StereoWidener/presets/*.xml` (new, generated).
 - `StereoWidener/CMakeLists.txt`: `FACTORY_PRESETS`, binary data, 0.1.30 -> 0.1.31.
+
+# Step 2: deploy rule (v0.1.32)
+
+Before, `PresetHandler::DeployFactoryPresets()` only ran when the user preset folder
+didn't exist yet (first start ever) and then copied all factory presets
+unconditionally. So existing installs never got factory presets, and later versions
+could never deliver new or corrected ones.
+
+Now each embedded preset is handled on its own, at every start:
+
+| File in the user folder | Action |
+|---|---|
+| doesn't exist | copy (new install, new preset -- or one the user deleted: it comes back, accepted) |
+| `bank="User"` | never touched: the Save button always writes bank "User", so this is the user's own preset or a factory preset saved over |
+| `bank="Factory"`, lower `presetversion` than embedded | overwrite: the preset was corrected in this version |
+| `bank="Factory"`, same or higher `presetversion` | leave |
+
+A file without `presetversion` counts as version 0. No hidden bookkeeping file (user
+decision). To ship a corrected preset: change its values in
+`python/make_factory_presets.py` and raise its `presetversion` (currently one global
+`PRESET_VERSION`; a per-preset version can be added when the first single preset
+changes).
+
+## Verification (temporary `HOME`,
+[deploy_console.txt](../../python/results/factory_presets/deploy_console.txt))
+
+- Existing folder with only a user `Init.xml` (like a real install): the 20 missing
+  presets are deployed, the user's `Init.xml` (bank User) is byte-identical.
+- User-saved preset under a factory name (bank User, older presetversion): unchanged.
+- Old unmodified factory copy (bank Factory, presetversion 0, edited value): replaced
+  by the embedded version 1.
+- Factory copy with the same presetversion but an edited value: unchanged.
+- Deleted factory preset: reappears.
+- pluginval --strictness-level 10: 3/3 SUCCESS, zero JUCE assertions.

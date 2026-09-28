@@ -15,6 +15,10 @@
 
 	// Version 1.2.0 18.01.20 JB: added submenus for categories (if provided)
 	// Version 1.2.1 18.09.23 JB: add category changed to prevent empty strings
+	// Version 1.3.0 28.09.26 JB: factory presets are deployed one by one, not only into a
+								  newly created folder: a missing preset is copied, an unmodified
+								  factory copy (bank "Factory") is updated if the embedded
+								  "presetversion" is higher; user-saved presets are never touched
 
   ==============================================================================
 */

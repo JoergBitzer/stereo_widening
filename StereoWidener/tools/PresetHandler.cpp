@@ -257,12 +257,17 @@ int PresetHandler::getAllKeys(std::vector<String>& keys, std::vector<String>& pr
 	return 0;
 }
 #ifdef FACTORY_PRESETS
+// Copies each embedded factory preset into the user preset folder, one by one:
+//  - if no file of that name exists yet: copy it (new install, or a preset new in this
+//    version -- or one the user deleted: it comes back, accepted);
+//  - if the file is an unmodified factory copy (bank "Factory") with a lower
+//    presetversion than the embedded one: overwrite it (the preset was corrected);
+//  - otherwise leave it alone -- in particular every preset the user saved (the Save
+//    button always writes bank "User"), even under a factory preset's name.
 void PresetHandler::DeployFactoryPresets()
 {
 	bool wasCreated;
 	File outfiledir = getUserPresetsFolder(wasCreated);
-	if (wasCreated == false)
-		return;
 
 	auto namesofbinarydata = BinaryData::namedResourceList;
 	auto sizesofbinarydata = BinaryData::namedResourceListSize;
@@ -276,21 +281,31 @@ void PresetHandler::DeployFactoryPresets()
 			int sizeData;
 			auto data = BinaryData::getNamedResource(binname, sizeData);
 
-			std::unique_ptr<XmlElement> xml(XmlDocument::parse(data));
-			ValueTree vt;
-			if (sizeData != 0 && xml != nullptr)
+			std::unique_ptr<XmlElement> xml(XmlDocument::parse(String::fromUTF8(data, sizeData)));
+			if (sizeData == 0 || xml == nullptr)
+				continue;
+
+			String presetname = xml->getStringAttribute("presetname");
+			if (presetname.isEmpty())
+				continue;
+
+			File existing = outfiledir.getChildFile(presetname + ".xml");
+			if (existing.existsAsFile())
 			{
-				vt = ValueTree::fromXml(*xml);
-				// Dies ist vermutlich falsch
-				// m_vts->replaceState(vt);
-				String name = vt.getProperty("presetname");
-				String category = vt.getProperty("category");
-				vt.setProperty("bank","Factory",nullptr);
-				// addOrChangeCurrentPreset(name, category, "Factory");
-				repairCategory(vt);
-				addPreset(vt);
-				savePreset(vt);
+				std::unique_ptr<XmlElement> existingXml(XmlDocument::parse(existing));
+				bool isUnmodifiedFactoryCopy = existingXml != nullptr
+					&& existingXml->getStringAttribute("bank") == "Factory";
+				bool isNewer = existingXml != nullptr
+					&& xml->getIntAttribute("presetversion", 0) > existingXml->getIntAttribute("presetversion", 0);
+				if (!(isUnmodifiedFactoryCopy && isNewer))
+					continue;
 			}
+
+			ValueTree vt = ValueTree::fromXml(*xml);
+			vt.setProperty("bank","Factory",nullptr);
+			repairCategory(vt);
+			addPreset(vt);
+			savePreset(vt);
 		}
 	}
 }

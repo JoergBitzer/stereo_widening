@@ -572,9 +572,11 @@ noted. Names start with the instrument so the list sorts usefully.
 data; values tuned with `python/evaluate_factory_presets.py` ("out" = output Gain as
 loudness compensation; the allpass presets were toned down for mono compatibility,
 the bass presets made stronger). No categories. See
-[phase6_factory_presets.md](docs/algorithms/phase6_factory_presets.md). Next: deploy
-each preset if it's missing, or if it's an unmodified factory copy with a lower
-`presetversion` -- never over a user-saved preset.
+[phase6_factory_presets.md](docs/algorithms/phase6_factory_presets.md).
+✅ Deploy rule (v0.1.32): at every start each factory preset is copied if it's missing,
+or over an unmodified factory copy (bank "Factory") with a lower `presetversion` --
+never over a user-saved preset (bank "User"). Deleted factory presets come back
+(accepted, no bookkeeping file).
 
 ### Phase 7 – v2 and later
 Every algorithm from planing.md not implemented (or not yet decided) for v1 lives
