@@ -83,6 +83,9 @@ StereoWidenerAudioProcessorEditor::StereoWidenerAudioProcessorEditor (StereoWide
     // kept JUCE's default dark-scheme colours (white text) until the first theme
     // toggle -- unreadable on the Day theme's light background.
     setLookAndFeel(&m_lookAndFeel);
+
+    for (auto* parameter : m_processorRef.getParameters())
+        parameter->addListener(this);
 }
 
 StereoWidenerAudioProcessorEditor::~StereoWidenerAudioProcessorEditor()
@@ -91,6 +94,19 @@ StereoWidenerAudioProcessorEditor::~StereoWidenerAudioProcessorEditor()
     // comment in the header) -- belt and braces against Component's own destructor
     // still consulting getLookAndFeel() while child components are being destroyed.
     setLookAndFeel(nullptr);
+    for (auto* parameter : m_processorRef.getParameters())
+        parameter->removeListener(this);
+}
+
+void StereoWidenerAudioProcessorEditor::parameterGestureChanged(int, bool gestureIsStarting)
+{
+    if (!gestureIsStarting)
+        return;
+    juce::MessageManager::callAsync([safeThis = juce::Component::SafePointer<StereoWidenerAudioProcessorEditor>(this)]
+    {
+        if (safeThis != nullptr)
+            safeThis->m_presetGUI.setSomethingChanged();
+    });
 }
 
 void StereoWidenerAudioProcessorEditor::toggleTheme()
