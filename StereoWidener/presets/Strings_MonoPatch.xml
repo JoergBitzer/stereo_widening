@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<StereoWidenerVTS presetname="Strings - Mono Patch" bank="Factory" version="0.1.31" category="Unknown" presetversion="1">
+  <PARAM id="algorithm" value="3.0"/>
+  <PARAM id="allpassAmount" value="30.0"/>
+  <PARAM id="allpassSpread" value="40.0"/>
+  <PARAM id="allpassWidth" value="110.0"/>
+  <PARAM id="balance" value="0.0"/>
+  <PARAM id="bassCutoff" value="30.0"/>
+  <PARAM id="broadbandWidth" value="100.0"/>
+  <PARAM id="chorusAmount" value="0.0"/>
+  <PARAM id="chorusDepth" value="50.0"/>
+  <PARAM id="chorusRate" value="0.3"/>
+  <PARAM id="chorusWidth" value="100.0"/>
+  <PARAM id="combCrossover" value="300.0"/>
+  <PARAM id="combDelay" value="10.0"/>
+  <PARAM id="combGain" value="0.0"/>
+  <PARAM id="combWidth" value="100.0"/>
+  <PARAM id="earlyReflAmount" value="0.0"/>
+  <PARAM id="earlyReflPreDelay" value="5.0"/>
+  <PARAM id="earlyReflRoomSize" value="50.0"/>
+  <PARAM id="earlyReflWidth" value="100.0"/>
+  <PARAM id="filteredWidth" value="100.0"/>
+  <PARAM id="highShelfFreq" value="16500.0"/>
+  <PARAM id="highShelfGain" value="3.0"/>
+  <PARAM id="invertL" value="0.0"/>
+  <PARAM id="invertR" value="0.0"/>
+  <PARAM id="monitorMode" value="0.0"/>
+  <PARAM id="multibandFreq1" value="150.0"/>
+  <PARAM id="multibandFreq2" value="1500.0"/>
+  <PARAM id="multibandFreq3" value="6000.0"/>
+  <PARAM id="multibandWidth2" value="100.0"/>
+  <PARAM id="multibandWidth3" value="100.0"/>
+  <PARAM id="multibandWidth4" value="100.0"/>
+  <PARAM id="outputGain" value="2.5"/>
+  <PARAM id="rotation" value="0.0"/>
+  <PARAM id="swapLR" value="0.0"/>
+</StereoWidenerVTS>
