@@ -8,7 +8,8 @@
 #include "StereoWidener.h"
 
 //==============================================================================
-class StereoWidenerAudioProcessorEditor  : public juce::AudioProcessorEditor
+class StereoWidenerAudioProcessorEditor  : public juce::AudioProcessorEditor,
+                                           private juce::AudioProcessorParameter::Listener
 {
 public:
 
@@ -31,6 +32,14 @@ private:
     // factor, a theme toggle is a rare discrete event, so there is no reason to defer
     // writing it to the destructor), updates the button's own icon, and repaints.
     void toggleTheme();
+
+    // Turns the preset bar's Save button red once the user changes a parameter.
+    // Listens to parameter GESTURES, which only user actions produce (knob or display
+    // drags, typed values, double-click resets, buttons, combo boxes) -- not preset
+    // loading or host automation, which would otherwise mark a just-loaded preset as
+    // changed. Gestures may arrive on any thread, hence the async hop.
+    void parameterValueChanged(int, float) override {}
+    void parameterGestureChanged(int parameterIndex, bool gestureIsStarting) override;
 
     // Declared FIRST (constructed first, destroyed LAST): Component's own destructor
     // may still consult getLookAndFeel() while child components below are being torn

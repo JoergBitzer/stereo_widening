@@ -6,7 +6,7 @@
 
 set(TARGET_NAME StereoWidener)
 
-project(${TARGET_NAME} VERSION 1.0.2)
+project(${TARGET_NAME} VERSION 1.0.3)
 
 configure_file(Versioning.h.in Versioning.h)
 
