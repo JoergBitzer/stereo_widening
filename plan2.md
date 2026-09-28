@@ -532,6 +532,12 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
    best -- ideas in 3.1 below. (The Mastering/Creative profiles were never
    implemented, so no split "for both profiles".)
 4. pluginval (strictness 10), tests in Reaper and AudioPluginHost, CPU check.
+   - ✅ Release builds (v0.1.32): O1/O2/O3+LTO/Os/Ofast/O3-native all build without
+     warnings, pass pluginval (strictness 10) and deploy the factory presets; O1-O3/Os
+     sound bit-identical to Debug, Ofast/native differ by at most -73 dB. CPU: at most
+     ~1 % of a core (Multiband), 4-7x faster than Debug. Ship JUCE's Release build. See
+     [phase6_release_builds.md](docs/algorithms/phase6_release_builds.md).
+   - Open: tests in Reaper and AudioPluginHost.
 5. README, user documentation, versioning.
 
 #### 3.1 Factory preset ideas
