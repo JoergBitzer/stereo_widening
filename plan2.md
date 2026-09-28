@@ -539,6 +539,12 @@ line, and was explicitly descoped by the user ("skip pitch-shift").
      [phase6_release_builds.md](docs/algorithms/phase6_release_builds.md).
    - Open: tests in Reaper and AudioPluginHost.
 5. README, user documentation, versioning.
+   - ✅ README for release (download via KVR, features, presets, build), screenshots,
+     license: source MIT (`LICENSE`), binaries AGPLv3 because of JUCE
+     (`LICENSE-AGPL-3.0.txt`).
+   - ✅ **Version 1.0.0** (2026-09-28). From now on semantic-style versioning: a new
+     feature raises the second number and resets the third (1.1.0), a fix or other
+     change raises the third (1.0.1).
 
 #### 3.1 Factory preset ideas
 

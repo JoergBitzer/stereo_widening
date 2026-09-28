@@ -141,8 +141,8 @@ cd python
   - [JUCE 8](https://github.com/juce-framework/JUCE), used under the
     [AGPLv3](https://www.gnu.org/licenses/agpl-3.0.html) (JUCE is dual-licensed
     AGPLv3 / commercial JUCE licence). Therefore the binaries as a whole are
-    distributed under the **AGPLv3**; the complete source code is this repository
-    plus JUCE.
+    distributed under the **AGPLv3** (full text: [LICENSE-AGPL-3.0.txt](LICENSE-AGPL-3.0.txt));
+    the complete source code is this repository plus JUCE.
   - the VST3 SDK by Steinberg (bundled with JUCE; GPLv3 option in the SDK version
     bundled with JUCE 8.0.x, MIT from VST 3.8 on) -- VST is a registered trademark
     of Steinberg Media Technologies GmbH;
