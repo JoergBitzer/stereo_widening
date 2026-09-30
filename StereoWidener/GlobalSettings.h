@@ -1,8 +1,8 @@
 /**
  * @file GlobalSettings.h
  * @brief User-wide default settings for StereoWidener (plan2.md Phase 4, "Global
- *        settings file"), loaded once at plugin startup from a small JSON file in the
- *        user's application-data folder.
+ *        settings file"), loaded once at plugin startup from a small JSON file
+ *        (settings.json) in the user preset folder (PresetHandler::getUserPresetsFolder()).
  *
  * JUCE's usual class for this job, juce::PropertiesFile, only writes XML or binary.
  * This uses juce::JSON instead (also built into juce_core, so no extra dependency) for

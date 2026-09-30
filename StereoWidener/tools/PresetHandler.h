@@ -62,7 +62,7 @@ public:
 	int changePresetCategory(String name, String category);
 
 	int deletePreset(ValueTree& newpreset);
-	File getUserPresetsFolder(bool & wasCreated);
+	static File getUserPresetsFolder(bool & wasCreated); // static: also used by GlobalSettings
 	File getFactoryPresetsFolder();
 	int savePreset(String name, String category = "Unknown", String bank = "User");
 	int savePreset(ValueTree& vt);

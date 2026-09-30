@@ -194,7 +194,9 @@ Night. See [phase6_daynight_theme.md](../docs/algorithms/phase6_daynight_theme.m
 
 See [../docs/algorithms/phase4_settings.md](../docs/algorithms/phase4_settings.md) (and
 its correction note about `lastUsedState`, removed later -- see below).
-`~/.config/StereoWidener/settings.json` (created automatically on first run) stores
+`settings.json` in the preset folder (e.g. `~/.config/Jade_Hochschule/StereoWidener/` on
+Linux; until the first 1.0.4 build `~/.config/StereoWidener/`, moved automatically;
+created on first run) stores
 user-wide preferences that aren't part of a DAW project's own saved state -- a project's
 saved parameter values and GUI size always take priority over these once they exist.
 Since v0.1.25 it holds no processing settings at all any more (the shelf gain, comb
