@@ -8,6 +8,7 @@ name: Build and release
 on:
   push:
     tags: ['v*.*.*']
+    branches: ['feature/ci-release'] # TEMPORARY: test builds before the merge, remove again
   workflow_dispatch:
 
 env:
