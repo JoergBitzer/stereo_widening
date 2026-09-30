@@ -72,13 +72,14 @@ overlays input (green) and output (blue).
 "Master - Gentle Widen"), plus a neutral "Init". Loudness changes are compensated with
 the output Gain, so presets can be compared fairly. Presets are plain XML files in
 your user preset folder; factory presets are copied there when missing and never
-overwrite a preset you saved yourself:
+overwrite a preset you saved yourself. The same folder holds `settings.json` (GUI size,
+theme, meter ballistics):
 
-| | Presets | Settings (GUI size, theme) |
-|---|---|---|
-| Windows | `%APPDATA%\Jade_Hochschule\StereoWidener\` | `%APPDATA%\StereoWidener\settings.json` |
-| macOS | `~/Library/Audio/Presets/Jade_Hochschule/StereoWidener/` | `~/Library/StereoWidener/settings.json` |
-| Linux | `~/.config/Jade_Hochschule/StereoWidener/` | `~/.config/StereoWidener/settings.json` |
+| | Presets and settings |
+|---|---|
+| Windows | `%APPDATA%\Jade_Hochschule\StereoWidener\` |
+| macOS | `~/Library/Audio/Presets/Jade_Hochschule/StereoWidener/` |
+| Linux | `~/.config/Jade_Hochschule/StereoWidener/` |
 
 ### Other
 
