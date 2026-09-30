@@ -16,9 +16,15 @@ an AI** -- see [How it was made](#how-it-was-made).
 
 ## Download
 
-Binaries for Windows, macOS and Linux: on the
-[Jade Hochschule developer page at KVR Audio](https://www.kvraudio.com/developer/jade-hochschule),
-together with the other free Jade Hochschule plugins.
+Binaries for Windows, macOS (Universal: Apple Silicon and Intel) and Linux:
+on the [GitHub Releases page](https://github.com/JoergBitzer/stereo_widening/releases)
+and on the [Jade Hochschule developer page at KVR Audio](https://www.kvraudio.com/developer/jade-hochschule),
+together with the other free Jade Hochschule plugins. Each zip contains the plugin, the
+Standalone application, the manual and the licenses.
+
+The macOS binaries are not signed with an Apple Developer ID yet. If macOS reports that
+the plugin is damaged or cannot be opened, remove the quarantine flag in the Terminal,
+e.g. `xattr -cr ~/Library/Audio/Plug-Ins/VST3/StereoWidener.vst3`.
 
 Install by copying the plugin into your plugin folder and rescanning in your DAW:
 
@@ -121,31 +127,32 @@ recordings were at hand) -- worth your own ears. Feedback is welcome.
 
 ## Build from source
 
-The plugin uses [JUCE 9](https://juce.com) (tested with 9.0.3, branch `master`) and CMake, in the AudioDev environment of
-the [AdvancedAudioTemplate](https://github.com/JoergBitzer/AdvancedAudioTemplate)
-(top-level `CMakeLists.txt`, `JUCE/`, `Libs/`):
-
-```
-AudioDev/
-├── CMakeLists.txt     # add_subdirectory(stereo_widening/StereoWidener) ...
-├── JUCE/
-├── Libs/
-└── stereo_widening/   # this repository
-```
-
-Release build (from `AudioDev/`):
+The plugin uses [JUCE 9](https://juce.com) (9.0.3, included as a git submodule) and
+CMake:
 
 ```console
-cmake -S . -B build-release -DCMAKE_BUILD_TYPE=Release
-cmake --build build-release --target StereoWidener_VST3 StereoWidener_Standalone -j8
+git clone --recursive https://github.com/JoergBitzer/stereo_widening.git
+cd stereo_widening
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --target StereoWidener_VST3 StereoWidener_Standalone
 # macOS additionally: --target StereoWidener_AU
 ```
 
-The results are in
-`build-release/stereo_widening/StereoWidener/StereoWidener_artefacts/Release/`.
+The results are in `build/StereoWidener/StereoWidener_artefacts/Release/`. Add
+`-DSTEREO_WIDENING_BUILD_EXTRAS=ON` to also build StereoAnalyzer and the test tools.
 Release (`-O3` with link-time optimisation) is the tested configuration: it produces
 bit-identical output to the Debug build and passes pluginval at strictness level 10
 (see [docs/algorithms/phase6_release_builds.md](docs/algorithms/phase6_release_builds.md)).
+
+**Releases** are built by GitHub Actions ([.github/workflows/release.yml](.github/workflows/release.yml)):
+pushing a tag `vX.Y.Z` that matches the version in `StereoWidener/CMakeLists.txt` builds
+Windows, macOS and Linux and creates a GitHub release with the zips. "Run workflow" on the
+Actions page builds without releasing.
+
+The plugin was developed in the AudioDev environment of the
+[AdvancedAudioTemplate](https://github.com/JoergBitzer/AdvancedAudioTemplate), whose
+top-level `CMakeLists.txt` adds `stereo_widening/StereoWidener` with its own `JUCE/`;
+that still works as before.
 
 ## For students and developers
 
