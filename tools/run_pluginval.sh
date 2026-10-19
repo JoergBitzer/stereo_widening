@@ -34,7 +34,10 @@ case "$(uname -s)" in
     Darwin) zipname=pluginval_macOS.zip; binary=pluginval.app/Contents/MacOS/pluginval ;;
     *)      echo "Unsupported system, use run_pluginval.ps1 on Windows"; exit 2 ;;
 esac
-cache=${XDG_CACHE_HOME:-$HOME/.cache}/pluginval
+# 2.0.0 is only published as a beta (2026-10); "releases/latest" would still give 1.0.4, which crashes now and then
+# (use-after-free in its VST3 run loop, fixed in JUCE 9.0.2). Change this to the final tag (e.g. v2.0.0) when it exists.
+pluginvalTag=v2.0.0-beta3
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/pluginval/$pluginvalTag
 if [ -n "${PLUGINVAL:-}" ]; then
     pluginval=$PLUGINVAL
 elif command -v pluginval > /dev/null; then
@@ -44,7 +47,7 @@ elif [ -x "$cache/$binary" ]; then
 else
     echo "Downloading pluginval to $cache ..."
     mkdir -p "$cache"
-    curl -sSfL -o "$cache/$zipname" "https://github.com/Tracktion/pluginval/releases/latest/download/$zipname" \
+    curl -sSfL -o "$cache/$zipname" "https://github.com/Tracktion/pluginval/releases/download/$pluginvalTag/$zipname" \
         && unzip -q -o "$cache/$zipname" -d "$cache" && rm "$cache/$zipname" || { echo "Download failed"; exit 2; }
     pluginval=$cache/$binary
 fi
@@ -57,7 +60,7 @@ failed=0
 for i in $(seq 1 "$runs"); do
     home=$(mktemp -d)
     log=$logdir/run_$i.log
-    HOME=$home "$pluginval" --strictness-level 10 --validate "$plugin" > "$log" 2>&1
+    HOME=$home "$pluginval" --strictness-level 10 validate "$plugin" > "$log" 2>&1
     rc=$?
     rm -rf "$home"
     assertions=$(grep -c "JUCE Assertion" "$log")
