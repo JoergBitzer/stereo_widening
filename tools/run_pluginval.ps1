@@ -55,7 +55,7 @@ $failed = 0
 for ($i = 1; $i -le $Runs; $i++) {
     $log = Join-Path $logdir "run_$i.log"
     # Start-Process -Wait: pluginval is a GUI application, "&" would not wait for it
-    $p = Start-Process -FilePath $pluginval -ArgumentList @("--strictness-level", "10", "validate", "`"$Plugin`"") `
+    $p = Start-Process -FilePath $pluginval -ArgumentList @("validate", "--strictness-level", "10", "`"$Plugin`"") `
                        -NoNewWindow -Wait -PassThru -RedirectStandardOutput $log -RedirectStandardError "$log.err"
     if ($p.ExitCode -eq 0) {
         Write-Host "run $i/$Runs`: SUCCESS"
