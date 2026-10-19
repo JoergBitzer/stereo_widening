@@ -101,7 +101,7 @@ void StereoWidenerAudioProcessor::setCurrentProgram (int index)
 const juce::String StereoWidenerAudioProcessor::getProgramName (int index)
 {
     juce::ignoreUnused (index);
-    return {};
+    return "Default"; // pluginval 2.x (VST3 validator) rejects a program without a name
 }
 
 void StereoWidenerAudioProcessor::changeProgramName (int index, const juce::String& newName)

@@ -26,6 +26,13 @@ if [ ! -e "$plugin" ]; then
     echo "Plugin not found: $plugin"
     exit 2
 fi
+# GUI tests must not disturb the person who works on this machine: on Linux the run goes into a virtual display (xvfb-run) if it is
+# installed and if we are not in one already. AAT_REAL_DISPLAY=1 switches this off (only for a machine nobody works at).
+if [ "$(uname -s)" = "Linux" ] && [ -z "${AAT_IN_VIRTUAL_DISPLAY:-}" ] && [ -z "${AAT_REAL_DISPLAY:-}" ] && command -v xvfb-run > /dev/null; then
+    echo "pluginval: running in a virtual display (xvfb-run)"
+    export AAT_IN_VIRTUAL_DISPLAY=1
+    exec xvfb-run -a "${BASH_SOURCE[0]}" "$@"
+fi
 plugin=$(cd "$(dirname "$plugin")" && pwd)/$(basename "$plugin") # absolute: HOME changes below
 
 # --- find or download pluginval ---

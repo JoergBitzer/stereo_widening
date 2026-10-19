@@ -97,7 +97,7 @@ void StereoAnalyzerAudioProcessor::setCurrentProgram (int index)
 const juce::String StereoAnalyzerAudioProcessor::getProgramName (int index)
 {
     juce::ignoreUnused (index);
-    return {};
+    return "Default"; // pluginval 2.x (VST3 validator) rejects a program without a name
 }
 
 void StereoAnalyzerAudioProcessor::changeProgramName (int index, const juce::String& newName)
