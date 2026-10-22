@@ -143,8 +143,9 @@ jobs:
 
       - name: Test with pluginval
         run: |
-          unzip -q "$PRODUCT-Linux.zip"
-          xvfb-run -a tools/run_pluginval.sh "$PRODUCT/$PRODUCT.vst3" 1
+          # into its own folder: the repository may have a source folder with the product name
+          unzip -q "$PRODUCT-Linux.zip" -d downloaded
+          xvfb-run -a tools/run_pluginval.sh "downloaded/$PRODUCT/$PRODUCT.vst3" 1
 
   release:
     name: Create release
