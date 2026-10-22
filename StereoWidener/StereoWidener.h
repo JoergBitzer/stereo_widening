@@ -166,9 +166,10 @@ private:
     juce::AudioParameterFloat* m_rotationParam = nullptr;
     juce::AudioParameterFloat* m_balanceParam = nullptr;
     juce::AudioParameterFloat* m_gainParam = nullptr;
-    juce::AudioParameterBool* m_invertLParam = nullptr;
-    juce::AudioParameterBool* m_invertRParam = nullptr;
-    juce::AudioParameterBool* m_swapLRParam = nullptr;
+    // on/off parameters: choices Off/On (tools/SwitchParameter.h), not AudioParameterBool (pluginval 2.x)
+    juce::AudioParameterChoice* m_invertLParam = nullptr;
+    juce::AudioParameterChoice* m_invertRParam = nullptr;
+    juce::AudioParameterChoice* m_swapLRParam = nullptr;
     juce::AudioParameterChoice* m_monitorModeParam = nullptr;
     UtilityProcessor m_utilityProcessor;
 
