@@ -2,6 +2,17 @@
 #include "StereoWidener.h"
 
 #include "PluginProcessor.h"
+#include "tools/SwitchParameter.h"
+
+namespace
+{
+// an on/off parameter made with jade::makeSwitchParameter (a choice Off/On): on = the entry "On"
+bool isOn(const juce::AudioParameterChoice* parameter)
+{
+    constexpr int kIndexOn = 1;
+    return parameter != nullptr && parameter->getIndex() == kIndexOn;
+}
+} // namespace
 
 StereoWidenerAudio::StereoWidenerAudio(StereoWidenerAudioProcessor* processor)
 :SynchronBlockProcessor(), m_processor(processor)
@@ -126,9 +137,9 @@ int StereoWidenerAudio::processSynchronBlock(juce::AudioBuffer<float> & buffer, 
     utilityParams.rotationDeg = m_rotationParam != nullptr ? m_rotationParam->get() : 0.0f;
     utilityParams.balance = m_balanceParam != nullptr ? m_balanceParam->get() * 0.01f : 0.0f; // % -> -1..1
     utilityParams.gainDb = m_gainParam != nullptr ? m_gainParam->get() : 0.0f;
-    utilityParams.invertL = m_invertLParam != nullptr && m_invertLParam->get();
-    utilityParams.invertR = m_invertRParam != nullptr && m_invertRParam->get();
-    utilityParams.swapLR = m_swapLRParam != nullptr && m_swapLRParam->get();
+    utilityParams.invertL = isOn(m_invertLParam);
+    utilityParams.invertR = isOn(m_invertRParam);
+    utilityParams.swapLR = isOn(m_swapLRParam);
     utilityParams.monitorMode = m_monitorModeParam != nullptr ? m_monitorModeParam->getIndex() : 0;
     m_utilityProcessor.process(buffer, utilityParams);
 
@@ -270,9 +281,11 @@ void StereoWidenerAudio::addParameter(std::vector<std::unique_ptr<juce::RangedAu
     paramVector.push_back(makeFloatParameter(g_paramRotation, g_paramRotation.defaultValue));
     paramVector.push_back(makeFloatParameter(g_paramBalance, g_paramBalance.defaultValue));
     paramVector.push_back(makeFloatParameterWithStep(g_paramGain, g_paramGain.defaultValue));
-    paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramInvertL.ID, g_paramInvertL.name, false));
-    paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramInvertR.ID, g_paramInvertR.name, false));
-    paramVector.push_back(std::make_unique<juce::AudioParameterBool>(g_paramSwapLR.ID, g_paramSwapLR.name, false));
+    // choices Off/On instead of AudioParameterBool: pluginval 2.x ("Discrete parameter state restoration") fails
+    // AudioParameterBool; the saved values stay 0/1, so presets and automation keep working
+    paramVector.push_back(jade::makeSwitchParameter(g_paramInvertL.ID, g_paramInvertL.name, false));
+    paramVector.push_back(jade::makeSwitchParameter(g_paramInvertR.ID, g_paramInvertR.name, false));
+    paramVector.push_back(jade::makeSwitchParameter(g_paramSwapLR.ID, g_paramSwapLR.name, false));
     paramVector.push_back(std::make_unique<juce::AudioParameterChoice>(g_paramMonitorModeID, g_paramMonitorModeName,
         g_monitorModeNames, 0));
 }
@@ -297,9 +310,9 @@ void StereoWidenerAudio::prepareParameter(std::unique_ptr<juce::AudioProcessorVa
     m_rotationParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramRotation.ID));
     m_balanceParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramBalance.ID));
     m_gainParam = dynamic_cast<juce::AudioParameterFloat*>(vts->getParameter(g_paramGain.ID));
-    m_invertLParam = dynamic_cast<juce::AudioParameterBool*>(vts->getParameter(g_paramInvertL.ID));
-    m_invertRParam = dynamic_cast<juce::AudioParameterBool*>(vts->getParameter(g_paramInvertR.ID));
-    m_swapLRParam = dynamic_cast<juce::AudioParameterBool*>(vts->getParameter(g_paramSwapLR.ID));
+    m_invertLParam = dynamic_cast<juce::AudioParameterChoice*>(vts->getParameter(g_paramInvertL.ID));
+    m_invertRParam = dynamic_cast<juce::AudioParameterChoice*>(vts->getParameter(g_paramInvertR.ID));
+    m_swapLRParam = dynamic_cast<juce::AudioParameterChoice*>(vts->getParameter(g_paramSwapLR.ID));
     m_monitorModeParam = dynamic_cast<juce::AudioParameterChoice*>(vts->getParameter(g_paramMonitorModeID));
 }
 

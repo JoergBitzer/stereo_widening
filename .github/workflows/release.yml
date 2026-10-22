@@ -61,11 +61,8 @@ jobs:
         shell: bash
         run: cmake --build build --config Release --parallel 4 --target ${{ matrix.targets }}
 
-      # pluginval (see tools/run_pluginval.*): a failing plugin stops the release
-      - name: Test with pluginval (Linux)
-        if: runner.os == 'Linux'
-        run: xvfb-run -a tools/run_pluginval.sh "$ARTEFACTS/VST3/$PRODUCT.vst3" 1
-
+      # pluginval (see tools/run_pluginval.*): a failing plugin stops the release.
+      # Linux: in the job test-linux below (pluginval 2.x needs glibc 2.38, ubuntu-22.04 has 2.35)
       - name: Test with pluginval (macOS)
         if: runner.os == 'macOS'
         run: tools/run_pluginval.sh "$ARTEFACTS/VST3/$PRODUCT.vst3" 1
@@ -125,9 +122,34 @@ jobs:
           name: ${{ env.PRODUCT }}-${{ matrix.name }}
           path: ${{ env.PRODUCT }}-${{ matrix.name }}.zip
 
+  # The Linux build runs on ubuntu-22.04 (old glibc: the plugin also runs on older distributions), but
+  # pluginval 2.0.0-beta3 needs glibc 2.38: so the Linux zip is tested here, on a newer Ubuntu.
+  test-linux:
+    name: Test Linux (pluginval)
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4 # for tools/run_pluginval.sh
+
+      - name: Install runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2t64 libfreetype6 libfontconfig1 \
+            libx11-6 libxext6 libxinerama1 libxrandr2 libxcursor1 libxcomposite1 libgl1 xvfb
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.PRODUCT }}-Linux
+
+      - name: Test with pluginval
+        run: |
+          # into its own folder: the repository may have a source folder with the product name
+          unzip -q "$PRODUCT-Linux.zip" -d downloaded
+          xvfb-run -a tools/run_pluginval.sh "downloaded/$PRODUCT/$PRODUCT.vst3" 1
+
   release:
     name: Create release
-    needs: build
+    needs: [build, test-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

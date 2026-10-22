@@ -23,7 +23,10 @@ if (-not (Test-Path $Plugin)) { Write-Host "Plugin not found: $Plugin"; exit 2 }
 $Plugin = (Resolve-Path $Plugin).Path
 
 # --- find or download pluginval ---
-$cache = Join-Path $env:LOCALAPPDATA "pluginval"
+# 2.0.0 is only published as a beta (2026-10); "releases/latest" would still give 1.0.4, which crashes now and then
+# (use-after-free in its VST3 run loop, fixed in JUCE 9.0.2). Change this to the final tag (e.g. v2.0.0) when it exists.
+$pluginvalTag = "v2.0.0-beta3"
+$cache = Join-Path (Join-Path $env:LOCALAPPDATA "pluginval") $pluginvalTag
 if ($env:PLUGINVAL) {
     $pluginval = $env:PLUGINVAL
 } elseif (Get-Command pluginval -ErrorAction SilentlyContinue) {
@@ -36,7 +39,7 @@ if ($env:PLUGINVAL) {
     $zip = Join-Path $cache "pluginval_Windows.zip"
     try {
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest -Uri "https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip" -OutFile $zip -UseBasicParsing
+        Invoke-WebRequest -Uri "https://github.com/Tracktion/pluginval/releases/download/$pluginvalTag/pluginval_Windows.zip" -OutFile $zip -UseBasicParsing
         Expand-Archive -Path $zip -DestinationPath $cache -Force
         Remove-Item $zip
     } catch { Write-Host "Download failed: $_"; exit 2 }
@@ -52,7 +55,7 @@ $failed = 0
 for ($i = 1; $i -le $Runs; $i++) {
     $log = Join-Path $logdir "run_$i.log"
     # Start-Process -Wait: pluginval is a GUI application, "&" would not wait for it
-    $p = Start-Process -FilePath $pluginval -ArgumentList @("--strictness-level", "10", "--validate", "`"$Plugin`"") `
+    $p = Start-Process -FilePath $pluginval -ArgumentList @("validate", "--strictness-level", "10", "`"$Plugin`"") `
                        -NoNewWindow -Wait -PassThru -RedirectStandardOutput $log -RedirectStandardError "$log.err"
     if ($p.ExitCode -eq 0) {
         Write-Host "run $i/$Runs`: SUCCESS"
